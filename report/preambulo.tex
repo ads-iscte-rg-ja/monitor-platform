@@ -1,0 +1,117 @@
+% ---------------------------------------------------------------------------
+% Preâmbulo: pacotes, aspeto e macros do relatório.
+% ---------------------------------------------------------------------------
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[portuguese]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[a4paper, margin=2.5cm, headheight=14pt]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% Matemática
+\usepackage{amsmath, amssymb, mathtools, bm}
+
+% Tabelas
+\usepackage{array, booktabs, tabularx, longtable, multirow, makecell}
+\usepackage{colortbl}
+\usepackage{threeparttable}
+\usepackage{pdflscape}
+
+% Figuras
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage[font=small, labelfont=bf, labelsep=period]{caption}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, shapes.multipart,
+                fit, calc, backgrounds, decorations.pathreplacing}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+
+% Diversos
+\usepackage{xcolor}
+\usepackage[inline]{enumitem}
+\usepackage{pifont}
+\usepackage{csquotes}
+\usepackage{url}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage[hidelinks, unicode, pdfusetitle]{hyperref}
+
+% ---------------------------------------------------------------------------
+% Cores (inspiradas na identidade do Iscte; ajustáveis)
+% ---------------------------------------------------------------------------
+\definecolor{iscte}{RGB}{0, 51, 102}
+\definecolor{acento}{RGB}{0, 112, 192}
+\definecolor{cinza}{RGB}{110, 110, 110}
+\definecolor{fundotab}{RGB}{235, 241, 248}
+\definecolor{bom}{RGB}{0, 128, 0}
+\definecolor{mau}{RGB}{190, 30, 45}
+\definecolor{parcial}{RGB}{200, 130, 0}
+
+% ---------------------------------------------------------------------------
+% Títulos de secção e cabeçalhos
+% ---------------------------------------------------------------------------
+\titleformat{\section}{\Large\bfseries\color{iscte}}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\bfseries\color{iscte}}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{iscte}}{\thesubsubsection}{0.8em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{cinza}\TituloCurto}
+\fancyhead[R]{\small\color{cinza}ADS --- Projeto}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Nomes em português de Portugal
+\addto\captionsportuguese{%
+  \renewcommand{\contentsname}{Índice}%
+  \renewcommand{\listfigurename}{Lista de Figuras}%
+  \renewcommand{\listtablename}{Lista de Tabelas}%
+  \renewcommand{\refname}{Referências}%
+  \renewcommand{\abstractname}{Resumo}%
+  \renewcommand{\tablename}{Tabela}%
+  \renewcommand{\figurename}{Figura}%
+  \renewcommand{\appendixname}{Anexo}%
+}
+
+% ---------------------------------------------------------------------------
+% Macros
+% ---------------------------------------------------------------------------
+% Marcas usadas nas tabelas comparativas
+\newcommand{\Sim}{\textcolor{bom}{\ding{51}}}          % abordado
+\newcommand{\Parc}{\textcolor{parcial}{\ding{108}}}    % abordado parcialmente
+\newcommand{\Nr}{\textcolor{cinza}{--}}                % não reportado
+\newcommand{\Nao}{\textcolor{mau}{\ding{55}}}          % ausente por desenho
+
+
+% Colunas de tabela
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+% Caixas de definição/observação
+\newcommand{\caixa}[2]{%
+  \begin{center}\begin{tikzpicture}
+    \node[draw=acento, fill=fundotab, rounded corners=2pt, inner sep=8pt,
+          text width=0.9\linewidth, align=justify] {\textbf{#1.}\ #2};
+  \end{tikzpicture}\end{center}}
+
+% ---------------------------------------------------------------------------
+% Macros específicas do relatório de ADS
+% ---------------------------------------------------------------------------
+% Texto ainda por escrever: aparece a vermelho para não passar despercebido.
+\newcommand{\porescrever}[1]{\textcolor{mau}{\itshape [Por escrever: #1]}}
+
+% Inclui uma tabela/figura gerada a partir das medições (make dados).
+% Se o ficheiro ainda não existir, mostra uma caixa com o nome esperado.
+\newcommand{\gerado}[1]{%
+  \IfFileExists{gerado/#1}{\input{gerado/#1}}%
+    {\caixa{Dados em falta}{\texttt{gerado/\detokenize{#1}} --- correr \texttt{make dados}.}}}
+
+% Identificadores de cenários, decisões e lacunas (ligam ao plano e aos ADRs).
+\newcommand{\cen}[1]{\textsf{#1}}
+\newcommand{\dec}[1]{\textsf{D#1}}

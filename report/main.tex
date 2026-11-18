@@ -1,0 +1,113 @@
+% ===========================================================================
+% Relatório do projeto — Arquitetura e Desenho de Software (ADS)
+% Sistema Monitor: requisitos de qualidade, decisões arquiteturais e avaliação
+%
+% Compilar:   make            (pdflatex + bibtex + pdflatex x2)
+% Dados:      make dados      (copia as tabelas geradas pelas medições; ver README.md)
+%
+% Antes de entregar: preencher os campos a vermelho (\porescrever) e os autores.
+% ===========================================================================
+\documentclass[11pt, a4paper]{article}
+
+% ----------------------------------------------------- dados da capa -------
+\newcommand{\Mestrado}{Engenharia Informática}
+\newcommand{\UnidadeCurricular}{Arquitetura e Desenho de Software}
+\newcommand{\Autores}{%
+  João Afonso, N.º 97990\\
+  \textcolor{red}{[Nome], N.º [número]}}
+\newcommand{\Docente}{Vitor Basto-Fernandes}
+\newcommand{\Titulo}{Monitor: Arquitetura Orientada a Atributos de Qualidade}
+\newcommand{\Subtitulo}{Métricas de Qualidade, Escalabilidade e Manutenção de um Sistema de Monitorização Distribuído}
+\newcommand{\Entrega}{Projeto --- entrega final}
+\newcommand{\Data}{9 de dezembro de 2026}
+\newcommand{\TituloCurto}{Monitor: arquitetura orientada a QA}
+\newcommand{\Repositorio}{https://github.com/joaoaeafonso/monitor-platform}
+
+\input{preambulo}
+
+\hypersetup{pdftitle={\Titulo: \Subtitulo}, pdfsubject={ADS -- Projeto}}
+
+% Folga extra para evitar linhas a sair da margem (termos em \texttt não hifenizam)
+\setlength{\emergencystretch}{2em}
+
+% Páginas só com tabelas/figuras começam no topo
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
+
+\begin{document}
+
+% ------------------------------------------------------------- capa -------
+\pagenumbering{Alph}
+\begin{titlepage}
+  \thispagestyle{empty}
+  \centering
+  \IfFileExists{figuras/iscte-logo.png}%
+    {\includegraphics[width=0.62\textwidth]{figuras/iscte-logo.png}}%
+    {\begin{tikzpicture}
+       \node[draw=iscte, line width=1pt, minimum width=6cm, minimum height=2.2cm,
+             text=iscte, font=\Large\bfseries] {iscte};
+     \end{tikzpicture}}
+  \par\vspace{2.2cm}
+
+  {\Large Mestrado em \Mestrado\par}
+  \vspace{0.6cm}
+  {\LARGE\bfseries\color{iscte} \UnidadeCurricular\par}
+  \vspace{1.6cm}
+
+  {\Large\bfseries \Titulo\par}
+  \vspace{0.4cm}
+  {\large \Subtitulo\par}
+  \vspace{0.6cm}
+  {\normalsize\itshape \Entrega\par}
+  \vspace{1.6cm}
+
+  \begin{flushleft}
+    \large
+    \textbf{Autores:}\\[0.2cm]
+    \Autores\\[0.8cm]
+    \textbf{Docente:} \Docente\\[0.8cm]
+    \textbf{Repositório:} \url{\Repositorio}\\[0.4cm]
+    \textbf{Data:} \Data
+  \end{flushleft}
+  \vfill
+\end{titlepage}
+
+% ---------------------------------------------------- pré-textuais --------
+\pagenumbering{roman}
+\input{seccoes/00-resumo}
+
+\clearpage
+\tableofcontents
+\clearpage
+
+% --------------------------------------------------------- texto ----------
+\pagenumbering{arabic}
+\input{seccoes/01-introducao}
+\input{seccoes/02-enquadramento}
+\input{seccoes/03-sistema}
+\input{seccoes/04-requisitos}
+\input{seccoes/05-metricas}
+\input{seccoes/06-decisoes}
+\input{seccoes/07-avaliacao}
+\input{seccoes/08-evolucao}
+\input{seccoes/09-discussao}
+\input{seccoes/10-conclusoes}
+
+% ---------------------------------------------------- referências ---------
+\clearpage
+\phantomsection
+\addcontentsline{toc}{section}{\refname}
+\bibliographystyle{IEEEtran-pt}
+\bibliography{referencias}
+
+% -------------------------------------------------------- anexos ----------
+\clearpage
+\appendix
+\renewcommand{\thesection}{\Alph{section}}
+\input{seccoes/anexo-a-reproducao}
+\input{seccoes/anexo-b-adrs}
+\input{seccoes/anexo-c-configuracao}
+
+\end{document}
