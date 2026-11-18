@@ -1,0 +1,22 @@
+# LaTeX
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.log
+report/*.out
+report/*.toc
+report/*.lof
+report/*.lot
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex.gz
+report/seccoes/*.aux
+report/main.pdf
+
+# Resultados brutos de carga (os resumos vão para docs/metrics)
+loadtest/results/
+
+# IDE / SO
+.idea/
+.vscode/
+.DS_Store
