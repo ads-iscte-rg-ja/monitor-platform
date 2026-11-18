@@ -1,0 +1,196 @@
+# Pipeline de qualidade reutilizável para todos os repositórios Go do Monitor.
+#
+# Uso (ver templates/ci.yml):
+#   jobs:
+#     go:
+#       uses: joaoaeafonso/monitor-platform/.github/workflows/go-ci.yml@v1
+#       with: { integration-packages: ./internal/integration }
+#       secrets: inherit
+#
+# Fases (docs/PLANO_MELHORIAS.md §4): higiene -> lint -> testes unitários ->
+# testes de integração -> vulnerabilidades -> SonarCloud.
+# Com lint-blocking=false (fase de baseline) o lint reporta mas não bloqueia.
+name: go-ci
+
+on:
+  workflow_call:
+    inputs:
+      integration-packages:
+        description: "Pacotes com testes de integração (-tags integration) que precisam de PostgreSQL. Vazio = não há."
+        type: string
+        default: ""
+      lint-blocking:
+        description: "true = issues novas do lint falham o pipeline; false = só reporta (baseline)."
+        type: boolean
+        default: false
+      sonar:
+        description: "Envia análise ao SonarCloud (requer sonar-project.properties e o secret SONAR_TOKEN)."
+        type: boolean
+        default: true
+      platform-ref:
+        description: "Versão do monitor-platform de onde vem a configuração de lint."
+        type: string
+        default: v1
+    secrets:
+      SONAR_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  GOWORK: "off"
+  # O detetor de races exige cgo; o remote e o SDK precisam dele para o SQLite.
+  CGO_ENABLED: "1"
+  GOLANGCI_LINT_VERSION: v2.15.0
+  GOVULNCHECK_VERSION: v1.10.0
+
+jobs:
+  hygiene:
+    name: Higiene (gofmt, go.mod)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then printf 'Ficheiros por formatar:\n%s\n' "$files"; exit 1; fi
+      - name: go mod tidy -diff
+        run: go mod tidy -diff
+      - name: go mod verify
+        run: go mod verify
+
+  lint:
+    name: Lint (golangci-lint)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # necessário para only-new-issues
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Obter configuração partilhada
+        uses: actions/checkout@v7
+        with:
+          repository: joaoaeafonso/monitor-platform
+          ref: ${{ inputs.platform-ref }}
+          path: .monitor-platform
+          sparse-checkout: lint
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        continue-on-error: ${{ !inputs.lint-blocking }}
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          only-new-issues: ${{ inputs.lint-blocking }}
+          args: >-
+            --config=.monitor-platform/lint/.golangci.yml
+            --output.text.path=stdout
+            --output.checkstyle.path=golangci-report.xml
+            --show-stats
+      - name: Guardar relatório do lint
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: golangci-report
+          path: golangci-report.xml
+          if-no-files-found: ignore
+
+  test:
+    name: Testes unitários (-race)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: go test
+        run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Cobertura total
+        run: go tool cover -func=coverage.out | tail -1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-unit
+          path: coverage.out
+
+  integration:
+    name: Testes de integração (PostgreSQL)
+    if: inputs.integration-packages != ''
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: monitor_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d monitor_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MONITOR_TEST_DSN: postgres://postgres:test@localhost:5432/monitor_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: go test -tags integration
+        # -coverpkg=./... para que os repositórios exercitados contem para a cobertura.
+        run: >-
+          go test -race -count=1 -tags integration
+          -covermode=atomic -coverpkg=./... -coverprofile=coverage-integration.out
+          ${{ inputs.integration-packages }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-integration
+          path: coverage-integration.out
+
+  vulnerabilities:
+    name: Vulnerabilidades (govulncheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: govulncheck
+        run: |
+          go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
+          govulncheck ./...
+
+  sonar:
+    name: SonarCloud
+    needs: [lint, test, integration]
+    # Corre mesmo que a integração não exista (skipped), mas só com os testes verdes.
+    if: >-
+      always() && inputs.sonar &&
+      needs.test.result == 'success' &&
+      needs.integration.result != 'failure'
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # o Sonar precisa do histórico para distinguir código novo
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "{coverage-*,golangci-report}"
+          merge-multiple: true
+      - name: Análise SonarCloud
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: >-
+            -Dsonar.qualitygate.wait=${{ inputs.lint-blocking }}
+      - name: Aviso
+        if: env.SONAR_TOKEN == ''
+        run: echo "::warning::SONAR_TOKEN não definido; análise SonarCloud ignorada."
