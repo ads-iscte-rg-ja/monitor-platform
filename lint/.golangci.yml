@@ -148,5 +148,9 @@ formatters:
     - gofmt
 
 issues:
+  # Sem limites nem deduplicação: as contagens são métricas do relatório.
+  # uniq-by-line (por omissão true) esconde o gocyclo sempre que o gocognit
+  # reporta a mesma função, porque ambos apontam para a linha da assinatura.
   max-issues-per-linter: 0
   max-same-issues: 0
+  uniq-by-line: false
