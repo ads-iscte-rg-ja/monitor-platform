@@ -21,10 +21,11 @@ Desenho de Software (ADS). A razão de existir deste repositório está no
   self-check.yml     CI deste repositório: actionlint, validação do lint, compilação do relatório
 lint/.golangci.yml   configuração única do golangci-lint (inclui as regras de camadas de todo o sistema)
 scripts/ci-local.sh  as mesmas verificações do CI, para correr localmente
+scripts/medir.py     mede os 4 repositórios e gera as tabelas do relatório (docs/metrics/)
 templates/           ficheiros a copiar para cada repositório (ci.yml, dependabot.yml, sonar-project.properties)
 e2e/                 testes ponta a ponta com os 4 componentes (Docker Compose)
 loadtest/            testes de carga k6 e geração das tabelas do relatório
-tools/               ferramentas de medição (ex.: acoplamento entre pacotes)
+tools/codemetrics/   acoplamento entre pacotes (Martin) e complexidade por função
 docs/
   PLANO_MELHORIAS.md plano de melhoria arquitetural (requisitos, métricas, decisões, roadmap)
   adr/               registo de decisões arquiteturais
@@ -59,6 +60,12 @@ Ferramentas, com as mesmas versões do CI:
 ```sh
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+```
+
+## Medir
+
+```sh
+scripts/medir.py baseline     # ou iter-N; detalhes em docs/metrics/README.md
 ```
 
 ## Relatório
