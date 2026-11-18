@@ -27,6 +27,10 @@ on:
         description: "Envia análise ao SonarCloud (requer sonar-project.properties e o secret SONAR_TOKEN)."
         type: boolean
         default: true
+      sibling-repos:
+        description: "Repositórios (dono/nome, separados por espaço) a clonar ao lado deste, para diretivas replace => ../<nome>. Temporário até o SDK ter versões publicadas."
+        type: string
+        default: ""
       platform-ref:
         description: "Versão do monitor-platform de onde vem a configuração de lint."
         type: string
@@ -51,6 +55,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Repositórios irmãos
+        if: inputs.sibling-repos != ''
+        env:
+          SIBLINGS: ${{ inputs.sibling-repos }}
+        run: |
+          for repo in $SIBLINGS; do
+            git clone --depth 1 "https://github.com/${repo}.git" "../${repo#*/}"
+          done
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -80,6 +92,14 @@ jobs:
           ref: ${{ inputs.platform-ref }}
           path: .monitor-platform
           sparse-checkout: lint
+      - name: Repositórios irmãos
+        if: inputs.sibling-repos != ''
+        env:
+          SIBLINGS: ${{ inputs.sibling-repos }}
+        run: |
+          for repo in $SIBLINGS; do
+            git clone --depth 1 "https://github.com/${repo}.git" "../${repo#*/}"
+          done
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -107,6 +127,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Repositórios irmãos
+        if: inputs.sibling-repos != ''
+        env:
+          SIBLINGS: ${{ inputs.sibling-repos }}
+        run: |
+          for repo in $SIBLINGS; do
+            git clone --depth 1 "https://github.com/${repo}.git" "../${repo#*/}"
+          done
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -137,6 +165,14 @@ jobs:
       MONITOR_TEST_DSN: postgres://postgres:test@localhost:5432/monitor_test?sslmode=disable
     steps:
       - uses: actions/checkout@v7
+      - name: Repositórios irmãos
+        if: inputs.sibling-repos != ''
+        env:
+          SIBLINGS: ${{ inputs.sibling-repos }}
+        run: |
+          for repo in $SIBLINGS; do
+            git clone --depth 1 "https://github.com/${repo}.git" "../${repo#*/}"
+          done
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -156,6 +192,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Repositórios irmãos
+        if: inputs.sibling-repos != ''
+        env:
+          SIBLINGS: ${{ inputs.sibling-repos }}
+        run: |
+          for repo in $SIBLINGS; do
+            git clone --depth 1 "https://github.com/${repo}.git" "../${repo#*/}"
+          done
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
