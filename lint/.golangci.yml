@@ -1,0 +1,152 @@
+# Configuração ÚNICA do golangci-lint para todos os repositórios Monitor.
+#
+# Usada pelo workflow reutilizável (.github/workflows/go-ci.yml) e localmente
+# por scripts/ci-local.sh. Cada métrica está ligada a um atributo de qualidade
+# (ver docs/PLANO_MELHORIAS.md §4.1, abordagem GQM).
+#
+# Versão fixada: golangci-lint v2.15.0 (ver actions/setup-go e scripts/ci-local.sh).
+version: "2"
+
+run:
+  timeout: 5m
+  # Inclui os testes de integração do central na análise.
+  build-tags:
+    - integration
+
+linters:
+  default: none
+  enable:
+    # Modifiability: conformidade com a arquitetura de módulos (Restrict Dependencies).
+    - depguard
+    # Modifiability: legibilidade (complexidade cognitiva) e duplicação.
+    - gocognit
+    - dupl
+    # Testability: número de caminhos a testar (complexidade ciclomática).
+    - gocyclo
+    # Reliability: bugs detetáveis estaticamente, erros ignorados, código morto.
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    # Security: padrões inseguros (SQL, TLS, permissões, aleatoriedade).
+    - gosec
+    # Maintainability: convenções e nomes.
+    - revive
+
+  settings:
+    gocognit:
+      # 15 = valor por omissão do SonarCloud, para local e remoto concordarem.
+      min-complexity: 15
+    gocyclo:
+      # McCabe recomenda 10; em Go cada `if err != nil` soma 1, por isso 15.
+      min-complexity: 15
+    dupl:
+      threshold: 100
+
+    # ------------------------------------------------------------------
+    # Regras de camadas de TODO o sistema: especificação executável da
+    # module view (docs/PLANO_MELHORIAS.md §5.1). Cada regra está limitada
+    # aos ficheiros de um pacote e proíbe imports de pacotes concretos do
+    # mesmo módulo; por isso as regras do central nunca disparam no remote.
+    # ------------------------------------------------------------------
+    depguard:
+      rules:
+        # ===== monitor-central (Layered: handlers -> services -> repositories) =====
+        central-handlers:
+          list-mode: lax
+          files: ["**/internal/handlers/**"]
+          deny:
+            - pkg: monitor-central/internal/repositories
+              desc: "handlers usam services; o acesso a dados pertence à camada de repositórios"
+            - pkg: monitor-central/internal/database
+              desc: "handlers não acedem à BD; usar um service (ex.: HealthService)"
+        central-services:
+          list-mode: lax
+          files: ["**/internal/services/**"]
+          deny:
+            - pkg: monitor-central/internal/handlers
+              desc: "services não conhecem a camada HTTP"
+            - pkg: monitor-central/internal/server
+              desc: "services não conhecem a composição da aplicação"
+            - pkg: monitor-central/internal/templating
+              desc: "services não renderizam páginas"
+            - pkg: monitor-central/internal/database
+              desc: "services usam interfaces de repositório, não a BD"
+        central-repositories:
+          list-mode: lax
+          files: ["**/internal/repositories/**"]
+          deny:
+            - pkg: monitor-central/internal/services
+              desc: "dependência para cima: repositórios não usam services"
+            - pkg: monitor-central/internal/handlers
+              desc: "dependência para cima: repositórios não usam handlers"
+            - pkg: monitor-central/internal/server
+              desc: "dependência para cima"
+        central-models:
+          list-mode: lax
+          files: ["**/internal/models/**"]
+          deny:
+            - pkg: monitor-central/internal/handlers
+              desc: "models é a base: não depende de nenhuma camada"
+            - pkg: monitor-central/internal/services
+              desc: "models é a base: não depende de nenhuma camada"
+            - pkg: monitor-central/internal/repositories
+              desc: "models é a base: não depende de nenhuma camada"
+            - pkg: monitor-central/internal/database
+              desc: "models é a base: não depende de nenhuma camada"
+
+        # ===== monitor-remote (sender orquestra; os restantes não se conhecem) =====
+        remote-requests:
+          list-mode: lax
+          files: ["**/internal/requests/**"]
+          deny:
+            - pkg: monitor-remote/internal/repository
+              desc: "o cliente HTTP não conhece o buffer; o sender orquestra"
+            - pkg: monitor-remote/internal/database
+              desc: "o cliente HTTP não conhece o buffer"
+            - pkg: monitor-remote/internal/sender
+              desc: "dependência circular conceptual"
+        remote-repository:
+          list-mode: lax
+          files: ["**/internal/repository/**"]
+          deny:
+            - pkg: monitor-remote/internal/requests
+              desc: "o buffer não conhece o transporte"
+            - pkg: monitor-remote/internal/sender
+              desc: "dependência para cima"
+        remote-collect:
+          list-mode: lax
+          files: ["**/internal/collect/**"]
+          deny:
+            - pkg: monitor-remote/internal/requests
+              desc: "a recolha não envia; o sender envia"
+            - pkg: monitor-remote/internal/sender
+              desc: "a recolha não envia; o sender envia"
+        remote-validation:
+          list-mode: lax
+          files: ["**/internal/validation/**"]
+          deny:
+            - pkg: monitor-remote/internal/requests
+              desc: "regras de domínio não dependem do transporte"
+            - pkg: monitor-remote/internal/repository
+              desc: "regras de domínio não dependem do armazenamento"
+            - pkg: monitor-remote/internal/sender
+              desc: "regras de domínio não dependem da orquestração"
+
+  exclusions:
+    presets:
+      - comments
+      - std-error-handling
+    rules:
+      # Testes podem repetir tabelas de casos e ter funções longas.
+      - path: _test\.go
+        linters: [dupl, gocognit, gocyclo, gosec, errcheck]
+
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
