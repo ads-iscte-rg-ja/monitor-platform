@@ -11,5 +11,116 @@
 \porescrever{monitor-platform, workflow reutilizável, gates no código novo (ADR-0002).}
 
 \subsection{Baseline}
+\label{sec:baseline}
+
+Antes de qualquer alteração arquitetural mediu-se o sistema tal como estava (iteração~0).
+Sem este ponto de partida, as decisões do capítulo~\ref{sec:decisoes} não poderiam ser avaliadas
+com números, só com afirmações. A medição é automática (\texttt{scripts/medir.py baseline}) e regista
+os \emph{commits} medidos e as versões das ferramentas, para se poder repetir
+(anexo~\ref{anx:reproducao}). Foram medidos os quatro repositórios. Os resultados mais importantes estão no
+\texttt{monitor-central}, que tem cerca de 75\,\% do código de produção, e no \texttt{monitor-remote},
+que corre em todos os \emph{hosts}.
+
+\paragraph{Lint e conformidade arquitetural.}
+A Tabela~\ref{tab:baseline-lint} mostra 66 \emph{issues} no central e 29 no remote. Quase todas são
+de manutenção e não defeitos: convenções (\texttt{revive}, 19 no central), erros ignorados
+(\texttt{errcheck} e \texttt{gosec} G104, que em boa parte coincidem) e complexidade
+(\texttt{gocognit} e \texttt{gocyclo}). O resultado mais relevante para a arquitetura é haver
+\textbf{uma única violação de camadas}: \texttt{handlers/health.go} importa diretamente
+\texttt{internal/database}, saltando as camadas de serviço e de repositório. A arquitetura em camadas
+do central está, portanto, praticamente respeitada. Até aqui isso era só uma convenção; o
+\texttt{depguard} passa a verificá-lo a cada \emph{pull request}. As duas ocorrências de \texttt{gosec}
+com mais peso para a segurança são falsos positivos já mitigados no código. O G201
+(\texttt{repositories/retention.go}) monta SQL apenas com constantes da aplicação e passa os valores
+como parâmetros. O G703 (\texttt{templating/pages/pages.go}) já valida o caminho com
+\texttt{filepath.Rel} e verifica que se trata de um ficheiro regular. Vão ser marcados com uma
+justificação explícita, para a exceção ficar registada e não se tornar ruído permanente.
+
 \gerado{baseline-lint.tex}
+
+\paragraph{Complexidade.}
+Em média, as funções são simples: complexidade ciclomática de 4,2 no central e 5,8 no remote
+(Tabela~\ref{tab:baseline-complexidade}). A dificuldade de manutenção está concentrada em poucas
+funções. No central, 5 das 237 funções (2\,\%) passam o limite ciclomático de 15 e 10 (4\,\%) passam o
+limite cognitivo. No remote a proporção é maior: 6 das 64 funções (9\,\%) passam o limite cognitivo.
+Os casos extremos são \texttt{(DB).Migrate} no central (99 linhas, ciclomática 30, cognitiva 46) e
+\texttt{deliverBatch} no remote (ciclomática 14, cognitiva 33). Este segundo caso fica precisamente
+no caminho de entrega de dados, que as decisões de escalabilidade vão alterar.
+
+As duas métricas divergem de forma útil, e é por isso que se usam as duas. \texttt{validateAlert} tem
+ciclomática 23 e cognitiva 23. É uma sequência plana de validações sem aninhamento, por isso a
+cognitiva não passa da ciclomática: o custo está sobretudo nos muitos caminhos para testar. \texttt{(HostHealthService).Check} tem ciclomática 12, mas cognitiva 26, porque o
+aninhamento torna-a difícil de compreender, embora não tenha muitos caminhos. A complexidade
+ciclomática~\cite{mccabe1976} indica o esforço de \textbf{teste}; a cognitiva~\cite{campbell2018}
+indica o esforço de \textbf{leitura}. \texttt{validateAlert} e
+\texttt{(AlertsService).EvaluateMetricAlerts} (cognitiva 23) ramificam sobre o tipo de métrica. São
+exatamente o código que a decisão \dec{13} substitui pelo padrão Strategy. A baseline dá, assim, a
+medida de partida do cenário de modificabilidade \cen{MO1}.
+
+\gerado{baseline-complexidade.tex}
+
+\paragraph{Cobertura de testes.}
+A cobertura unitária do central é de 25,9\,\% (Tabela~\ref{tab:baseline-cobertura}). Contando também
+os testes de integração com PostgreSQL, sobe para 40,3\,\%. A medição com integração é feita com
+\texttt{-coverpkg=./...}, para que um teste conte para todos os pacotes que exercita. A distribuição
+por pacote (Tabela~\ref{tab:baseline-cobertura-central}) diz mais do que o total:
+\begin{itemize}
+  \item \texttt{services} tem 71--73\,\%. A lógica de negócio é a parte mais bem testada.
+  \item \texttt{repositories} só é exercitado pela integração (0\,\% $\to$ 38,7\,\%). Isto confirma que
+        a camada de dados não tem testes unitários, porque depende de uma base de dados real.
+  \item \texttt{handlers} fica em 16,1\,\% e \texttt{server} em 0\,\%, mesmo somando a integração.
+        A camada HTTP, que é a fronteira com os agentes e com o \emph{dashboard}, é a menos testada.
+        Os \emph{handlers} dependem de \emph{services} concretos, e por isso testá-los obriga a montar
+        o sistema inteiro. É este o problema que \dec{14} resolve: interfaces do lado de quem consome
+        e relógio injetável.
+\end{itemize}
+O remote tem 68\,\% de cobertura unitária e o SDK não tem testes. Uma percentagem global mais alta não
+foi tomada como objetivo em si. O que se pretende é testar o código novo e o caminho crítico
+(ingestão e entrega), que é o que o \emph{quality gate} do SonarCloud verifica.
+
 \gerado{baseline-cobertura.tex}
+
+\paragraph{Vulnerabilidades.}
+O govulncheck só reporta vulnerabilidades em funções efetivamente \textbf{chamadas} pelo código, o que
+reduz o ruído. Mesmo assim, encontrou 52 no central, 37 no remote e uma no SDK e no hello-world. Todas
+vêm da biblioteca padrão, exceto duas. A causa é a configuração, não o código: os \texttt{go.mod}
+declaram \texttt{go 1.25.0} e o CI instala exatamente essa versão, que é anterior a vários patches de
+segurança. A imagem de produção (\texttt{golang:1.25-alpine}) já usa o último patch, mas o CI deve
+analisar a versão declarada e não a que, por acaso, foi usada na compilação. A correção, que é a
+primeira ação da iteração~1, é declarar \texttt{toolchain go1.25.\emph{x}} nos quatro módulos. As
+duas restantes, ambas no central, são reais: estão em \texttt{golang.org/x/text} e resolvem-se
+atualizando a dependência. Este resultado justifica ter o govulncheck no CI e o Dependabot a propor
+atualizações. Nenhuma das duas situações era visível sem uma ferramenta.
+
+\paragraph{Acoplamento.}
+As Tabelas~\ref{tab:baseline-acoplamento-central} e~\ref{tab:baseline-acoplamento-remote}
+aplicam as métricas de Martin~\cite{martin2002}. No central, a estrutura corresponde ao esperado numa
+arquitetura em camadas:
+\begin{itemize}
+  \item \texttt{server} (Ce = 10, I = 0,91) é a raiz de composição. É instável por natureza, e isso não
+        é um problema.
+  \item \texttt{services} é o único pacote com abstração relevante (A = 0,47), porque declara as
+        interfaces dos repositórios de que precisa (inversão de dependências). É, por isso, o pacote
+        mais próximo da sequência principal (D = 0,10).
+  \item \texttt{models} e \texttt{config} têm D = 1: são estáveis e concretos, a chamada \emph{zona de
+        dor}. Para pacotes de dados e configuração isto é aceitável, porque raramente mudam de forma
+        incompatível.
+  \item \texttt{database} tem Ca = 8. Fora dos repositórios, quem depende dele (o \emph{handler} em
+        violação, o \emph{seed} e os comandos) terá de ser revisto quando o esquema mudar (\dec{9}).
+\end{itemize}
+No remote a distância média é maior (0,66 contra 0,52). Nenhum pacote declara interfaces, exceto
+\texttt{collect}, e o \texttt{sender} (Ce = 4) depende diretamente do buffer SQLite e do cliente
+HTTP concretos. Trocar o buffer ou simular falhas de rede num teste obriga, por isso, a alterar ou
+a montar estas implementações. Os números confirmam a lacuna de testabilidade que \dec{14} trata.
+
+\gerado{baseline-acoplamento.tex}
+
+\paragraph{Síntese.}
+Os resultados da baseline originam quatro ações na iteração~1, por ordem de custo e benefício:
+(1)~declarar a \emph{toolchain} e atualizar \texttt{x/text}, o que trata as 91 vulnerabilidades
+reportadas nos quatro repositórios (89 da biblioteca padrão e 2 de \texttt{x/text}) e deve deixar o CI
+verde; (2)~criar um \texttt{HealthService}, eliminando a única violação de
+camadas; (3)~testar o SDK, que é a peça que as aplicações dos utilizadores incorporam; e
+(4)~documentar as exceções do \texttt{gosec}. As refatorações de complexidade não são tratadas
+isoladamente. Fazem parte das decisões que tocam essas funções (\dec{5}, \dec{13}, \dec{19}), e o
+efeito vai ser medido na tabela antes/depois do capítulo~\ref{sec:avaliacao}.
