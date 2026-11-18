@@ -1,0 +1,50 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Acoplamento entre pacotes do \texttt{monitor-central} (baseline)}
+  \label{tab:baseline-acoplamento-central}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Pacote & Ca & Ce & I & A & D \\
+    \midrule
+    \texttt{deployments/database} & 1 & 0 & 0.00 & 0.00 & 1.00 \\
+    \texttt{config} & 14 & 0 & 0.00 & 0.00 & 1.00 \\
+    \texttt{database} & 8 & 3 & 0.27 & 0.50 & 0.23 \\
+    \texttt{handlers} & 1 & 6 & 0.86 & 0.00 & 0.14 \\
+    \texttt{models} & 5 & 0 & 0.00 & 0.00 & 1.00 \\
+    \texttt{repositories} & 3 & 4 & 0.57 & 0.00 & 0.43 \\
+    \texttt{seed} & 2 & 4 & 0.67 & 0.00 & 0.33 \\
+    \texttt{server} & 1 & 10 & 0.91 & 0.00 & 0.09 \\
+    \texttt{services} & 4 & 3 & 0.43 & 0.47 & 0.10 \\
+    \texttt{templating/pages} & 2 & 1 & 0.33 & 0.00 & 0.67 \\
+    \texttt{utils} & 0 & 0 & --- & 0.00 & --- \\
+    \texttt{utils/apikey} & 6 & 0 & 0.00 & 0.00 & 1.00 \\
+    \texttt{utils/email} & 1 & 2 & 0.67 & 0.00 & 0.33 \\
+    \texttt{utils/middleware} & 1 & 4 & 0.80 & 0.50 & 0.30 \\
+    \texttt{utils/session} & 3 & 2 & 0.40 & 0.00 & 0.60 \\
+    \bottomrule
+  \end{tabular}
+  \par\smallskip\footnotesize Ca/Ce: acoplamento aferente/eferente dentro do módulo; I = Ce/(Ca+Ce); A = interfaces/tipos; D = $|A+I-1|$ \cite{martin2002}.
+\end{table}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Acoplamento entre pacotes do \texttt{monitor-remote} (baseline)}
+  \label{tab:baseline-acoplamento-remote}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Pacote & Ca & Ce & I & A & D \\
+    \midrule
+    \texttt{database} & 1 & 0 & 0.00 & 0.00 & 1.00 \\
+    \texttt{collect} & 1 & 1 & 0.50 & 0.25 & 0.25 \\
+    \texttt{config} & 2 & 0 & 0.00 & 0.00 & 1.00 \\
+    \texttt{database} & 2 & 1 & 0.33 & 0.00 & 0.67 \\
+    \texttt{models} & 5 & 0 & 0.00 & 0.00 & 1.00 \\
+    \texttt{repository} & 2 & 1 & 0.33 & 0.00 & 0.67 \\
+    \texttt{requests} & 2 & 2 & 0.50 & 0.00 & 0.50 \\
+    \texttt{sender} & 1 & 4 & 0.80 & 0.00 & 0.20 \\
+    \texttt{validation} & 2 & 1 & 0.33 & 0.00 & 0.67 \\
+    \bottomrule
+  \end{tabular}
+  \par\smallskip\footnotesize Ca/Ce: acoplamento aferente/eferente dentro do módulo; I = Ce/(Ca+Ce); A = interfaces/tipos; D = $|A+I-1|$ \cite{martin2002}.
+\end{table}
+

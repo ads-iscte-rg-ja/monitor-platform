@@ -1,0 +1,20 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Métricas de código (baseline)}
+  \label{tab:metricas-antes-depois}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Métrica & central & remote & SDK & hello-world \\
+    \midrule
+    Issues de lint & 66 & 29 & 4 & 1 \\
+    Violações de camadas & 1 & 0 & 0 & 0 \\
+    Funções ciclomática $>15$ & 5 & 3 & 0 & 0 \\
+    Funções cognitiva $>15$ & 10 & 6 & 0 & 1 \\
+    Blocos duplicados & 3 & 2 & 0 & 0 \\
+    Cobertura unit.\ (\%) & 25.9 & 68.0 & 0.0 & 56.8 \\
+    Cobertura + integr.\ (\%) & 40.3 & --- & --- & --- \\
+    Vulnerabilidades alcançáveis & 52 & 37 & 1 & 1 \\
+    Distância média D & 0.52 & 0.66 &  &  \\
+    \bottomrule
+  \end{tabular}
+\end{table}
