@@ -621,7 +621,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Decisão:**
   * remover `ErrorLogCollector`;
   * derivar `protectedPaths` das rotas;
-  * módulo do SDK passa a `github.com/rmgh97/monitor-go-sdk` (os repos vão ser públicos aí);
+  * módulo do SDK passa a `github.com/ads-iscte-rg-ja/monitor-go-sdk` (organização GitHub do projeto, onde os repos vão ser públicos);
   * `go.work` na raiz para remote, SDK e hello-world;
   * LICENSE (MIT) nos 4 repos antes de os tornar públicos;
   * testes do SDK;

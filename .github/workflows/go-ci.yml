@@ -3,7 +3,7 @@
 # Uso (ver templates/ci.yml):
 #   jobs:
 #     go:
-#       uses: joaoaeafonso/monitor-platform/.github/workflows/go-ci.yml@v1
+#       uses: ads-iscte-rg-ja/monitor-platform/.github/workflows/go-ci.yml@v1
 #       with: { integration-packages: ./internal/integration }
 #       secrets: inherit
 #
@@ -88,7 +88,7 @@ jobs:
       - name: Obter configuração partilhada
         uses: actions/checkout@v7
         with:
-          repository: joaoaeafonso/monitor-platform
+          repository: ads-iscte-rg-ja/monitor-platform
           ref: ${{ inputs.platform-ref }}
           path: .monitor-platform
           sparse-checkout: lint
