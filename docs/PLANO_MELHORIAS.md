@@ -429,7 +429,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
   **Medir a baseline antes de mudar código** (iteração 0), para o relatório ter **antes/depois**.
 * **Teoria:** *Restrict Dependencies* tornado verificável; testabilidade (slide 03); *generate and test* (slide 06).
 * **Alternativas e trade-offs:** ver §4.2. O custo é mais um passo no CI (~1–2 min).
-* **Verificação:** o *quality gate* aparece no PR; existe um relatório de baseline commitado em `docs/architecture/metrics/`.
+* **Verificação:** o *quality gate* aparece no PR; existe um relatório de baseline commitado em `docs/metrics/`.
 
 #### D3. CI em todos os repos
 * **Problema:** M1, TE1.
@@ -553,7 +553,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
   * `setup()` regista N hosts via seed e obtém as chaves;
   * thresholds no próprio script (`p(95)<300`, `http_req_failed<0.001`).
 
-  Os resultados (JSON + capturas Grafana) ficam em `docs/architecture/metrics/` para cada iteração.
+  Os resultados (JSON + capturas Grafana) ficam em `docs/metrics/` para cada iteração.
 * **Teoria:** QA analysis por medição (slide 04: *"analysis later in the life cycle yields higher confidence"*); *generate and test*.
 * **Verificação:** o relatório final traz uma tabela de cenários com valor medido antes e depois de D5–D9.
 
@@ -759,7 +759,7 @@ de implementação**. Num relatório de arquitetura isso conta como trabalho de 
 4. Se uma decisão Must derrapar mais de 1 dia, baixa para Should e é documentada como desenhada, sem implementação.
 
 ### 11.3 Ritual por decisão (Agile + ADD, slide 06)
-ADR → código → PR com review cruzado → métricas medidas de novo → nota em `docs/architecture/metrics/`.
+ADR → código → PR com review cruzado → métricas medidas de novo → nota em `docs/metrics/`.
 
 ---
 

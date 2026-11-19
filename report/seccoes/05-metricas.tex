@@ -83,14 +83,16 @@ foi tomada como objetivo em si. O que se pretende é testar o código novo e o c
 \paragraph{Vulnerabilidades.}
 O govulncheck só reporta vulnerabilidades em funções efetivamente \textbf{chamadas} pelo código, o que
 reduz o ruído. Mesmo assim, encontrou 52 no central, 37 no remote e uma no SDK e no hello-world. Todas
-vêm da biblioteca padrão, exceto duas. A causa é a configuração, não o código: os \texttt{go.mod}
-declaram \texttt{go 1.25.0} e o CI instala exatamente essa versão, que é anterior a vários patches de
-segurança. A imagem de produção (\texttt{golang:1.25-alpine}) já usa o último patch, mas o CI deve
-analisar a versão declarada e não a que, por acaso, foi usada na compilação. A correção, que é a
-primeira ação da iteração~1, é declarar \texttt{toolchain go1.25.\emph{x}} nos quatro módulos. As
-duas restantes, ambas no central, são reais: estão em \texttt{golang.org/x/text} e resolvem-se
-atualizando a dependência. Este resultado justifica ter o govulncheck no CI e o Dependabot a propor
-atualizações. Nenhuma das duas situações era visível sem uma ferramenta.
+vêm da biblioteca padrão, exceto duas. A causa é a versão da linguagem, não o código: os
+\texttt{go.mod} declaram \texttt{go 1.25.0}, o CI instala essa versão e a imagem de produção
+(\texttt{golang:1.25-alpine}) usa a mesma linha. O Go só suporta as duas versões mais recentes
+(1.26 e 1.27), e parte destas correções só foi publicada na 1.26; por isso nem o último patch da 1.25
+as resolve, e a produção estava tão exposta como o CI. A correção, primeira ação da iteração~1, é
+declarar \texttt{toolchain go1.27.4} nos quatro módulos e compilar a imagem com a mesma versão, para
+que o CI teste e analise exatamente o Go que vai para produção. As duas restantes, ambas no central,
+estão em \texttt{golang.org/x/text} e resolvem-se com a v0.41.0, a menor versão que corrige as duas
+sem subir a versão mínima da linguagem. Nenhuma destas situações era visível sem uma ferramenta, o que
+justifica o govulncheck no CI e o Dependabot a propor atualizações.
 
 \paragraph{Acoplamento.}
 As Tabelas~\ref{tab:baseline-acoplamento-central} e~\ref{tab:baseline-acoplamento-remote}

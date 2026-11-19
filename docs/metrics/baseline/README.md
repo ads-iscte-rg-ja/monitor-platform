@@ -47,6 +47,12 @@ Gerado com `scripts/medir.py baseline`.
    Há **2 vulnerabilidades reais de dependências** no central (`golang.org/x/text`: GO-2026-5970 e
    GO-2026-6629). **Ação:** atualizar o `x/text`. O Dependabot também o vai propor.
 
+   **Correção (19/11, ao executar a iteração 1):** a premissa sobre a imagem de produção estava
+   errada. O Go só suporta as duas últimas versões (1.26 e 1.27), e parte das correções só existe na
+   1.26: a linha 1.25, incluindo o último patch, continua vulnerável. Ação aplicada: `toolchain
+   go1.27.4` nos 4 `go.mod` e imagem `golang:1.27.4-alpine`; `x/text` v0.41.0 (a menor versão que
+   corrige as duas, mantendo `go 1.25.0`). Resultado em `../iter-1/`.
+
 5. **gosec: dois prováveis falsos positivos para documentar.** O `G201` em `repositories/retention.go:55`
    formata SQL, mas só com constantes da aplicação; os valores vão como parâmetros `$1`/`$2`. O `G703` em
    `templating/pages/pages.go:135,140` já está mitigado com `filepath.Rel` e uma verificação de

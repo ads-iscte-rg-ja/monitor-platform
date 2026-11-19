@@ -19,7 +19,7 @@ golangci-lint (configuração partilhada lint/.golangci.yml), govulncheck, go te
 tools/codemetrics (acoplamento de Martin e complexidade ciclomática por função).
 
 Os testes de integração do central usam um PostgreSQL 16 temporário em Docker.
-O govulncheck corre com a versão de Go declarada no go.mod, a mesma que o CI instala.
+O govulncheck corre com a versão de Go do go.mod (toolchain, ou go), a mesma que o CI instala.
 """
 
 from __future__ import annotations
@@ -86,7 +86,10 @@ def tex(s: object) -> str:
 
 
 def go_version(repo: Path) -> str:
-    m = re.search(r"^go (\S+)", (repo / "go.mod").read_text(), re.M)
+    """Versão de Go que o CI instala: a da diretiva `toolchain`, se existir; senão a de `go`
+    (a mesma regra do actions/setup-go com go-version-file)."""
+    gomod = (repo / "go.mod").read_text()
+    m = re.search(r"^toolchain go(\S+)", gomod, re.M) or re.search(r"^go (\S+)", gomod, re.M)
     return m.group(1)
 
 
@@ -371,12 +374,12 @@ def ambiente(saida: Path) -> None:
         ref = sh(["git", "rev-parse", "--short", "HEAD"], repo).strip()
         ramo = sh(["git", "branch", "--show-current"], repo).strip()
         sujo = " (com alterações por commitar)" if sh(["git", "status", "--porcelain"], repo).strip() else ""
-        linhas.append(f"{r}: {ramo}@{ref}{sujo}, go.mod go {go_version(repo)}")
+        linhas.append(f"{r}: {ramo}@{ref}{sujo}, Go {go_version(repo)}")
     linhas.append("go (medição): " + sh(["go", "version"], WS).strip())
     linhas.append("golangci-lint: " + sh(["golangci-lint", "version", "--short"], WS).strip())
     versao = sh(["govulncheck", "-version"], WS).splitlines()
     linhas.append("govulncheck: " + next((l for l in versao if l.startswith("Scanner")), "?"))
-    linhas.append("govulncheck corre com GOTOOLCHAIN = versão do go.mod (a que o CI instala)")
+    linhas.append("govulncheck corre com GOTOOLCHAIN = toolchain (ou go) do go.mod, a versão que o CI instala")
     cpu = next((l.split(":", 1)[1].strip() for l in Path("/proc/cpuinfo").read_text().splitlines()
                 if l.startswith("model name")), "?") if Path("/proc/cpuinfo").exists() else "?"
     linhas.append(f"cpu: {cpu} ({os.cpu_count()} threads)")
