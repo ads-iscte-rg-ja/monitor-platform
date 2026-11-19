@@ -1,0 +1,17 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Sensibilidade ao perfil de logs}
+  \label{tab:carga-sensibilidade}
+  \begin{tabular}{lrrrrrr}
+    \toprule
+     & \multicolumn{3}{c}{iter-3} & \multicolumn{3}{c}{iter-4} \\
+    Logs & ×1 & ×2 & ×5 & ×1 & ×2 & ×5 \\
+    \midrule
+    p95 da ingestão (agente) & 6 ms & 9 ms & 10 ms & 5 ms & 5 ms & 5 ms \\
+    CPU média do central & 4\,\% & 5\,\% & 8\,\% & 3\,\% & 3\,\% & 4\,\% \\
+    Atraso p95 (exceto rajada) & 6 ms & 10 ms & 10 ms & 5 ms & 5 ms & 6 ms \\
+    Pedidos não OK & 0,00\,\% & 0,00\,\% & 0,00\,\% & 0,00\,\% & 0,00\,\% & 0,00\,\% \\
+    Cumpre SC1 & \Sim & \Sim & \Sim & \Sim & \Sim & \Sim \\
+    \bottomrule
+  \end{tabular}
+\end{table}

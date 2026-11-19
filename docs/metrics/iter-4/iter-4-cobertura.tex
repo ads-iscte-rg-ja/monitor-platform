@@ -1,0 +1,44 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Dimensão e cobertura de testes (iter-4)}
+  \label{tab:iter-4-cobertura}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Repositório & LOC prod. & LOC testes & Statements & Unit.\ (\%) & + Integr.\ (\%) \\
+    \midrule
+    central & 7486 & 2877 & 2620 & 32.1 & 48.3 \\
+    remote & 1909 & 1458 & 720 & 68.9 & --- \\
+    SDK & 131 & 153 & 75 & 89.3 & --- \\
+    hello-world & 74 & 133 & 37 & 56.8 & --- \\
+    \bottomrule
+  \end{tabular}
+  \par\smallskip\footnotesize LOC: linhas não vazias. \emph{+ Integr.}: testes unitários e de integração (PostgreSQL) com \texttt{-coverpkg=./...}.
+\end{table}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Cobertura por pacote do \texttt{monitor-central} (iter-4)}
+  \label{tab:iter-4-cobertura-central}
+  \begin{tabular}{lrrr}
+    \toprule
+    Pacote & Statements & Unit.\ (\%) & + Integr.\ (\%) \\
+    \midrule
+    \texttt{config} & 143 & 45.5 & 68.5 \\
+    \texttt{database} & 173 & 0.0 & 59.5 \\
+    \texttt{grpcapi} & 116 & 97.4 & 97.4 \\
+    \texttt{handlers} & 303 & 5.9 & 5.9 \\
+    \texttt{models} & 2 & 0.0 & 50.0 \\
+    \texttt{observability} & 88 & 93.2 & 93.2 \\
+    \texttt{repositories} & 517 & 0.0 & 46.4 \\
+    \texttt{seed} & 44 & 0.0 & 70.5 \\
+    \texttt{server} & 307 & 15.3 & 15.3 \\
+    \texttt{services} & 574 & 71.8 & 73.0 \\
+    \texttt{templating/pages} & 79 & 69.6 & 69.6 \\
+    \texttt{utils} & 22 & 0.0 & 0.0 \\
+    \texttt{utils/apikey} & 12 & 0.0 & 83.3 \\
+    \texttt{utils/email} & 23 & 0.0 & 0.0 \\
+    \texttt{utils/middleware} & 29 & 0.0 & 0.0 \\
+    \texttt{utils/session} & 23 & 52.2 & 52.2 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -1,0 +1,5 @@
+pacote,ficheiro,linha,funcao,linhas,ciclomatica,cognitiva
+.,main.go,18,main,13,2,1
+.,main.go,32,env,6,2,1
+.,main.go,39,run,33,11,18
+.,main.go,73,capturePanic,8,2,2

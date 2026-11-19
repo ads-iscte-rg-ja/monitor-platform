@@ -1,0 +1,12 @@
+package,ca,ce,instability,types,interfaces,abstractness,distance
+cmd/agent,0,6,1.00,0,0,0.00,0.00
+cmd/seed/main,0,2,1.00,0,0,0.00,0.00
+database,1,0,0.00,0,0,0.00,1.00
+internal/collect,1,1,0.50,4,1,0.25,0.25
+internal/config,2,0,0.00,1,0,0.00,1.00
+internal/database,2,1,0.33,0,0,0.00,0.67
+internal/models,5,0,0.00,3,0,0.00,1.00
+internal/repository,2,1,0.33,3,0,0.00,0.67
+internal/requests,3,2,0.40,2,0,0.00,0.60
+internal/sender,1,4,0.80,2,0,0.00,0.20
+internal/validation,2,1,0.33,1,0,0.00,0.67
