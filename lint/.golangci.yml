@@ -65,12 +65,25 @@ linters:
               desc: "handlers usam services; o acesso a dados pertence à camada de repositórios"
             - pkg: monitor-central/internal/database
               desc: "handlers não acedem à BD; usar um service (ex.: HealthService)"
+        central-grpcapi:
+          # Transporte gRPC da ingestão (ADR-0003): mesma camada que os handlers HTTP.
+          list-mode: lax
+          files: ["**/internal/grpcapi/**"]
+          deny:
+            - pkg: monitor-central/internal/repositories
+              desc: "a camada de transporte usa services; o acesso a dados pertence aos repositórios"
+            - pkg: monitor-central/internal/database
+              desc: "a camada de transporte não acede à BD"
+            - pkg: monitor-central/internal/handlers
+              desc: "transportes independentes: gRPC não depende do HTTP"
         central-services:
           list-mode: lax
           files: ["**/internal/services/**"]
           deny:
             - pkg: monitor-central/internal/handlers
               desc: "services não conhecem a camada HTTP"
+            - pkg: monitor-central/internal/grpcapi
+              desc: "services não conhecem a camada gRPC"
             - pkg: monitor-central/internal/server
               desc: "services não conhecem a composição da aplicação"
             - pkg: monitor-central/internal/templating
