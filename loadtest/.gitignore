@@ -1,3 +1,4 @@
 .carga.env
 dados/
 results/
+__pycache__/

@@ -11,6 +11,7 @@ Processo em [ADR-0001](0001-registar-decisoes-com-adrs.md); modelo em [0000-mode
 | [0005](0005-escritas-em-lote.md) | Escritas em lote na ingestão e na resolução de alertas | Aceite | Scalability |
 | [0006](0006-controlo-de-admissao.md) | Controlo de admissão na ingestão, com ligações reservadas para o resto do central | Aceite | Scalability, Availability |
 | [0007](0007-central-escalavel-horizontalmente.md) | Central com várias instâncias: liderança por *job*, limites partilhados e balanceador | Aceite | Scalability, Availability, Security |
+| [0008](0008-metricas-de-alerta-como-strategy.md) | Métricas de alerta como Strategy, com um registo como Simple Factory | Aceite | Modifiability |
 
 ## Por escrever
 

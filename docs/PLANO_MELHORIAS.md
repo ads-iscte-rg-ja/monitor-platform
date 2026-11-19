@@ -624,6 +624,10 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Alternativas rejeitadas:** avaliar em Go com queries por métrica (N×M queries, contra D5); motor de regras
   configurável na BD (custo de introduzir o mecanismo ≫ ritmo de mudança; slide 03).
 * **Verificação:** MO1 medido (ficheiros e tempo) e registado no ADR.
+* **Estado (20/11):** implementado ([ADR-0008](adr/0008-metricas-de-alerta-como-strategy.md)). Linha de base de MO1:
+  7 sítios em 5 ficheiros e 3 camadas por métrica nova; agora, 1 ficheiro + 1 migração. Uma consulta constante
+  por métrica (6 por ciclo, *set-based*) em vez de SQL montado. `for_seconds` (US1) **não** implementado, com
+  gatilho (alertas falsos por picos isolados). A medição de MO1 faz-se em D17 (`buffer_quarantined`).
 
 #### D14. Testabilidade: interfaces nos handlers, relógio injetável, timezone configurável
 * **Problema:** M5, M6, TE2, TE3; **MO3** (EUVI muda a UI → os handlers têm de ser testáveis em isolamento).

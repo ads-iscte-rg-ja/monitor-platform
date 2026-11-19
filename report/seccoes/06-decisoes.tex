@@ -290,7 +290,93 @@ lida, e só depois a chave é verificada na base de dados.
         correspondência direta de códigos.
 \end{itemize}
 
-\porescrever{\dec{12}--\dec{15}.}
+\subsubsection{Métricas de alerta como Strategy (\dec{13}, ADR-0008)}
+\label{sec:d13}
+
+\paragraph{Problema.}
+\cen{MO1} pede que uma métrica de alerta nova se faça sem tocar no avaliador genérico, com no máximo três
+ficheiros Go e uma migração. Antes desta decisão, contámos o que uma métrica nova exigia: \textbf{7 sítios em 5
+ficheiros e 3 camadas}. No serviço, a lista de métricas válidas, as regras do limiar, a formatação e um caso
+especial da comparação; no repositório, um ramo do \texttt{CASE} da consulta de avaliação e a condição de
+frescura; na apresentação, a lista e o texto de ajuda do formulário; e o \texttt{CHECK} da base de dados. Era
+baixa coesão: o que pertence a uma métrica estava espalhado, e cada métrica nova obrigava a mudar o avaliador.
+
+\paragraph{Decisão.}
+Cada métrica passa a ser uma estratégia que implementa a interface \texttt{Metric}, no seu próprio ficheiro, e
+regista-se num registo que a devolve pelo nome (Figura~\ref{fig:d13}). O serviço valida, compara e formata
+através da interface; o formulário gera a lista e a ajuda a partir do registo; o repositório pede a cada
+métrica a sua consulta. Cada métrica fornece a consulta completa que devolve as suas regras com o valor atual,
+juntada em tempo de compilação a partir de blocos constantes partilhados. A avaliação faz uma consulta por
+métrica (seis), qualquer que seja o número de regras, e continua \emph{set-based} (\dec{5}). Nenhum SQL é
+montado em tempo de execução. O \texttt{CHECK} da base de dados mantém-se como defesa em profundidade, e um teste
+de integração compara-o com o registo: uma métrica nova sem a migração é apanhada pelos testes.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}[
+      cls/.style={draw=iscte, fill=fundotab, rectangle split, rectangle split parts=2,
+                  font=\scriptsize\ttfamily, align=left, inner sep=3pt},
+      cliente/.style={draw=iscte, fill=white, rounded corners=2pt, font=\scriptsize\ttfamily, minimum height=6mm},
+      usa/.style={-{Stealth[length=2mm]}, thick, iscte},
+      impl/.style={-{Triangle[open, length=2.5mm, width=2.5mm]}, thick, dashed, iscte}]
+    \node[cls] (metric) {\textbf{«interface» Metric}
+      \nodepart{second} Name(), Help()\\ValidThreshold(t)\\Breached(cond, v, t)\\Format(v), FormatThreshold(cond, t)\\Query() (sql, args)};
+    \node[cls, below left=9mm and 4mm of metric] (machine) {machineMetric\nodepart{second}cpu, ram, disk};
+    \node[cls, below=9mm of metric] (errors) {errorRate, errorLevel\nodepart{second}erros por minuto; nível $\ge$};
+    \node[cls, below right=9mm and 4mm of metric] (offline) {hostOffline\nodepart{second}minutos sem contacto};
+    \draw[impl] (machine.north) -- (metric.south west);
+    \draw[impl] (errors.north) -- (metric.south);
+    \draw[impl] (offline.north) -- (metric.south east);
+    \node[cliente, left=18mm of metric] (reg) {registo: Lookup, All, Names};
+    \draw[usa] (reg) -- node[above, font=\scriptsize\rmfamily] {devolve} (metric);
+    \node[cliente, above=7mm of reg.north west, anchor=south west] (svc) {AlertsService};
+    \node[cliente, right=3mm of svc] (repo) {AlertsRepository};
+    \node[cliente, right=3mm of repo] (form) {formulário};
+    \draw[usa] (svc) -- (reg);
+    \draw[usa] (repo) -- (reg);
+    \draw[usa] (form) -- (reg);
+  \end{tikzpicture}
+  \caption{\dec{13}: as métricas de alerta como estratégias, obtidas pelo nome a partir de um registo}
+  \label{fig:d13}
+\end{figure}
+
+\paragraph{Teoria.}
+O padrão \emph{Strategy} (GoF): uma família de algoritmos (calcular, validar, comparar e formatar uma métrica)
+encapsulada atrás de uma interface, e o avaliador depende só da abstração. O registo é uma \emph{Simple Factory}:
+devolve a estratégia a partir do nome guardado na base de dados. É \emph{program to an interface} e o princípio
+\emph{open/closed}: o avaliador fica fechado a alterações e aberto a métricas novas. Nas táticas de
+modificabilidade, \emph{Increase Cohesion} (o que muda junto fica junto) e \emph{Reduce Coupling} (o avaliador não
+conhece as métricas).
+
+\paragraph{O que ficou de fora, e porquê.}
+O plano previa também uma duração mínima por regra (\texttt{for\_seconds}): só alertar se a violação se mantiver,
+para evitar alertas por picos isolados. O cenário correspondente tem prioridade baixa (M,L), e a funcionalidade
+exige guardar o início de cada violação e mudar o formulário. Fica desenhada no ADR, com o gatilho: alertas
+falsos por picos isolados reportados pelos utilizadores.
+
+\paragraph{Alternativas.}
+Juntar fragmentos SQL num único \texttt{CASE} em tempo de execução daria uma só consulta, mas com SQL montado em
+tempo de execução, que a análise estática (Sonar, regra S2077) assinala. Calcular os valores em Go faria uma
+consulta por regra, contra \dec{5}. Uma consulta única com todos os valores possíveis obrigaria a mudá-la por
+cada métrica que precise de um dado novo, voltando a mexer no avaliador. Um motor de regras configurável na base
+de dados custaria muito mais do que o ritmo a que as métricas mudam.
+
+\paragraph{Trade-offs.}
+A estratégia conhece o SQL do seu próprio valor, o que põe SQL fora da camada de repositórios. É o preço de
+\cen{MO1}: a alternativa voltaria a separar o que muda junto. O SQL fica confinado ao pacote
+\texttt{alertmetric}, e uma regra de camadas no lint impede esse pacote de depender do resto do central. A
+avaliação passa de uma consulta para seis por ciclo, todas \emph{set-based}; a um ciclo a cada 15~s, o custo não
+se compara com o da ingestão.
+
+\paragraph{Verificação.}
+Antes da refatoração, escrevemos um teste de caracterização: num PostgreSQL real, fixa o valor que cada uma das
+seis métricas calcula e as regras que ficam de fora (estatísticas com mais de 5~minutos, regras desativadas). O
+teste passou antes e depois da mudança. Cada estratégia tem testes unitários, e um teste compara o registo com o
+\texttt{CHECK} da base de dados. A refatoração baixou também as \emph{issues} de lint do central de 56 para 54,
+porque a validação das regras deixou de estar acima dos limites de complexidade. A medição de \cen{MO1}, com uma
+métrica nova real, é feita com \dec{17}.
+
+\porescrever{\dec{12}, \dec{14}, \dec{15}.}
 
 \subsection{Disponibilidade e monitorabilidade}
 \porescrever{\dec{16}--\dec{17}.}
