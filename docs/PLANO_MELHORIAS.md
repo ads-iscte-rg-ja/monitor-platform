@@ -134,7 +134,7 @@ Utility
 │   ├── SE2 (M,M) XSS/clickjacking no dashboard → bloqueado por CSP e frame-ancestors
 │   └── SE3 (M,M) Health endpoint para metadados de cloud ou loopback → rejeitado
 ├── Interoperability
-│   └── IO1 (L,M) Agente noutra linguagem implementável só com OpenAPI + fixtures
+│   └── IO1 (L,M) Agente noutra linguagem implementável só com o `.proto` do monitor-api (ADR-0003)
 └── Usability (tratada em EUVI)
     └── US1 (M,L) Pico de 1 amostra → sem alerta se se exigir duração sustentada
 ```
@@ -580,13 +580,15 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 
 #### D11. Contrato de ingestão explícito com códigos de erro
 * **Problema:** M2, MO2. Acoplamento semântico escondido: mudar o texto de uma mensagem no central quebra silenciosamente o remote.
-* **Decisão:** campo `code` estável no erro (`future_timestamp`, `invalid_cpu_percent`, …), de forma aditiva
-  e compatível com v1. O remote decide pelo `code`. `docs/api/ingest-v1.yaml` (OpenAPI 3.1) passa a ser a
-  especificação normativa, e as **fixtures JSON partilhadas** são testadas nos dois lados.
+* **Decisão (revista a 19/11, [ADR-0003](adr/0003-contrato-ingestao-grpc.md)):** contrato em **gRPC/protobuf**
+  no repositório `monitor-api`, versionado por tags e usado pelo central e pelo remote. Os erros levam um
+  `RejectionReason` estável (enum); o remote decide só por ele. Os endpoints HTTP de ingestão são removidos.
+  *Decisão original, substituída:* campo `code` no JSON + OpenAPI 3.1 + fixtures partilhadas.
 * **Teoria:** Interoperability → *Manage Interfaces*, interoperabilidade **semântica** (slide 03);
   Modifiability → *Encapsulate*, *Reduce Coupling*.
-* **Alternativas rejeitadas:** módulo Go partilhado de tipos (acopla ciclos de release, quebra `GOWORK=off`
-  e impede IO1); gRPC (mudança de tecnologia sem ASR; slide 03: *"standards shouldn't drive the architecture"*).
+* **Alternativas rejeitadas:** ver ADR-0003 (D11 original com OpenAPI; `.proto` dentro do central; cópias do
+  `.proto`; HTTP e gRPC em paralelo). A rejeição inicial do gRPC ("mudança de tecnologia sem ASR") foi revista:
+  o ASR é MO2/M2, e o gRPC resolve-o com o compilador em vez de uma especificação ao lado do código.
 * **Verificação:** um teste de contrato falha quando há divergência; mudar uma mensagem não muda o comportamento.
 
 #### D12. Fonte única para regras de domínio
