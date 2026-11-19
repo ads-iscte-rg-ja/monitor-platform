@@ -196,9 +196,9 @@ Para não medir "porque a ferramenta mede", cada métrica responde a uma pergunt
 | Modifiability | Uma mudança tem de ser repetida em vários sítios? | % de linhas duplicadas (código novo) | ≤3% | SonarQube Cloud (+ `dupl` local) |
 | Modifiability | As camadas respeitam a arquitetura? | Violações de dependência entre camadas | **0** | `depguard` (golangci-lint) |
 | Modifiability | O acoplamento entre pacotes está a crescer? | Ca, Ce e instabilidade I = Ce/(Ca+Ce) por pacote | tendência, sem gate | script `tools/coupling` (`go list -deps -json`) |
-| Maintainability (global) | A dívida técnica está controlada? | *Technical debt ratio* / *Maintainability rating* | ≤5% / **A** | SonarQube Cloud |
+| ~~Maintainability (global)~~ | ~~A dívida técnica está controlada?~~ | ~~*Technical debt ratio* / *Maintainability rating*~~ | — | **Retirada** (19/11): 0,0% / A nos 4 repos na baseline, apesar de 66 issues e cognitiva até 46; não discrimina. A pergunta passa a ser respondida pelas métricas de modifiability (relatório §5.1) |
 | Testability | O código novo está testado? | Cobertura de linhas no **código novo** | ≥80% | `go test -coverprofile` (unit + integração) → SonarQube Cloud |
-| Testability | Todo o sistema está testado? | Cobertura global | ≥60% no fim (baseline 25,8% central) | idem |
+| Testability | Todo o sistema está testado? | Cobertura global (unitária e com integração) | tendência, sem gate (baseline central: 25,9% unit, 40,3% com integração) | idem |
 | Testability | Os testes detetam faltas a sério? | *Mutation score* (amostra: services) | reportado, sem gate | `gremlins` (só na avaliação final) |
 | Reliability | Há bugs detetáveis estaticamente? | Issues de staticcheck/errcheck; *data races* | 0 | golangci-lint; `go test -race` |
 | Security | Há vulnerabilidades conhecidas **alcançáveis**? | Vulns alcançáveis no call graph | 0 | `govulncheck` |

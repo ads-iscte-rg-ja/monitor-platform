@@ -2,10 +2,128 @@
 \label{sec:metricas}
 
 \subsection{Seleção das métricas (GQM)}
-\porescrever{tabela objetivo--pergunta--métrica--limite (plano §4.1) e separação entre métricas principais e gates.}
+\label{sec:gqm}
+
+Para não medir só porque uma ferramenta o permite, cada métrica foi derivada pelo método
+\emph{Goal--Question--Metric}~\cite{basili1994}. Cada objetivo é um atributo de qualidade, cada pergunta
+concretiza-o, e uma métrica só entra se responder a uma pergunta. Há dois tipos de métricas, e o
+relatório trata-os em separado:
+\begin{itemize}
+  \item \textbf{métricas de execução}, que são as \emph{response measures} dos cenários (latência,
+        débito, perdas). Avaliam os atributos que só se observam com o sistema a correr: escalabilidade,
+        disponibilidade e desempenho;
+  \item \textbf{métricas de código} (complexidade, duplicação, acoplamento, cobertura, vulnerabilidades).
+        São \emph{proxies} dos atributos de desenvolvimento: modificabilidade e testabilidade.
+\end{itemize}
+A Tabela~\ref{tab:gqm} mostra o resultado. A coluna \emph{Uso} separa os \textbf{gates}, que bloqueiam um
+\emph{pull request}, das métricas de \textbf{tendência}, que são reportadas na comparação antes/depois
+do capítulo~\ref{sec:avaliacao} mas não bloqueiam nada. Uma métrica é \emph{gate} só quando tem um
+limite objetivo e aplicável a cada alteração; o acoplamento, por exemplo, não tem um valor certo
+absoluto, e o que interessa é a evolução.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Métricas derivadas por GQM}
+  \label{tab:gqm}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}Xll>{\raggedright\arraybackslash}p{0.16\linewidth}}
+    \toprule
+    Pergunta & Métrica & Limite & Uso & Ferramenta \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Modifiability}} \\
+    As funções são fáceis de compreender? & Complexidade cognitiva por função & $\le 15$ & \emph{gate} & gocognit \\
+    Há funções com caminhos a mais para testar? & Complexidade ciclomática por função & $\le 15$ & \emph{gate} & gocyclo \\
+    Uma mudança repete-se em vários sítios? & \% de linhas duplicadas & $\le 3\,\%$ & \emph{gate} & dupl, SonarQube Cloud \\
+    As camadas são respeitadas? & Violações de dependência entre camadas & 0 & \emph{gate} & depguard \\
+    O acoplamento está a crescer? & Ca, Ce, I, A e D por pacote~\cite{martin2002} & --- & tendência & codemetrics \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Testability}} \\
+    O código novo está testado? & Cobertura do código novo & $\ge 80\,\%$ & \emph{gate} & go test, SonarQube Cloud \\
+    O sistema está testado? & Cobertura global (unitária e com integração) & --- & tendência & go test \\
+    Os testes detetam faltas? & \emph{Mutation score} (amostra) & --- & tendência & gremlins \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Reliability}} \\
+    Há defeitos detetáveis sem executar? & \emph{Issues} de errcheck, govet, staticcheck & 0 novos & \emph{gate} & golangci-lint \\
+    Há acessos concorrentes inseguros? & \emph{Data races} nos testes & 0 & \emph{gate} & go test -race \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Security}} \\
+    Há vulnerabilidades conhecidas alcançáveis? & Vulnerabilidades no grafo de chamadas & 0 & \emph{gate} & govulncheck \\
+    Há padrões de código inseguros? & \emph{Issues} gosec por triar & 0 & \emph{gate} & gosec, SonarQube Cloud \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Scalability, Availability}} \\
+    Quanto aguenta o sistema? & Débito, p95/p99, \% de 429/5xx, atraso de ingestão & cenários & tendência & k6, Prometheus \\
+    Perde-se ou duplica-se dados? & Enviados vs.\ recebidos; duplicados & 0 / 0 & tendência & teste E2E \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Limites.}
+McCabe recomenda complexidade ciclomática até 10~\cite{mccabe1976}, mas em Go cada
+\texttt{if err != nil} soma um, e esse limite penalizaria código idiomático; usa-se 15. A complexidade
+cognitiva~\cite{campbell2018} é a principal das duas porque não penaliza o tratamento de erros linear e
+mede melhor o esforço de leitura. O limite de 15 é o valor por omissão do SonarQube Cloud, para que a
+análise local e a remota concordem. Os limites de cobertura (80\,\%) e duplicação (3\,\%) aplicam-se só
+ao código novo, pela razão explicada na secção~\ref{sec:pipeline}.
+
+\paragraph{Porque a cobertura não chega.}
+A cobertura mede o que foi executado, não o que foi verificado: um teste sem asserções aumenta a
+cobertura sem detetar nada. A testabilidade é a probabilidade de um teste revelar uma falta que
+exista~\cite{bastofernandes2026}, e é isso que o \emph{mutation score} aproxima. Por ser lento, é
+medido numa amostra (os \emph{services} do central) e só na avaliação final.
+
+\paragraph{Uma métrica prevista que se revelou inútil.}
+O plano previa o \emph{technical debt ratio} do SonarQube Cloud ($\le 5\,\%$, \emph{rating} A) como
+resposta à pergunta ``a dívida técnica está controlada?''. Na baseline deu 0,0\,\% nos quatro
+repositórios, apesar de 66 \emph{issues} de lint e de funções com complexidade cognitiva até 46
+(secção~\ref{sec:baseline}): as regras da ferramenta para Go são poucas, e a métrica não distingue código
+bom de mau neste sistema. Foi retirada da tabela. A pergunta passa a ser respondida pelas métricas de
+modificabilidade acima, que a baseline mostrou serem sensíveis aos problemas reais.
 
 \subsection{Ferramentas e alternativas}
-\porescrever{golangci-lint, SonarQube Cloud, govulncheck, k6, Prometheus; alternativas rejeitadas (plano §4.2).}
+\label{sec:ferramentas}
+
+Cada ferramenta foi escolhida para medir uma ou mais métricas da Tabela~\ref{tab:gqm}. Três critérios
+pesaram em todas as escolhas: medir \textbf{o mesmo} no portátil e no CI, para os números serem
+reproduzíveis; ter custo de operação nulo, porque a equipa tem duas pessoas e três semanas; e dar
+resultados que se possam exportar para as tabelas do relatório. A Tabela~\ref{tab:ferramentas} resume as
+escolhas e as alternativas rejeitadas.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Ferramentas escolhidas e alternativas rejeitadas}
+  \label{tab:ferramentas}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
+    \toprule
+    Necessidade & Escolha & Porquê & Rejeitadas \\
+    \midrule
+    Lint e métricas de código & golangci-lint v2.15.0 & Agrega os \emph{linters} da Tabela~\ref{tab:gqm} num só passo, com uma configuração única para os quatro repositórios, igual no portátil e no CI & Cada \emph{linter} isolado: mais configuração e resultados inconsistentes \\
+    Acoplamento e complexidade de todas as funções & codemetrics (própria, ${\sim}250$ linhas, só biblioteca padrão) & Ca, Ce, I, A e D por pacote e a ciclomática de \emph{todas} as funções, em CSV para as tabelas & Não há ferramenta Go mantida para as métricas de Martin; o golangci-lint só reporta as funções acima do limite \\
+    Segunda opinião, histórico, PR & SonarQube Cloud & Motor e regras diferentes do lint; analisa SQL, JavaScript e HTML; \emph{quality gate} no código novo; histórico público & SonarQube \emph{self-hosted}: mais um serviço a manter. Prescindir dele: ver texto \\
+    Vulnerabilidades & govulncheck v1.10.0 + Dependabot & Base oficial do Go; só reporta o que é alcançável no grafo de chamadas. O Dependabot propõe as atualizações & Só alertas do Dependabot: reportam tudo o que está no \texttt{go.mod}, mesmo o inalcançável \\
+    Testes de carga & k6 & Cenários em código, \emph{thresholds} (p95, \% de erros) que decidem o resultado, imagem Docker & JMeter: cenários em XML/GUI. Locust: \emph{thresholds} não nativos. vegeta: só taxa constante \\
+    Métricas de execução & Prometheus (\texttt{/metrics}) + Grafana opcional & Formato padrão; histogramas dão p95/p99; custo nulo quando ninguém lê & Só logs: não dão percentis. OpenTelemetry completo: mais peças do que o necessário (evolução E6) \\
+    \emph{Mutation testing} & gremlins & Funciona com módulos Go atuais e \texttt{go test} & Mutação manual: não escala \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Porque o SonarQube Cloud, se o lint já mede quase tudo.}
+Antes de o integrar, ponderou-se prescindir dele. O lint, o govulncheck e as métricas próprias já
+cobrem a complexidade, a duplicação, os padrões inseguros e o acoplamento, e a cobertura do código novo
+pode ser verificada por uma ferramenta local. Ficaria sem a análise de uma ferramenta exterior à equipa,
+sem análise das linguagens que não são Go e sem histórico consultável. A baseline confirmou que estas
+diferenças importam. O SonarQube Cloud chegou de forma independente aos mesmos dois falsos positivos de
+segurança e encontrou três problemas em SQL, JavaScript e HTML que as ferramentas de Go não veem
+(secção~\ref{sec:baseline}). A divisão de papéis ficou, por isso, assim: os \emph{gates} são das ferramentas que
+correm também localmente, e o SonarQube Cloud é a segunda opinião, o histórico e o \emph{dashboard}. É
+gratuito, sem limite de projetos, para repositórios públicos.
+
+\paragraph{Versões fixadas.}
+As versões do golangci-lint e do govulncheck estão fixadas no pipeline e no script de medição, e a do
+Go está declarada em cada \texttt{go.mod} (diretiva \texttt{toolchain}). Uma versão nova de uma
+ferramenta pode mudar as contagens sem que o código mude, e isso estragaria a comparação
+antes/depois. As atualizações passam, por isso, a ser alterações explícitas e revistas. O govulncheck é
+instalado com a versão de Go de que precisa, mas analisa com a versão do projeto: são as vulnerabilidades
+dessa versão que interessam, porque é ela que vai para produção.
 
 \subsection{Pipeline de integração contínua}
 \label{sec:pipeline}
@@ -184,10 +302,8 @@ ferramenta, sem o relatório do lint, e funciona por isso como uma opinião inde
 (valores em \texttt{docs/metrics/baseline/sonar.csv}). No remote, no SDK e no hello-world não encontrou
 nenhum problema. A duplicação é de 1,9\,\% no central e nula nos restantes, abaixo do limite de 3\,\%:
 os três casos do \texttt{dupl} no central são locais e a duplicação não é um problema do sistema. O
-\emph{maintainability rating} é A, com \emph{technical debt ratio} de 0,0\,\%, nos quatro repositórios.
-Como as regras do SonarQube Cloud para Go são poucas, esta métrica não distingue código bom de mau neste
-sistema. A pergunta GQM sobre dívida técnica passa, por isso, a ser respondida pelas contagens do lint e
-pela complexidade, e não pelo \emph{rating}.
+\emph{maintainability rating} é A, com \emph{technical debt ratio} de 0,0\,\%, nos quatro repositórios,
+o que levou a retirar esta métrica do GQM (secção~\ref{sec:gqm}).
 
 O central teve \emph{rating} E em fiabilidade e em segurança, o pior da escala, por causa de oito
 \emph{issues}. A Tabela~\ref{tab:baseline-sonar} mostra a triagem.
