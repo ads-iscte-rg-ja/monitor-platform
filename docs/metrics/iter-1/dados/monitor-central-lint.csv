@@ -1,0 +1,61 @@
+linter,ficheiro,linha,mensagem
+dupl,internal/handlers/alerts.go,160,160-213 lines are duplicate of `internal/handlers/alerts.go:315-374`
+dupl,internal/handlers/alerts.go,315,315-374 lines are duplicate of `internal/handlers/hosts.go:123-177`
+dupl,internal/handlers/hosts.go,123,123-177 lines are duplicate of `internal/handlers/alerts.go:160-213`
+errcheck,internal/database/migrate.go,25,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repositories/alerts.go,181,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repositories/alerts.go,394,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repositories/hosts.go,144,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repositories/monitoring.go,35,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repositories/monitoring.go,62,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repositories/notifications.go,19,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repositories/retention.go,28,Error return value of `tx.Rollback` is not checked
+errcheck,internal/seed/admin.go,19,Error return value of `tx.Rollback` is not checked
+errcheck,internal/seed/demo.go,18,Error return value of `tx.Rollback` is not checked
+gocognit,cmd/key-secret/main.go,21,cognitive complexity 22 of func `configureSecret` is high (> 15)
+gocognit,internal/database/migrate.go,17,cognitive complexity 46 of func `(*DB).Migrate` is high (> 15)
+gocognit,internal/database/postgres.go,162,cognitive complexity 17 of func `scanRows` is high (> 15)
+gocognit,internal/seed/demo.go,13,cognitive complexity 24 of func `Demo` is high (> 15)
+gocognit,internal/server/server.go,43,cognitive complexity 16 of func `New` is high (> 15)
+gocognit,internal/services/alerts.go,77,cognitive complexity 23 of func `validateAlert` is high (> 15)
+gocognit,internal/services/alerts.go,167,cognitive complexity 23 of func `(*AlertsService).EvaluateMetricAlerts` is high (> 15)
+gocognit,internal/services/host_health.go,69,cognitive complexity 26 of func `(*HostHealthService).Check` is high (> 15)
+gocognit,internal/templating/pages/pages.go,26,cognitive complexity 17 of func `NewPageBox` is high (> 15)
+gocognit,internal/templating/pages/pages.go,112,cognitive complexity 19 of func `(*PageBox).MountStatic` is high (> 15)
+gocyclo,cmd/key-secret/main.go,21,cyclomatic complexity 18 of func `configureSecret` is high (> 15)
+gocyclo,internal/database/migrate.go,17,cyclomatic complexity 30 of func `(*DB).Migrate` is high (> 15)
+gocyclo,internal/services/alerts.go,77,cyclomatic complexity 23 of func `validateAlert` is high (> 15)
+gocyclo,internal/services/host_health.go,19,cyclomatic complexity 19 of func `validateHostHealth` is high (> 15)
+gocyclo,internal/services/ingestion.go,91,cyclomatic complexity 20 of func `prepareMachineStat` is high (> 15)
+gosec,cmd/key-secret/main.go,22,G304: Potential file inclusion via variable
+gosec,cmd/key-secret/main.go,65,G104: Errors unhandled
+gosec,cmd/key-secret/main.go,69,G104: Errors unhandled
+gosec,internal/config/config.go,76,G304: Potential file inclusion via variable
+gosec,internal/database/migrate.go,85,G104: Errors unhandled
+gosec,internal/database/migrate.go,91,G104: Errors unhandled
+gosec,internal/templating/pages/pages.go,61,G304: Potential file inclusion via variable
+govet,internal/database/postgres.go,81,inline: Constant reflect.Ptr should be inlined
+govet,internal/database/postgres.go,164,inline: Constant reflect.Ptr should be inlined
+govet,internal/database/postgres.go,172,inline: Constant reflect.Ptr should be inlined
+revive,internal/database/postgres.go,17,"blank-imports: a blank import should be only in a main or test package, or have a comment justifying it"
+revive,internal/server/routes.go,127,"unused-parameter: parameter 'handler' seems to be unused, consider removing or renaming it as _"
+revive,internal/server/routes.go,127,"unused-parameter: parameter 'middlewares' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/dashboard_test.go,27,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/dashboard_test.go,33,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/dashboard_test.go,39,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/dashboard_test.go,45,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/dashboard_test.go,51,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/dashboard_test.go,57,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/error_logs_test.go,53,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/error_logs_test.go,82,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/error_logs_test.go,93,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/error_logs_test.go,155,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/error_logs_test.go,156,"unused-parameter: parameter 'filters' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/error_logs_test.go,163,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/error_logs_test.go,170,"unused-parameter: parameter 'ctx' seems to be unused, consider removing or renaming it as _"
+revive,internal/services/host_test.go,34,"unused-parameter: parameter 'id' seems to be unused, consider removing or renaming it as _"
+revive,internal/utils/session/manager.go,16,"exported: type name will be used as session.SessionConfig by other packages, and that stutters; consider calling this Config"
+revive,internal/utils/session/manager.go,38,"exported: type name will be used as session.SessionManager by other packages, and that stutters; consider calling this Manager"
+staticcheck,internal/database/postgres.go,91,"QF1008: could remove embedded field ""DB"" from selector"
+staticcheck,internal/database/postgres.go,132,"QF1008: could remove embedded field ""DB"" from selector"
+staticcheck,internal/database/postgres.go,143,"QF1008: could remove embedded field ""DB"" from selector"

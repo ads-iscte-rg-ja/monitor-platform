@@ -1,0 +1,2 @@
+linter,ficheiro,linha,mensagem
+gocognit,main.go,39,cognitive complexity 18 of func `run` is high (> 15)
