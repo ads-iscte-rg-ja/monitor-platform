@@ -158,3 +158,16 @@ issues:
   max-issues-per-linter: 0
   max-same-issues: 0
   uniq-by-line: false
+
+# Severidade no relatório checkstyle. O SonarQube Cloud usa-a para classificar os issues
+# importados: "error" -> Bug (Reliability), "warning" -> Code Smell (Maintainability);
+# o gosec é sempre Vulnerability (Security). Sem isto, todos os linters saem como "error"
+# e a complexidade e a duplicação contavam como bugs no rating de fiabilidade.
+severity:
+  # Modifiability/Maintainability: gocognit, gocyclo, dupl, depguard, revive, unused.
+  default: warning
+  rules:
+    # Reliability: erros ignorados e defeitos detetáveis estaticamente.
+    # Security: gosec mantém "error" (é o caso já validado como Vulnerability no Sonar).
+    - linters: [errcheck, govet, staticcheck, ineffassign, gosec]
+      severity: error
