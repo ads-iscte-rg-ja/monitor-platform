@@ -76,6 +76,21 @@ linters:
               desc: "a camada de transporte não acede à BD"
             - pkg: monitor-central/internal/handlers
               desc: "transportes independentes: gRPC não depende do HTTP"
+        central-observability:
+          # Métricas e logs (ADR-0004): transversal, não conhece nenhuma camada da aplicação.
+          list-mode: lax
+          files: ["**/internal/observability/**"]
+          deny:
+            - pkg: monitor-central/internal/handlers
+              desc: "observability é usado pelas camadas, não as usa"
+            - pkg: monitor-central/internal/grpcapi
+              desc: "observability é usado pelas camadas, não as usa"
+            - pkg: monitor-central/internal/services
+              desc: "observability é usado pelas camadas, não as usa"
+            - pkg: monitor-central/internal/repositories
+              desc: "observability é usado pelas camadas, não as usa"
+            - pkg: monitor-central/internal/database
+              desc: "recebe um *sql.DB e funções; não conhece o pacote database"
         central-services:
           list-mode: lax
           files: ["**/internal/services/**"]
