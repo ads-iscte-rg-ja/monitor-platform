@@ -1,0 +1,19 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Cenário SC2: recuperação após 1 h com o central em baixo (iter-3)}
+  \label{tab:carga-sc2}
+  \begin{tabular}{llrc}
+    \toprule
+    Medida & Alvo & Medido & Cumpre \\
+    \midrule
+    \emph{Hosts} que entregaram todo o \emph{backlog} & todos & 1\,000 de 1\,000 & \Sim \\
+    Registos do \emph{backlog} entregues & todos & 441\,000 de 441\,000 & \Sim \\
+    \emph{Backlog} absorvido & $\le$ 15 min & 1,4 min & \Sim \\
+    p95 do \emph{dashboard} durante a recuperação & $<$ 1 s & $\ge$ 10 s & \Nao \\
+    Lotes não entregues & 0 & 0,00\,\% & \Sim \\
+    Pedidos não OK & --- & 3,09\,\% & --- \\
+    Esperas por ligação à BD & --- & 11\,199 & --- \\
+    Confirmados = gravados, sem duplicados & sim & 441\,000 / 441\,000, 0 dup. & \Sim \\
+    \bottomrule
+  \end{tabular}
+\end{table}

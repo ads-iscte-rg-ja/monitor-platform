@@ -548,12 +548,18 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 
 #### D10. Testes de carga reprodutíveis
 * **Problema:** os cenários SC precisam de evidência repetível, não de uma demonstração única.
-* **Decisão:** `monitor-ws/loadtest/` com k6:
-  * cenários `nominal` (SC1), `recovery-storm` (SC2), `scale-out` (SC3) e `dashboard-30d` (SC4);
-  * `setup()` regista N hosts via seed e obtém as chaves;
-  * thresholds no próprio script (`p(95)<300`, `http_req_failed<0.001`).
-
-  Os resultados (JSON + capturas Grafana) ficam em `docs/metrics/` para cada iteração.
+* **Decisão (implementada a 19/11, `loadtest/`):** k6 com o cliente gRPC, contra um ambiente Compose
+  próprio (`loadtest/compose.yaml`) com os limites da medição em código (central e PostgreSQL com 2 vCPU /
+  4 GB cada). Cada VU é um host que se comporta como o remote (estatísticas a cada 30 s, erros a cada 10 s,
+  lotes de 100, novas tentativas). Medições: `nominal` (SC1), `nominal-x2` e `nominal-x5` (sensibilidade
+  ao perfil de logs), `noisy-neighbour` (SC5) e `recovery-storm` (SC2). Cada medição recria o ambiente do
+  zero. `recolher.py` junta k6 (agente), Prometheus (servidor, D4) e a contagem na BD (perdas e duplicados);
+  `tabelas.py` gera as tabelas LaTeX, com `--antes` para antes/depois.
+  `scale-out` (SC3) fica para depois de D8; `dashboard-30d` (SC4) exige gerar 30 dias de dados e fica para
+  depois de D9.
+* **Atraso medido:** do primeiro envio de um lote à confirmação, com novas tentativas — o que o central
+  acrescenta. O intervalo de recolha do agente (até 10 s) é fixo por desenho e fica de fora; medi-lo
+  tornaria SC1/SC5 (p95 < 5 s) impossíveis por definição.
 * **Teoria:** QA analysis por medição (slide 04: *"analysis later in the life cycle yields higher confidence"*); *generate and test*.
 * **Verificação:** o relatório final traz uma tabela de cenários com valor medido antes e depois de D5–D9.
 

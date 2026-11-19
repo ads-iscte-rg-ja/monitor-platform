@@ -2,12 +2,94 @@
 \label{sec:avaliacao}
 
 \subsection{Método de medição}
-\porescrever{ambiente (Ryzen 7 3700X, limites dos containers), perfil misto de logs, cenários k6.}
+\label{sec:metodo}
+
+As medições de carga correm num ambiente próprio, descrito em código no ficheiro
+\texttt{loadtest/compose.yaml}: o
+central e o PostgreSQL~16 com \textbf{2 vCPU e 4~GB cada}, e o Prometheus a recolher as métricas do central a
+cada 5~s (\dec{4}). A máquina é um AMD Ryzen~7 3700X com 16 \emph{threads} e 31~GB de memória. Cada medição
+recria o ambiente do zero, com a base de dados vazia e o central acabado de arrancar, para nenhuma herdar
+dados nem \emph{caches} da anterior. As medições não correm no CI, porque os \emph{runners} partilhados dão
+números com demasiado ruído.
+
+\paragraph{Agentes simulados.}
+O k6 simula 1\,000 \emph{hosts}, um por utilizador virtual, cada um com a sua chave e a sua ligação gRPC. Cada
+um comporta-se como o \texttt{monitor-remote}: envia estatísticas a cada 30~s e erros a cada 10~s, em lotes
+de até 100 registos, tenta de novo com \emph{backoff} nas falhas transitórias e desiste nas definitivas. Os
+erros seguem o perfil da Tabela~\ref{tab:perfil-logs}, atribuído de forma determinística pelo índice do
+\emph{host}. Simular os agentes em vez de correr 1\,000 processos \texttt{monitor-remote} é o que torna a
+medição possível numa só máquina; a simulação usa o mesmo contrato (\texttt{.proto} do \texttt{monitor-api})
+e as mesmas regras de envio.
+
+\paragraph{Três fontes, cada uma para o que mede bem.}
+O k6 dá a visão do agente: latência de cada pedido, atraso acrescentado pelo central (definido na
+secção~\ref{sec:requisitos}) e lotes que o agente teria posto de parte. O Prometheus dá a do servidor:
+percentis da ingestão e do \emph{dashboard}, CPU, memória e ocupação do \emph{pool} de ligações. A base de dados
+dá a integridade: no fim de cada medição compara-se o número de registos confirmados ao agente com o número
+gravado, e procuram-se duplicados. As contagens vêm do k6 e da base de dados, e não dos contadores do
+Prometheus, que perdem o que acontece antes da primeira recolha.
+
+\paragraph{Medições.}
+\texttt{nominal} (\cen{SC1}) corre 10~minutos com o perfil de logs; \texttt{nominal-x2} e
+\texttt{nominal-x5} repetem-no com a taxa de logs multiplicada por 2 e por 5, porque o perfil é uma hipótese
+(análise de sensibilidade). \texttt{noisy-neighbour} (\cen{SC5}) põe 1\,\% dos \emph{hosts} a 200 logs/s durante
+2~minutos, a meio de uma medição nominal. \texttt{recovery-storm} (\cen{SC2}) dá a cada \emph{host} 1~h de
+\emph{backlog} (cerca de 441\,000 registos no total) e põe-nos todos a enviar ao mesmo tempo, enquanto o
+\emph{dashboard} é consultado a cada 2~s. \cen{SC3} (várias instâncias) só se mede depois de \dec{8}, e
+\cen{SC4} (30 dias de dados) depois de \dec{9}.
+
+\paragraph{Limitações.}
+O gerador de carga corre na mesma máquina que o sistema medido. Os limites de CPU do central e da base de
+dados impedem que o k6 lhes tire recursos, mas não isolam totalmente a memória e o disco partilhados. Os
+números absolutos dependem desta máquina; o que se compara são as iterações entre si, medidas da mesma
+forma.
 
 \subsection{Escalabilidade: antes e depois}
+\label{sec:aval-escala}
+
+\paragraph{Baseline de carga (iteração~3).}
+A baseline de carga foi medida com o código da iteração~3 (contrato gRPC e métricas), antes de qualquer
+decisão de escalabilidade (\dec{5}--\dec{8}). É o ``antes'' com que essas decisões vão ser comparadas.
+
 \gerado{carga-sc1.tex}
-\gerado{carga-sc2.tex}
+
+Em regime normal (Tabela~\ref{tab:carga-sc1}), \cen{SC1} cumpre-se com uma folga muito grande: p95 da
+ingestão de 6~ms contra um limite de 300~ms, e o central usa 4\,\% dos 2 vCPU. O débito medido, 122 registos
+por segundo, coincide com a estimativa feita antes de qualquer medição (cerca de 90 logs e 33 estatísticas por
+segundo, secção~\ref{sec:estimativas}). A medição confirma a estimativa \emph{back-of-the-envelope} e a
+conclusão que se tirou dela: a ingestão nominal não é o problema de escala. Todos os registos confirmados ao
+agente estão na base de dados, sem duplicados.
+
+\gerado{carga-sensibilidade.tex}
+
+Como o perfil de logs é uma hipótese, a medição repetiu-se com o dobro e o quíntuplo da taxa de logs
+(Tabela~\ref{tab:carga-sensibilidade}). Com cinco vezes mais logs, o p95 sobe para 10~ms e o CPU para 8\,\%:
+\cen{SC1} continua cumprido. A conclusão anterior não depende, portanto, de a hipótese estar certa.
+
 \gerado{carga-sc5.tex}
+
+O cenário do vizinho ruidoso (Tabela~\ref{tab:carga-sc5}) também se cumpre: enquanto 1\,\% dos \emph{hosts}
+envia 200 logs por segundo, o atraso p95 dos restantes fica em 6~ms. O risco que motivava a parte
+de justiça entre \emph{hosts} de \dec{6} (lacuna S10) não se materializa a esta escala. É o \emph{generate and
+test} a funcionar: a medição refutou uma hipótese da análise, e essa parte de \dec{6} perde prioridade.
+
+\gerado{carga-sc2.tex}
+
+A recuperação (Tabela~\ref{tab:carga-sc2}) é o único cenário que falha, e falha onde a análise previa. Os
+1\,000 \emph{hosts} entregaram as 441\,000 linhas do \emph{backlog} em 1,4~minutos, sem perdas nem duplicados,
+mesmo com cerca de 540 pedidos a chegar ao \emph{timeout} e a ser repetidos: os recibos de deduplicação
+funcionam sob carga. Mas o \emph{dashboard} ficou inutilizável durante esse tempo, com um p95 de pelo menos
+10~s, o limite superior do histograma. O CPU do central nunca passou de 30\,\%; o estrangulamento foi o
+\emph{pool} de ligações à base de dados, sempre esgotado (25 de 25), com mais de 11\,000 esperas por ligação. A
+ingestão ocupou todas as ligações, porque cada registo é uma escrita separada (S2) e nada limita quantos
+pedidos entram ao mesmo tempo (S4), e o \emph{dashboard} ficou à espera de uma ligação livre. São exatamente as
+lacunas que \dec{5} (escritas em lote, que reduzem o tempo de ocupação de cada ligação) e \dec{6} (controlo de
+admissão e uma reserva de ligações para o \emph{dashboard}) tratam.
+
+O limite de 15~minutos de \cen{SC2} revelou-se folgado: o \emph{backlog} absorve-se em menos de 2. O critério
+que o cenário de facto exige é o outro, o \emph{dashboard} continuar utilizável durante a recuperação. Isto
+também significa que \dec{6} pode trocar velocidade de absorção por estabilidade (rejeitar parte dos pedidos com
+\texttt{RESOURCE\_EXHAUSTED}) e continuar dentro do limite.
 
 \subsection{Disponibilidade e integridade dos dados}
 \porescrever{AV1 e AV4: perdas e duplicados.}

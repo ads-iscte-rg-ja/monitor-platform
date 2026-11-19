@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""Gera as tabelas LaTeX dos testes de carga a partir de docs/metrics/<iteração>/carga/*.json.
+
+Uso:  loadtest/tabelas.py <iteração> [--antes <iteração>]
+
+Escreve em docs/metrics/<iteração>/: carga-sc1.tex, carga-sc2.tex, carga-sc5.tex e
+carga-sensibilidade.tex (o relatório inclui-as com \\gerado, depois de "make dados ITER=...").
+Com --antes, cada tabela acrescenta a coluna da iteração anterior (antes/depois).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+METRICAS = Path(__file__).resolve().parent.parent / "docs" / "metrics"
+
+
+def carregar(iteracao: str, medicao: str) -> dict | None:
+    caminho = METRICAS / iteracao / "carga" / f"{medicao}.json"
+    return json.loads(caminho.read_text()) if caminho.exists() else None
+
+
+def valor(m: dict | None, *chaves):
+    for chave in chaves:
+        if m is None:
+            return None
+        m = m.get(chave) if isinstance(m, dict) else None
+    return m
+
+
+def num(x, casas: int = 0, unidade: str = "") -> str:
+    if x is None:
+        return "---"
+    texto = f"{x:,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", "\\,")
+    return f"{texto}{unidade}"
+
+
+def p95_servidor(m: dict | None) -> str:
+    v = valor(m, "servidor", "ingestao_p95_ms")
+    # 10 s é o último limite do histograma (ADR-0004): acima disso só se sabe que é "pelo menos".
+    return "$\\ge$ 10 s" if v is not None and v >= 10000 else num(v, 0, " ms")
+
+
+def duracao(ms_valor) -> str:
+    """Em milissegundos abaixo de 1 s, em segundos acima: 6 ms em vez de "0,01 s"."""
+    if ms_valor is None:
+        return "---"
+    return num(ms_valor, 0, " ms") if ms_valor < 1000 else num(ms_valor / 1000, 2, " s")
+
+
+def cumpre(ok) -> str:
+    return "---" if ok is None else ("\\Sim" if ok else "\\Nao")
+
+
+def nao_ok_pct(m: dict | None) -> float | None:
+    codigos = valor(m, "servidor", "pedidos_por_codigo")
+    if not codigos:
+        return None
+    total = sum(codigos.values())
+    return 100 * sum(v for c, v in codigos.items() if c != "OK") / total if total else None
+
+
+def integridade(m: dict | None) -> tuple[float | None, float | None, float | None]:
+    confirmados = valor(m, "agente", "registos_confirmados", "count")
+    bd = valor(m, "base_de_dados")
+    gravados = None if bd is None else bd["stats"] + bd["erros"]
+    return confirmados, gravados, None if bd is None else bd["duplicados"]
+
+
+def linhas_sc1(m: dict | None) -> list[tuple[str, str, str, str]]:
+    p95 = valor(m, "agente", "grpc_req_duration{ingestao:sim}", "p(95)")
+    atraso = valor(m, "agente", "atraso_central{vizinho:sim}", "p(95)")
+    perdidos = valor(m, "agente", "lotes_perdidos", "rate")
+    cpu_med, cpu_max = valor(m, "servidor", "cpu_media_pct"), valor(m, "servidor", "cpu_max_pct")
+    falhas = nao_ok_pct(m)
+    confirmados, gravados, duplicados = integridade(m)
+    segundos = valor(m, "agente", "duracao_s")
+    return [
+        ("p95 da ingestão (agente)", "$<$ 300 ms", num(p95, 0, " ms"), cumpre(None if p95 is None else p95 < 300)),
+        ("p95 da ingestão (servidor)", "---", p95_servidor(m), "---"),
+        ("Pedidos não OK", "0\\,\\%", num(falhas, 2, "\\,\\%"), cumpre(None if falhas is None else falhas == 0)),
+        ("Lotes não entregues", "0", num(None if perdidos is None else perdidos * 100, 2, "\\,\\%"),
+         cumpre(None if perdidos is None else perdidos == 0)),
+        ("CPU do central, média / máx.", "$<$ 70\\,\\%", f"{num(cpu_med, 0)} / {num(cpu_max, 0, '\\,\\%')}",
+         cumpre(None if cpu_max is None else cpu_max < 70)),
+        ("Atraso p95 (exceto rajada)", "$<$ 5 s", duracao(atraso),
+         cumpre(None if atraso is None else atraso < 5000)),
+        ("Registos confirmados / s", "---", num(None if not confirmados or not segundos else confirmados / segundos, 0), "---"),
+        ("Confirmados = gravados, sem duplicados", "sim",
+         "---" if gravados is None else f"{num(confirmados)} / {num(gravados)}, {num(duplicados)} dup.",
+         cumpre(None if gravados is None else confirmados == gravados and duplicados == 0)),
+    ]
+
+
+def tabela(rotulo: str, legenda: str, cabecalho: list[str], linhas: list[list[str]], formato: str, nota: str = "") -> str:
+    corpo = "\n".join("    " + " & ".join(l) + " \\\\" for l in linhas)
+    nota_tex = f"\n  \\par\\smallskip\\footnotesize {nota}" if nota else ""
+    return f"""\\begin{{table}}[htbp]
+  \\centering\\small
+  \\caption{{{legenda}}}
+  \\label{{{rotulo}}}
+  \\begin{{tabular}}{{{formato}}}
+    \\toprule
+    {" & ".join(cabecalho)} \\\\
+    \\midrule
+{corpo}
+    \\bottomrule
+  \\end{{tabular}}{nota_tex}
+\\end{{table}}
+"""
+
+
+def com_antes(linhas_depois, linhas_antes):
+    if linhas_antes is None:
+        return [[d[0], d[1], d[2], d[3]] for d in linhas_depois]
+    return [[d[0], d[1], a[2], d[2], d[3]] for d, a in zip(linhas_depois, linhas_antes)]
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("iteracao")
+    ap.add_argument("--antes")
+    a = ap.parse_args()
+    destino = METRICAS / a.iteracao
+    ambiente = "Ambiente: " + (destino / "carga" / "ambiente.txt").read_text().splitlines()[-1] if (destino / "carga" / "ambiente.txt").exists() else ""
+    cab = ["Medida", "Alvo", "Medido", "Cumpre"] if not a.antes else ["Medida", "Alvo", a.antes, a.iteracao, "Cumpre"]
+    fmt = "llrc" if not a.antes else "llrrc"
+
+    def gerar(medicao: str, linhas_fn, rotulo: str, legenda: str, nota: str = "") -> None:
+        depois = carregar(a.iteracao, medicao)
+        if depois is None:
+            return
+        antes = linhas_fn(carregar(a.antes, medicao)) if a.antes else None
+        (destino / f"{rotulo}.tex").write_text(
+            tabela(f"tab:{rotulo}", f"{legenda} ({a.iteracao})", cab, com_antes(linhas_fn(depois), antes), fmt, nota))
+
+    gerar("nominal", linhas_sc1, "carga-sc1", "Cenário SC1: 1\\,000 \\emph{hosts} em regime normal",
+          "Atraso: do primeiro envio de um lote à confirmação, com as novas tentativas. " + ambiente)
+
+    def linhas_sc5(m):
+        vizinhos = valor(m, "agente", "atraso_central{fase:rajada,vizinho:sim}", "p(95)")
+        rajada = valor(m, "agente", "atraso_central{perfil:rajada}", "p(95)")
+        p95 = valor(m, "agente", "grpc_req_duration{ingestao:sim}", "p(95)")
+        falhas = nao_ok_pct(m)
+        return [
+            ("Atraso p95 dos outros \\emph{hosts}, durante a rajada", "$<$ 5 s",
+             duracao(vizinhos), cumpre(None if vizinhos is None else vizinhos < 5000)),
+            ("Atraso p95 dos \\emph{hosts} em rajada", "---", duracao(rajada), "---"),
+            ("p95 da ingestão (agente)", "---", num(p95, 0, " ms"), "---"),
+            ("Pedidos não OK", "---", num(falhas, 2, "\\,\\%"), "---"),
+        ]
+    gerar("noisy-neighbour", linhas_sc5, "carga-sc5", "Cenário SC5: 1\\,\\% dos \\emph{hosts} em rajada de 200 logs/s")
+
+    def linhas_sc2(m):
+        hosts = valor(m, "hosts")
+        concluidos = valor(m, "agente", "tempo_recuperacao", "count")
+        todos = hosts is not None and concluidos == hosts
+        # Só há tempo de absorção se todos os hosts entregaram o backlog dentro do tempo máximo.
+        tempo = valor(m, "agente", "tempo_recuperacao", "max") if todos else None
+        esperado = valor(m, "agente", "backlog_total", "count")
+        # p95 do dashboard só na janela da recuperação (Prometheus); a média da medição inteira
+        # diluía o impacto com os minutos de calma depois de o backlog acabar.
+        dash = valor(m, "dashboard_p95_ms_durante_recuperacao")
+        perdidos = valor(m, "agente", "lotes_perdidos", "rate")
+        confirmados, gravados, duplicados = integridade(m)
+        return [
+            ("\\emph{Hosts} que entregaram todo o \\emph{backlog}", "todos",
+             "---" if hosts is None else f"{num(concluidos or 0)} de {num(hosts)}", cumpre(None if hosts is None else todos)),
+            ("Registos do \\emph{backlog} entregues", "todos",
+             "---" if esperado is None else f"{num(confirmados)} de {num(esperado)}",
+             cumpre(None if esperado is None else confirmados == esperado)),
+            ("\\emph{Backlog} absorvido", "$\\le$ 15 min",
+             num(None if tempo is None else tempo / 60000, 1, " min") if todos else "não absorvido",
+             cumpre(False if not todos else tempo <= 900000)),
+            ("p95 do \\emph{dashboard} durante a recuperação", "$<$ 1 s",
+             "$\\ge$ 10 s" if dash is not None and dash >= 10000 else duracao(dash),
+             cumpre(None if dash is None else dash < 1000)),
+            ("Lotes não entregues", "0", num(None if perdidos is None else perdidos * 100, 2, "\\,\\%"),
+             cumpre(None if perdidos is None else perdidos == 0)),
+            ("Pedidos não OK", "---", num(nao_ok_pct(m), 2, "\\,\\%"), "---"),
+            ("Esperas por ligação à BD", "---", num(valor(m, "servidor", "esperas_por_ligacao")), "---"),
+            ("Confirmados = gravados, sem duplicados", "sim",
+             "---" if gravados is None else f"{num(confirmados)} / {num(gravados)}, {num(duplicados)} dup.",
+             cumpre(None if gravados is None else confirmados == gravados and duplicados == 0)),
+        ]
+    gerar("recovery-storm", linhas_sc2, "carga-sc2", "Cenário SC2: recuperação após 1 h com o central em baixo")
+
+    # Sensibilidade à hipótese do perfil de logs (relatório, secção 4.3).
+    medicoes = [(m, carregar(a.iteracao, m)) for m in ("nominal", "nominal-x2", "nominal-x5")]
+    medicoes = [(m, d) for m, d in medicoes if d is not None]
+    if len(medicoes) > 1:
+        def col(f):
+            return [f(d) for _, d in medicoes]
+        linhas = [
+            ["p95 da ingestão (agente)"] + col(lambda d: num(valor(d, "agente", "grpc_req_duration{ingestao:sim}", "p(95)"), 0, " ms")),
+            ["CPU média do central"] + col(lambda d: num(valor(d, "servidor", "cpu_media_pct"), 0, "\\,\\%")),
+            ["Atraso p95 (exceto rajada)"] + col(lambda d: duracao(valor(d, "agente", "atraso_central{vizinho:sim}", "p(95)"))),
+            ["Pedidos não OK"] + col(lambda d: num(nao_ok_pct(d), 2, "\\,\\%")),
+            ["Cumpre SC1"] + col(lambda d: cumpre(all(l[3] != "\\Nao" for l in linhas_sc1(d)))),
+        ]
+        nomes = {"nominal": "logs ×1", "nominal-x2": "logs ×2", "nominal-x5": "logs ×5"}
+        (destino / "carga-sensibilidade.tex").write_text(tabela(
+            "tab:carga-sensibilidade", f"Sensibilidade ao perfil de logs ({a.iteracao})",
+            ["Medida"] + [nomes[m] for m, _ in medicoes], linhas, "l" + "r" * len(medicoes)))
+    print(f"tabelas de carga escritas em {destino}")
+
+
+if __name__ == "__main__":
+    main()

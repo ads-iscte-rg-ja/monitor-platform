@@ -1,0 +1,8 @@
+# Recolha das métricas do central durante os testes de carga (ADR-0004).
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+scrape_configs:
+  - job_name: monitor-central
+    static_configs:
+      - targets: ["backend:9464"]
