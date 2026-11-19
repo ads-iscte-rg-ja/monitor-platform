@@ -190,11 +190,11 @@ A Tabela~\ref{tab:cenarios} detalha, no formato de seis partes, os cenários que
     \toprule
     & Fonte e estímulo & Artefacto & Ambiente & Resposta & Medida \\
     \midrule
-    \cen{SC1} & 1\,000 remotes: estatísticas a cada 30~s e logs com o perfil misto & API de ingestão e PostgreSQL & normal; 1 instância com 2~vCPU e 4~GB & todos os pedidos aceites e persistidos; um \emph{host} ruidoso não atrasa os outros & p95 $<$ 300~ms; 0\,\% 5xx; CPU $<$ 70\,\%; atraso p95 $<$ 5~s nos não ruidosos \\ \addlinespace
+    \cen{SC1} & 1\,000 remotes: estatísticas a cada 30~s e logs com o perfil misto & API de ingestão e PostgreSQL & normal; 1 instância com 2~vCPU e 4~GB & todos os pedidos aceites e persistidos; um \emph{host} ruidoso não atrasa os outros & p95 $<$ 300~ms; 0\,\% 5xx; CPU $<$ 70\,\%; atraso acrescentado pelo central p95 $<$ 5~s nos não ruidosos \\ \addlinespace
     \cen{SC2} & 1\,000 remotes com 1~h de \emph{backlog} enviam ao mesmo tempo & central e base de dados & central acabado de arrancar & aceita até à capacidade; o excesso é rejeitado com o atraso para nova tentativa; nada se perde & \emph{backlog} absorvido em $\le$ 15~min; \emph{dashboard} p95 $<$ 1~s; 0 perdas; 0 duplicados \\ \addlinespace
     \cen{SC3} & operador acrescenta instâncias atrás do balanceador & central & carga acima da capacidade de 1 instância & o débito sobe; cada \emph{job} corre numa só instância & $\ge$ 1,8× com 2; $\ge$ 2,5× com 3; 0 \emph{jobs} duplicados; troca de líder $\le$ 30~s \\ \addlinespace
     \cen{SC4} & operador consulta o \emph{dashboard} & \emph{dashboard} e PostgreSQL & 30 dias de dados de 1\,000 \emph{hosts}; retenção ativa & a consulta responde; a retenção não degrada a ingestão & p95 $<$ 1~s; ingestão sem degradação durante a retenção \\ \addlinespace
-    \cen{SC5} & 1\,\% dos \emph{hosts} em rajada de 200 logs/s durante 2~min & ingestão do central & normal, 1\,000 \emph{hosts} & o \emph{host} em rajada é rejeitado por sobrecarga e guarda localmente; os outros não são afetados & atraso p95 $<$ 5~s para os restantes \\ \addlinespace
+    \cen{SC5} & 1\,\% dos \emph{hosts} em rajada de 200 logs/s durante 2~min & ingestão do central & normal, 1\,000 \emph{hosts} & o \emph{host} em rajada é rejeitado por sobrecarga e guarda localmente; os outros não são afetados & atraso acrescentado pelo central p95 $<$ 5~s para os restantes \\ \addlinespace
     \cen{AV4} & aplicação em ciclo de erro gera uma rajada de logs & remote e \emph{buffer} & central indisponível & o \emph{buffer} respeita o limite; descarta primeiro INFO e WARN, e conta o que descarta & tamanho $\le$ limite; perdas só de INFO/WARN, contadas e reportadas \\ \addlinespace
     \cen{MO1} & programador recebe o pedido de uma métrica de alerta nova & módulo de alertas & desenvolvi\-mento & métrica implementada e testada sem tocar no avaliador genérico & $\le$ 1 pessoa-dia; $\le$ 3 ficheiros Go e 1 migração \\ \addlinespace
     \cen{AV1} & falha de infraestrutura: central em baixo 1~h & remote e \emph{buffer} SQLite & aplicações continuam a registar erros & o remote guarda tudo e entrega quando o central volta & 0 perdas; 0 duplicados (teste E2E) \\
@@ -209,4 +209,7 @@ $\approx$435\,000 linhas do \emph{backlog} a $\approx$480 linhas/s, enquanto con
 normais: cerca de cinco vezes o débito nominal, uma margem exigente mas plausível com escritas em lote
 (\dec{5}). O fator 1,8× de \cen{SC3} admite que duas instâncias
 percam 10\,\% para a coordenação; o de 2,5× admite uma perda maior com três. Os limites de \cen{MO1} correspondem a uma alteração confinada a um único
-módulo, que é o que a modificabilidade promete.
+módulo, que é o que a modificabilidade promete. O \emph{atraso} de \cen{SC1} e \cen{SC5} conta do primeiro
+envio de um lote à sua confirmação, incluindo novas tentativas: é o atraso que o central acrescenta. O
+intervalo de recolha do agente (até 10~s para os erros) é fixo por desenho e fica de fora; contá-lo tornaria
+o limite de 5~s impossível por definição.

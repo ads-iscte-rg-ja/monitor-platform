@@ -1,0 +1,16 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Sensibilidade ao perfil de logs (iter-3)}
+  \label{tab:carga-sensibilidade}
+  \begin{tabular}{lrrr}
+    \toprule
+    Medida & logs ×1 & logs ×2 & logs ×5 \\
+    \midrule
+    p95 da ingestão (agente) & 6 ms & 9 ms & 10 ms \\
+    CPU média do central & 4\,\% & 5\,\% & 8\,\% \\
+    Atraso p95 (exceto rajada) & 6 ms & 10 ms & 10 ms \\
+    Pedidos não OK & 0,00\,\% & 0,00\,\% & 0,00\,\% \\
+    Cumpre SC1 & \Sim & \Sim & \Sim \\
+    \bottomrule
+  \end{tabular}
+\end{table}

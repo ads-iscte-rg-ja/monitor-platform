@@ -2,7 +2,74 @@
 \label{sec:decisoes}
 
 \subsection{Escalabilidade}
-\porescrever{\dec{4}--\dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
+
+\subsubsection{Medir primeiro: métricas e logs estruturados (\dec{4}, ADR-0004)}
+\label{sec:d4}
+
+\paragraph{Problema.}
+O central não expunha nenhuma métrica de execução (lacuna S8). As medidas dos cenários de escalabilidade
+(p95 da ingestão, rejeições por sobrecarga, atraso de ingestão, CPU, ocupação do \emph{pool} de ligações)
+só se podiam observar do lado do cliente de carga, que mostra que o sistema está lento mas não
+\emph{onde}. Sem isso, nenhuma das decisões \dec{5}--\dec{8} se consegue avaliar. Os logs eram texto livre,
+sem identificador de pedido nem de \emph{host} (lacuna A3), e por isso não se filtravam nem se correlacionavam.
+
+\paragraph{Decisão.}
+O central passou a expor métricas no formato Prometheus, num registo próprio do pacote
+\texttt{observability}, transversal às camadas (uma regra \texttt{depguard} impede-o de depender delas). A
+Tabela~\ref{tab:metricas-d4} liga cada métrica ao cenário que serve. As métricas são servidas num
+\emph{listener} separado (\texttt{METRICS\_ADDR}), fora do \emph{router} do \emph{dashboard}: nunca passam
+pelo \emph{proxy} público nem pela sessão. Os logs passaram a JSON com \texttt{log/slog}: os pedidos HTTP com
+o \texttt{request\_id}, rota, estado e duração; os pedidos de ingestão que falham, com o \texttt{host\_id} e o
+código gRPC. Um perfil Compose \texttt{observability} junta Prometheus e Grafana para os testes de carga.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Métricas do central e cenários que servem}
+  \label{tab:metricas-d4}
+  \begin{tabularx}{\linewidth}{L{0.42\linewidth}Yl}
+    \toprule
+    Métrica & O que mede & Cenários \\
+    \midrule
+    \texttt{ingest\_request\_duration\_seconds} & latência da ingestão, por método e código gRPC & \cen{SC1}, \cen{SC2}, \cen{SC5} \\
+    \texttt{ingest\_records\_total} & registos novos, duplicados e rejeitados & \cen{AV1} \\
+    \texttt{ingest\_lag\_seconds} & atraso entre a recolha no \emph{host} e a gravação & \cen{SC1}, \cen{SC5} \\
+    \texttt{http\_request\_duration\_seconds} & latência do \emph{dashboard}, por rota & \cen{SC2}, \cen{SC4} \\
+    \texttt{job\_duration\_seconds}, \texttt{job\_failures\_total}, \texttt{job\_last\_success\_\ldots} & duração e saúde dos \emph{jobs} de fundo & \cen{AV2}, \cen{MN2} \\
+    \texttt{email\_outbox\_pending}, \texttt{go\_sql\_*}, \texttt{process\_*} & \emph{backlog} de notificações, \emph{pool} de ligações, CPU e memória & \cen{SC1}, \cen{SC2} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Teoria.}
+\emph{Monitor} (disponibilidade) e monitorabilidade: o sistema observa-se a si próprio. \emph{Limit
+Exposure} (segurança): as métricas ficam fora do \emph{listener} público. Esta decisão é também um exemplo
+de ADD a rever o que falta tratar: na primeira versão do plano, o Prometheus estava adiado. Passou a ser
+necessário quando a escalabilidade passou a (H,H), porque um cenário (H,H) tem de ser medido.
+
+\paragraph{Alternativas.}
+OpenTelemetry completo (\emph{traces}, métricas e coletor) traria mais infraestrutura do que um único
+serviço a 1\,000 \emph{hosts} precisa; fica no plano de evolução, com o gatilho ``diagnosticar latência entre
+serviços''. Medir só do lado do k6 dá a latência vista pelo cliente, mas não a causa. Servir
+\texttt{/metrics} no \emph{router} do \emph{dashboard} exigiria autenticação própria. Reescrever todas as
+chamadas de log existentes não trazia valor arquitetural: o \texttt{log.Logger} antigo passou a escrever
+através do mesmo \emph{handler} JSON.
+
+\paragraph{Trade-offs.}
+Nenhuma métrica usa o \emph{host} como \emph{label}: com 1\,000 \emph{hosts} seriam 1\,000 séries por métrica, e o
+próprio Prometheus degradar-se-ia. O detalhe por \emph{host} fica nos logs. Os pedidos de ingestão bem-sucedidos
+só são registados em nível \texttt{debug}, porque 1\,000 \emph{hosts} gerariam dezenas de linhas por segundo.
+A métrica do \emph{outbox} faz uma consulta à base de dados por recolha (a cada 5--15~s), com um \emph{timeout}
+curto. Nas estatísticas, o repositório não distingue registos novos de reenviados; a métrica conta-os juntos,
+e a descrição da métrica di-lo.
+
+\paragraph{Verificação.}
+Testes fazem a recolha real de \texttt{/metrics} depois de pedidos de ingestão aceites, duplicados e rejeitados,
+de pedidos HTTP e de execuções de \emph{jobs} (incluindo uma falhada e uma interrompida pelo encerramento, que
+não conta como falha). Num teste ponta-a-ponta, com o central, o PostgreSQL e um agente reais, as métricas
+mostraram os valores esperados. A alteração não acrescentou \emph{issues} de lint: as que introduziu na
+complexidade do arranque do servidor foram corrigidas na mesma alteração (60 para 58).
+
+\porescrever{\dec{5}--\dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
 
 \subsection{Manutenção e testabilidade}
 

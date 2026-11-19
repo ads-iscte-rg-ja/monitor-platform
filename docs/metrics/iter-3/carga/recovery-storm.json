@@ -1,0 +1,269 @@
+{
+  "janela": {
+    "inicio": 1795110997,
+    "fim": 1795111958
+  },
+  "hosts": 1000,
+  "agente": {
+    "http_req_duration{expected_response:true}": {
+      "min": 54.04833,
+      "med": 79.87087149999999,
+      "p(90)": 123.8632816,
+      "p(95)": 1925.969064999979,
+      "p(99)": 24708.3088244,
+      "max": 26802.261513,
+      "count": 474,
+      "avg": 880.556357527425
+    },
+    "iterations": {
+      "count": 1473,
+      "rate": 1.5338963550035258
+    },
+    "respostas_nao_ok{codigo:15}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "tempo_recuperacao": {
+      "avg": 38853.541,
+      "min": 6608,
+      "med": 38474,
+      "p(90)": 61032.8,
+      "p(95)": 64832.24999999999,
+      "p(99)": 82826.93,
+      "max": 83472,
+      "count": 1000,
+      "thresholds": {
+        "max<900000": true
+      }
+    },
+    "respostas_nao_ok": {
+      "count": 543,
+      "rate": 0.5654485544921348
+    },
+    "respostas_nao_ok{codigo:6}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:1}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "backlog_total": {
+      "count": 441000,
+      "rate": 459.23169895217575
+    },
+    "respostas_nao_ok{codigo:12}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "grpc_req_duration{ingestao:sim}": {
+      "count": 5733,
+      "avg": 4876.75125849187,
+      "min": 37.777175,
+      "med": 3978.032535,
+      "p(90)": 11000.2493304,
+      "p(95)": 12695.685826599998,
+      "p(99)": 14632.36933292,
+      "max": 15001.628913,
+      "thresholds": {
+        "p(95)<300": false
+      }
+    },
+    "lotes_perdidos": {
+      "passes": 0,
+      "fails": 5700,
+      "rate": 0,
+      "thresholds": {
+        "rate==0": true
+      }
+    },
+    "respostas_nao_ok{codigo:9}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "registos_confirmados": {
+      "count": 441000,
+      "rate": 459.23169895217575
+    },
+    "respostas_nao_ok{codigo:11}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "atraso_central": {
+      "min": 40,
+      "med": 4296,
+      "p(90)": 14129.200000000004,
+      "p(95)": 25493.050000000003,
+      "p(99)": 33498.820000000065,
+      "max": 57939,
+      "count": 5700,
+      "avg": 6762.165087719298
+    },
+    "atraso_central{vizinho:sim}": {
+      "p(90)": 14129.200000000004,
+      "p(95)": 25493.050000000003,
+      "p(99)": 33498.820000000065,
+      "max": 57939,
+      "count": 5700,
+      "avg": 6762.165087719298,
+      "min": 40,
+      "med": 4296,
+      "thresholds": {
+        "p(95)<5000": false
+      }
+    },
+    "http_req_duration{dashboard:sim}": {
+      "med": 79.843385,
+      "p(90)": 123.78689440000001,
+      "p(95)": 1956.510190999986,
+      "p(99)": 24708.3572976,
+      "max": 26802.261513,
+      "count": 473,
+      "avg": 881.9722628752633,
+      "min": 54.04833,
+      "thresholds": {
+        "p(95)<1000": false
+      }
+    },
+    "respostas_nao_ok{codigo:10}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:3}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "http_req_duration": {
+      "p(95)": 1925.969064999979,
+      "p(99)": 24708.3088244,
+      "max": 26802.261513,
+      "count": 474,
+      "avg": 880.556357527425,
+      "min": 54.04833,
+      "med": 79.87087149999999,
+      "p(90)": 123.8632816
+    },
+    "respostas_nao_ok{codigo:5}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "grpc_req_duration": {
+      "p(95)": 12695.685826599998,
+      "p(99)": 14632.36933292,
+      "max": 15001.628913,
+      "count": 5733,
+      "avg": 4876.75125849187,
+      "min": 37.777175,
+      "med": 3978.032535,
+      "p(90)": 11000.2493304
+    },
+    "respostas_nao_ok{codigo:8}": {
+      "rate": 0,
+      "count": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:13}": {
+      "rate": 0.0010413417209799904,
+      "count": 1,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:7}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:16}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:2}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:4}": {
+      "count": 541,
+      "rate": 0.5633658710501748,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:14}": {
+      "count": 1,
+      "rate": 0.0010413417209799904,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "duracao_s": 960.3
+  },
+  "servidor": {
+    "ingestao_p95_ms": 10000.0,
+    "ingestao_p99_ms": 10000.0,
+    "pedidos_por_codigo": {
+      "OK": 5619.93843952604,
+      "Internal": 147.75282765957445,
+      "Unavailable": 31.1595070040253
+    },
+    "registos": {
+      "stats_duplicate": 0.0,
+      "stats_inserted": 110670.97382198954,
+      "stats_rejected": 0.0,
+      "errors_duplicate": 0.0,
+      "errors_inserted": 321781.57176842104,
+      "errors_rejected": 0.0
+    },
+    "dashboard_p95_ms": 2450.1,
+    "cpu_media_pct": 3.2,
+    "cpu_max_pct": 29.4,
+    "memoria_max_mb": 109.4,
+    "ligacoes_bd_max": 25.0,
+    "ligacoes_bd_limite": 25.0,
+    "esperas_por_ligacao": 11198.920418848167,
+    "espera_por_ligacao_s": 33871.386641687444
+  },
+  "dashboard_p95_ms_durante_recuperacao": 10000.0,
+  "base_de_dados": {
+    "stats": 120000,
+    "erros": 321000,
+    "duplicados": 0
+  }
+}

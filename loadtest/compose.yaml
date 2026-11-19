@@ -1,0 +1,84 @@
+# Ambiente dos testes de carga (D10). Independente do Compose de desenvolvimento do central:
+# outro projeto, outras portas, e os limites de recursos da medição escritos aqui, em código.
+#
+# Não usar diretamente: ./correr.sh trata da configuração, do arranque e da recolha dos resultados.
+name: monitor-carga
+
+x-central: &central
+  build:
+    context: ../../monitor-central
+    dockerfile: Dockerfile
+  env_file: [.carga.env]
+  environment:
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    PORT: "3333"
+    GRPC_PORT: "3334"
+    METRICS_ADDR: ":9464"
+    FRONTEND_PATH: /app/frontend
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: monitor
+      POSTGRES_PASSWORD: carga
+      POSTGRES_DB: monitor
+    volumes:
+      - ../../monitor-central/deployments/database/init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    # Mesmo limite que o central: a base de dados é parte do sistema medido (plano §4.5).
+    cpus: 2
+    mem_limit: 4g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U monitor -d monitor"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    <<: *central
+    command: ["/app/bin/migrate"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  backend:
+    <<: *central
+    depends_on:
+      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+    # Limites do sistema medido (cenário SC1: 1 instância com 2 vCPU e 4 GB).
+    cpus: 2
+    mem_limit: 4g
+    ports:
+      - "127.0.0.1:${CARGA_HTTP_PORT:-13333}:3333"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "3", "-O", "/dev/null", "http://127.0.0.1:3333/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    depends_on: [backend]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:${CARGA_PROMETHEUS_PORT:-19090}:9090"
+
+  # Gerador de carga. Corre com "docker compose run", na mesma rede que o central, sem limites:
+  # não é ele que está a ser medido.
+  k6:
+    image: grafana/k6:2.4.0
+    profiles: [k6]
+    volumes:
+      - ./k6:/scripts:ro
+      - ./dados:/dados:ro
+      - ./results:/results
+      - ../../monitor-api/proto:/proto:ro
+    environment:
+      CENTRAL_GRPC: backend:3334
+      CENTRAL_HTTP: http://backend:3333
