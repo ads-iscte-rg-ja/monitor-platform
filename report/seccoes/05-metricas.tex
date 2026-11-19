@@ -50,7 +50,7 @@ absoluto, e o que interessa é a evolução.
     Há padrões de código inseguros? & \emph{Issues} gosec por triar & 0 & \emph{gate} & gosec, SonarQube Cloud \\
     \midrule
     \multicolumn{5}{l}{\textit{Scalability, Availability}} \\
-    Quanto aguenta o sistema? & Débito, p95/p99, \% de 429/5xx, atraso de ingestão & cenários & tendência & k6, Prometheus \\
+    Quanto aguenta o sistema? & Débito, p95/p99, \% de rejeições e erros, atraso de ingestão & cenários & tendência & k6, Prometheus \\
     Perdem-se ou duplicam-se dados? & Enviados vs.\ recebidos; duplicados & 0 / 0 & tendência & teste E2E \\
     \bottomrule
   \end{tabularx}
@@ -134,10 +134,11 @@ dessa versão que interessam, porque é ela que vai para produção.
 \subsection{Pipeline de integração contínua}
 \label{sec:pipeline}
 
-Os quatro repositórios precisam das mesmas verificações, com os mesmos limites. Em vez de quatro
-cópias do pipeline, que divergiriam à primeira alteração, o pipeline vive num único
-\emph{workflow} reutilizável no repositório \texttt{monitor-platform}, e cada repositório tem apenas um
-\texttt{ci.yml} de 22 a 26 linhas que o invoca e escolhe as suas opções (ADR-0002, anexo~\ref{anx:adrs}).
+Os repositórios Go (os quatro componentes e, desde a iteração~2, o \texttt{monitor-api}) precisam das
+mesmas verificações, com os mesmos limites. Em vez de uma cópia do pipeline por repositório, que
+divergiriam à primeira alteração, o pipeline vive num único \emph{workflow} reutilizável no repositório
+\texttt{monitor-platform}, e cada repositório tem apenas um \texttt{ci.yml} de cerca de vinte linhas que o
+invoca e escolhe as suas opções (ADR-0002, anexo~\ref{anx:adrs}).
 É a tática \emph{Abstract Common Services}: o que é comum fica num só sítio. A configuração de lint
 também é única e inclui as regras \texttt{depguard} das camadas de todos os componentes, o que torna
 \emph{Restrict Dependencies} uma verificação executável e não uma convenção. A
@@ -186,6 +187,13 @@ defeitos do próprio pipeline (a instalação do govulncheck dependia da versão
 o relatório do lint era escrito num caminho que o SonarQube Cloud não encontrava, e a severidade dos
 \emph{issues} importados classificava complexidade como \emph{bugs}) foram corrigidos uma vez e
 chegaram aos quatro repositórios ao mover a \emph{tag}, sem tocar em nenhum deles.
+
+\paragraph{Um gate para o contrato.}
+O \texttt{monitor-api} acrescenta ao pipeline comum uma fase própria: \texttt{buf lint} verifica as
+convenções do contrato, \texttt{buf breaking} compara cada alteração com o \texttt{main} e falha se ela
+for incompatível com os agentes existentes, e uma verificação confirma que o código gerado corresponde ao
+\texttt{.proto}. É a forma executável do cenário \cen{MO2}: uma divergência no protocolo deixa de ser
+descoberta em produção e passa a ser um erro de CI (secção~\ref{sec:d11}).
 
 \paragraph{Dependências tornadas explícitas.}
 O CI obrigou a declarar uma dependência que até aí era implícita. Os testes do SDK e do

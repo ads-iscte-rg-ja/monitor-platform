@@ -54,7 +54,7 @@ escolha feita e a tática que mitiga o lado que perde.
     \midrule
     Scalability vs.\ Modifiability & Escalar só até onde as medições exigem (1\,000 \emph{hosts}); o resto fica no plano de evolução, com gatilhos & Defer Binding (papéis por configuração); Encapsulate (particionamento escondido no repositório) \\
     Availability vs.\ Consistency & Entrega \emph{at-least-once} com deduplicação idempotente (recibos) & Transactions (registo e recibo juntos) \\
-    Scalability vs.\ Availability & O controlo de admissão rejeita pedidos (429), mas sem perder dados: o remote guarda e volta a tentar & Limit Event Response no central; Retry com \texttt{Retry-After} no remote \\
+    Scalability vs.\ Availability & O controlo de admissão rejeita pedidos por sobrecarga, mas sem perder dados: o remote guarda e volta a tentar & Limit Event Response no central; Retry com o atraso indicado pelo central \\
     Modifiability vs.\ Performance & Estratégias por métrica de alerta, mas uma única consulta \emph{set-based} montada a partir delas & Increase Cohesion sem consultas N+1 \\
     Security vs.\ Performance & Aceitar o custo: o HMAC custa microssegundos; o bcrypt só corre no \emph{login} & --- \\
     Security vs.\ Modifiability da UI & CSP primeiro em modo \emph{Report-Only}, depois aplicada quando a interface estiver adaptada & Change Default Settings, faseado \\
@@ -81,8 +81,8 @@ estimativas.
     \midrule
     Pedidos de estatísticas & 1\,000 / 30~s & 33~pedidos/s \\
     Linhas de estatísticas & 33/s × 86\,400~s & 2,9~M/dia ($\approx$0,6~GB/dia; 17~GB em 30 dias) \\
-    Linhas de logs & perfil da Tabela~\ref{tab:perfil-logs} & \porescrever{TODO: depende da taxa dos ruidosos} \\
-    \emph{Backlog} após 1~h em baixo & 1\,000 × 120 estatísticas + logs de 1~h & \porescrever{TODO: depende da taxa dos ruidosos} \\
+    Linhas de logs & perfil da Tabela~\ref{tab:perfil-logs}, sem rajadas & $\approx$90/s: 7,6~M/dia ($\approx$7,6~GB/dia, $\approx$1~KB/linha) \\
+    \emph{Backlog} após 1~h em baixo & 120\,000 estatísticas + 90/s × 3\,600~s de logs & $\approx$435\,000 linhas \\
     Verificação de disponibilidade, pior caso & 1\,000 × 5~s de \emph{timeout} / 8 em paralelo & 625~s por ciclo, contra um intervalo de 30~s \\
     Resolução de alertas & 1\,000 \emph{hosts} × $\sim$6 regras, a cada 15~s & até 400 UPDATE/s só para resolver alertas \\
     Ligações à base de dados com 3 instâncias & 3 × 25 & 75 das 100 permitidas por omissão \\
@@ -100,8 +100,7 @@ uma reescrita foi rejeitada e cada ponto é tratado com uma tática localizada.
 O número de logs de um \emph{host} não é constante: é zero quando não há nada a registar e muito alto
 quando uma aplicação entra em ciclo de erro. Dimensionar pela média seria errado; o sistema tem de ser
 desenhado para a cauda. Os testes de carga usam, por isso, o perfil misto da
-Tabela~\ref{tab:perfil-logs}. Os valores são uma hipótese explícita da equipa, e a avaliação mostra a
-sensibilidade a essa hipótese.
+Tabela~\ref{tab:perfil-logs}. Os valores são uma hipótese explícita da equipa.
 
 \begin{table}[htbp]
   \centering\small
@@ -113,11 +112,18 @@ sensibilidade a essa hipótese.
     \midrule
     70\,\% & silenciosos & 0--1 por minuto \\
     25\,\% & normais & $\sim$10 por minuto \\
-    4\,\% & ruidosos & \porescrever{TODO: taxa a alinhar} \\
+    4\,\% & ruidosos & $\sim$1 por segundo \\
     1\,\% & em rajada (aplicação em ciclo de erro) & $\sim$200 por segundo durante 2 minutos \\
     \bottomrule
   \end{tabular}
 \end{table}
+
+Cada categoria fica cerca de uma ordem de grandeza acima da anterior, para que meçam comportamentos
+distintos. Os registos são erros de aplicações, não registos de acesso: um erro por segundo, sem parar (86
+mil por dia), já descreve uma aplicação claramente avariada, e é esse o significado de ``ruidoso''. As
+rajadas não entram na média da Tabela~\ref{tab:estimativas}: são o estímulo do cenário \cen{SC5} e
+medem-se à parte. Como o perfil é uma hipótese, a avaliação repete o cenário principal com uma carga de
+logs duas e cinco vezes maior, para mostrar a partir de onde os cenários deixam de ser cumpridos.
 
 Este perfil revela dois riscos que o desenho original não tratava. No \emph{host}: com o central em baixo,
 uma aplicação ruidosa enche o \emph{buffer} sem limite e, com ele, o disco, e o monitor passa a prejudicar o
@@ -163,7 +169,7 @@ A Tabela~\ref{tab:utility} apresenta a \emph{utility tree}. Cada folha é um cen
      & \emph{Browser} & \cen{SE2} & (M,M) & XSS e \emph{clickjacking} bloqueados por CSP e \texttt{frame-ancestors} \\
      & SSRF & \cen{SE3} & (M,M) & Verificação de disponibilidade para \emph{loopback} ou metadados de \emph{cloud}: rejeitada \\
     \midrule
-    Interoperability & Novos agentes & \cen{IO1} & (L,M) & Agente noutra linguagem implementável só com OpenAPI e exemplos \\
+    Interoperability & Novos agentes & \cen{IO1} & (L,M) & Agente noutra linguagem implementável só com o contrato publicado \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -185,10 +191,10 @@ A Tabela~\ref{tab:cenarios} detalha, no formato de seis partes, os cenários que
     & Fonte e estímulo & Artefacto & Ambiente & Resposta & Medida \\
     \midrule
     \cen{SC1} & 1\,000 remotes: estatísticas a cada 30~s e logs com o perfil misto & API de ingestão e PostgreSQL & normal; 1 instância com 2~vCPU e 4~GB & todos os pedidos aceites e persistidos; um \emph{host} ruidoso não atrasa os outros & p95 $<$ 300~ms; 0\,\% 5xx; CPU $<$ 70\,\%; atraso p95 $<$ 5~s nos não ruidosos \\ \addlinespace
-    \cen{SC2} & 1\,000 remotes com 1~h de \emph{backlog} enviam ao mesmo tempo & central e base de dados & central acabado de arrancar & aceita até à capacidade; o excesso recebe 429 com \texttt{Retry-After}; nada se perde & \emph{backlog} absorvido em $\le$ 15~min; \emph{dashboard} p95 $<$ 1~s; 0 perdas; 0 duplicados \\ \addlinespace
+    \cen{SC2} & 1\,000 remotes com 1~h de \emph{backlog} enviam ao mesmo tempo & central e base de dados & central acabado de arrancar & aceita até à capacidade; o excesso é rejeitado com o atraso para nova tentativa; nada se perde & \emph{backlog} absorvido em $\le$ 15~min; \emph{dashboard} p95 $<$ 1~s; 0 perdas; 0 duplicados \\ \addlinespace
     \cen{SC3} & operador acrescenta instâncias atrás do balanceador & central & carga acima da capacidade de 1 instância & o débito sobe; cada \emph{job} corre numa só instância & $\ge$ 1,8× com 2; $\ge$ 2,5× com 3; 0 \emph{jobs} duplicados; troca de líder $\le$ 30~s \\ \addlinespace
     \cen{SC4} & operador consulta o \emph{dashboard} & \emph{dashboard} e PostgreSQL & 30 dias de dados de 1\,000 \emph{hosts}; retenção ativa & a consulta responde; a retenção não degrada a ingestão & p95 $<$ 1~s; ingestão sem degradação durante a retenção \\ \addlinespace
-    \cen{SC5} & 1\,\% dos \emph{hosts} em rajada de 200 logs/s durante 2~min & ingestão do central & normal, 1\,000 \emph{hosts} & o \emph{host} em rajada recebe 429 e guarda localmente; os outros não são afetados & atraso p95 $<$ 5~s para os restantes \\ \addlinespace
+    \cen{SC5} & 1\,\% dos \emph{hosts} em rajada de 200 logs/s durante 2~min & ingestão do central & normal, 1\,000 \emph{hosts} & o \emph{host} em rajada é rejeitado por sobrecarga e guarda localmente; os outros não são afetados & atraso p95 $<$ 5~s para os restantes \\ \addlinespace
     \cen{AV4} & aplicação em ciclo de erro gera uma rajada de logs & remote e \emph{buffer} & central indisponível & o \emph{buffer} respeita o limite; descarta primeiro INFO e WARN, e conta o que descarta & tamanho $\le$ limite; perdas só de INFO/WARN, contadas e reportadas \\ \addlinespace
     \cen{MO1} & programador recebe o pedido de uma métrica de alerta nova & módulo de alertas & desenvolvi\-mento & métrica implementada e testada sem tocar no avaliador genérico & $\le$ 1 pessoa-dia; $\le$ 3 ficheiros Go e 1 migração \\ \addlinespace
     \cen{AV1} & falha de infraestrutura: central em baixo 1~h & remote e \emph{buffer} SQLite & aplicações continuam a registar erros & o remote guarda tudo e entrega quando o central volta & 0 perdas; 0 duplicados (teste E2E) \\
@@ -198,7 +204,9 @@ A Tabela~\ref{tab:cenarios} detalha, no formato de seis partes, os cenários que
 
 \paragraph{Origem dos números.}
 Os 1\,000 \emph{hosts} são a escala escolhida pela equipa. Os 300~ms são folgados para um POST assíncrono e
-servem de sinal de saturação, não de requisito de latência. Os 15~minutos de \cen{SC2} são cerca de quatro
-vezes o tempo teórico de envio do \emph{backlog}. O fator 1,8× de \cen{SC3} admite que duas instâncias
+servem de sinal de saturação, não de requisito de latência. Os 15~minutos de \cen{SC2} obrigam a absorver as
+$\approx$435\,000 linhas do \emph{backlog} a $\approx$480 linhas/s, enquanto continuam a chegar as $\approx$120/s
+normais: cerca de cinco vezes o débito nominal, uma margem exigente mas plausível com escritas em lote
+(\dec{5}). O fator 1,8× de \cen{SC3} admite que duas instâncias
 percam 10\,\% para a coordenação; o de 2,5× admite uma perda maior com três. Os limites de \cen{MO1} correspondem a uma alteração confinada a um único
 módulo, que é o que a modificabilidade promete.

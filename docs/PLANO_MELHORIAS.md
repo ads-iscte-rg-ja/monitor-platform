@@ -85,7 +85,7 @@ tradeoffs."* Esta secção torna esses trade-offs explícitos.
 |---|---|---|
 | **Scalability vs Modifiability**: mais instâncias, partições e coordenação trazem mais complexidade | Escalar **só até onde as medições exigem** (1.000 hosts). O resto fica em backlog com gatilhos (§8) | *Defer Binding* (papéis por configuração), *Encapsulate* (o particionamento fica escondido atrás do repositório) |
 | **Availability vs Consistency**: entrega at-least-once pode duplicar | At-least-once + **deduplicação idempotente** (recibos por `host_id, source_id`) | *Transactions* (dados + recibo na mesma transação) |
-| **Scalability vs Availability**: controlo de admissão (429) rejeita pedidos | Rejeitar **sem perder**: o remote guarda e volta a tentar com `Retry-After` | *Limit Event Response* no central + *Retry* no remote |
+| **Scalability vs Availability**: controlo de admissão (`RESOURCE_EXHAUSTED`) rejeita pedidos | Rejeitar **sem perder**: o remote guarda e volta a tentar depois do `RetryInfo` | *Limit Event Response* no central + *Retry* no remote |
 | **Modifiability vs Performance**: estratégias por métrica vs uma query set-based | Manter **uma só query set-based**, montada a partir das estratégias (D13) | *Increase Cohesion* sem *N+1 queries* |
 | **Security vs Performance**: HMAC por pedido, bcrypt no login | Aceitar o custo: HMAC custa µs; o bcrypt só corre no login | — |
 | **Security vs Modifiability da UI (EUVI)**: uma CSP restritiva pode partir scripts inline | CSP primeiro em **Report-Only**, depois *enforce* de forma coordenada | *Change Default Settings* faseado |
@@ -112,7 +112,7 @@ Utility
 │   ├── Crescimento de dados
 │   │   └── SC4 (H,M) 30 dias de dados de 1.000 hosts → query do dashboard p95 <1 s; retenção sem degradar a ingestão
 │   └── Volume de logs imprevisível
-│       ├── SC5 (H,H) 1% dos hosts em rajada (200 logs/s) → os restantes mantêm lag p95 <5 s; o host ruidoso recebe 429
+│       ├── SC5 (H,H) 1% dos hosts em rajada (200 logs/s) → os restantes mantêm lag p95 <5 s; o host ruidoso é rejeitado por sobrecarga (`RESOURCE_EXHAUSTED`)
 │       └── AV4 (H,M) Rajada de logs com o central em baixo → o buffer do host nunca passa o limite configurado; perdas só de INFO/WARN, contadas e reportadas
 ├── Modifiability
 │   ├── MO1 (H,H) Nova métrica de alerta → ≤1 pessoa-dia, ≤3 ficheiros Go + 1 migração
@@ -152,7 +152,7 @@ A escalabilidade é o bloco com mais cenários (H,H) e é por isso o eixo do roa
 **SC2: recuperação após falha (*thundering herd*)**
 | Fonte | Estímulo | Artefacto | Ambiente | Resposta | Medida |
 |---|---|---|---|---|---|
-| 1.000 remotes com 1 h de backlog | todos voltam a enviar ao mesmo tempo | central + BD | o central acabou de arrancar | o central aceita até à capacidade; o excesso recebe 429 + `Retry-After`; nada se perde | backlog absorvido ≤15 min; dashboard p95 <1 s; 0 perdas; 0 duplicados |
+| 1.000 remotes com 1 h de backlog | todos voltam a enviar ao mesmo tempo | central + BD | o central acabou de arrancar | o central aceita até à capacidade; o excesso recebe `RESOURCE_EXHAUSTED` + `RetryInfo`; nada se perde | backlog absorvido ≤15 min; dashboard p95 <1 s; 0 perdas; 0 duplicados |
 
 **SC3: escala horizontal**
 | Fonte | Estímulo | Artefacto | Ambiente | Resposta | Medida |
@@ -170,8 +170,8 @@ A escalabilidade é o bloco com mais cenários (H,H) e é por isso o eixo do roa
 | Falha de infraestrutura | central em baixo 1 h | remote + buffer SQLite | apps continuam a gerar logs | o remote guarda tudo e entrega quando o central volta | 0 perdas, 0 duplicados (verificado por E2E) |
 
 **Origem dos números:** 1.000 hosts é a escala-alvo escolhida. Os 30 s vêm do intervalo atual do remote.
-Os 300 ms são folgados para um POST assíncrono e servem de sinal de saturação. Os 15 min equivalem a
-4× o tempo de flush teórico (§4.3). O fator 1,8× deixa 10% de overhead de coordenação.
+Os 300 ms são folgados para um POST assíncrono e servem de sinal de saturação. Os 15 min obrigam a absorver ≈435 k linhas a
+≈480 linhas/s mais as ≈120/s normais: ≈5× o débito nominal (§4.3). O fator 1,8× deixa 10% de overhead de coordenação.
 
 ---
 
@@ -203,7 +203,7 @@ Para não medir "porque a ferramenta mede", cada métrica responde a uma pergunt
 | Reliability | Há bugs detetáveis estaticamente? | Issues de staticcheck/errcheck; *data races* | 0 | golangci-lint; `go test -race` |
 | Security | Há vulnerabilidades conhecidas **alcançáveis**? | Vulns alcançáveis no call graph | 0 | `govulncheck` |
 | Security | O código tem padrões inseguros? | Issues gosec; *security hotspots* revistos | 0 / 100% | `gosec` (golangci-lint) + SonarQube Cloud |
-| Scalability | Quanto aguenta o sistema? | Throughput sustentado, p95/p99, % 429/5xx, lag de ingestão | ver SC1–SC3 | **k6** + `/metrics` (Prometheus) |
+| Scalability | Quanto aguenta o sistema? | Throughput sustentado, p95/p99, % de rejeições por sobrecarga e de erros, lag de ingestão | ver SC1–SC3 | **k6** + `/metrics` (Prometheus) |
 | Scalability | Os dados crescem como previsto? | Bytes/dia por tabela, duração da limpeza | ver SC4 | `pg_total_relation_size`, `pg_stat_statements` |
 | Availability | Perde-se ou duplica-se algo? | Registos enviados vs recebidos, duplicados | 0 / 0 | teste E2E |
 
@@ -243,9 +243,9 @@ ao longo do tempo no relatório.
 |---|---|---|
 | Pedidos de stats | 1.000 / 30 s | **33 req/s** |
 | Linhas de stats | 33/s × 86.400 | 2,9 M/dia ≈ **0,6 GB/dia** (≈200 B/linha com índices) → 17 GB/30 dias |
-| Logs | **Não é constante:** vai de 0 (nada a registar) a "muitos" (rajadas). Usamos o perfil misto de §4.4 | Média do perfil ≈ 100 linhas/s → ≈8,6 M/dia ≈ **9 GB/dia** (≈1 KB/linha; até 64 KB com stack trace). O que dimensiona o sistema é a **cauda** (rajadas), não a média |
-| Backlog após 1 h em baixo | 1.000 × (120 stats + 60 logs) | **180 k linhas** chegam quase de uma vez |
-| Statements SQL hoje | 1 INSERT por linha + recibo + update do host | 180 k linhas → **≈400 k statements** em segundos → 25 ligações saturadas e dashboard bloqueado (motiva D5 e D6) |
+| Logs | **Não é constante:** vai de 0 (nada a registar) a "muitos" (rajadas). Usamos o perfil misto de §4.4 | Média do perfil, sem rajadas, ≈ 90 linhas/s → ≈7,6 M/dia ≈ **7,6 GB/dia** (≈1 KB/linha; até 64 KB com stack trace). O que dimensiona o sistema é a **cauda** (rajadas), não a média |
+| Backlog após 1 h em baixo | 120 k stats + 90/s × 3.600 s de logs | **≈435 k linhas** chegam quase de uma vez |
+| Statements SQL hoje | 1 INSERT por linha + recibo + update do host | 435 k linhas → **≈1 M de statements** em poucos minutos → 25 ligações saturadas e dashboard bloqueado (motiva D5 e D6) |
 | Probes de health, pior caso | 1.000 hosts × timeout 5 s / concorrência 8 | **625 s por ciclo** contra um intervalo de 30 s → **AV2 violado 20×** (motiva D7) |
 | Avaliação de alertas | 1.000 hosts × ~6 regras | 6.000 avaliações a cada 15 s; hoje até **400 UPDATE/s** só para "resolver" (motiva D5) |
 | Ligações à BD com 3 instâncias | 3 × 25 | 75 de 100 do `max_connections` por omissão → reduzir para 20 por instância |
@@ -271,10 +271,10 @@ entra em ciclo de erro. Isto muda três coisas.
 |---|---|---|
 | 70% | silenciosos | 0–1/min |
 | 25% | normais | ~10/min |
-| 4% | ruidosos | ~10/s contínuo |
+| 4% | ruidosos | ~1/s contínuo (taxa fixada a 19/11: erros de aplicação, não logs de acesso; 86 mil/dia já é uma app avariada) |
 | 1% | **rajada** (app em ciclo de erro) | ~200/s durante 2 min |
 
-Os valores são uma **hipótese explícita**. O relatório deve dizê-lo e mostrar a sensibilidade: que acontece se os ruidosos forem 10%.
+Os valores são uma **hipótese explícita**. O relatório deve dizê-lo e mostrar a sensibilidade: o cenário principal repete-se com uma carga de logs 2× e 5× maior (por exemplo, 10% de hosts ruidosos), para ver a partir de onde os cenários falham.
 
 **2. Há um risco novo no host monitorizado (lacuna S9).** O buffer SQLite **não tem limite**. Se uma app
 logar muito enquanto o central está em baixo, o remote enche o disco do host e **o monitor prejudica o
@@ -445,7 +445,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Problema:** S8, A3. Não se defende escalabilidade sem números.
 * **Decisão:** `prometheus/client_golang` com:
   * histogramas de latência por rota de ingestão;
-  * contadores de registos aceites, duplicados e rejeitados e de respostas 429;
+  * contadores de registos aceites, duplicados e rejeitados e de rejeições por sobrecarga (`RESOURCE_EXHAUSTED`);
   * gauges do outbox pendente e do pool de BD;
   * duração e último sucesso de cada job;
   * lag de ingestão (`now - collected_at`).
@@ -461,7 +461,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Verificação:** os dashboards Grafana mostram as medidas de SC1–SC3 durante os testes k6.
 
 #### D5. Escritas set-based
-* **Problema:** S2, S3. ≈400 k statements numa recuperação; 400 UPDATE/s nos alertas.
+* **Problema:** S2, S3. ≈1 M de statements numa recuperação; 400 UPDATE/s nos alertas.
 * **Decisão:** inserts multi-linha com `unnest($1::bigint[], …)`: **1 statement por lote** para dados,
   outro para recibos, com `ON CONFLICT DO NOTHING` a manter a idempotência. Resolver alertas com **1 UPDATE
   por ciclo**, que junta os eventos abertos ao resultado da avaliação.
@@ -475,11 +475,11 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 #### D6. Controlo de admissão na ingestão (*load shedding*)
 * **Problema:** S4, SC2. Quando o central volta, 1.000 remotes despejam o backlog ao mesmo tempo.
 * **Decisão:** um semáforo de pedidos de ingestão em curso (`INGEST_MAX_INFLIGHT`, por omissão ≈ 60% do pool
-  de BD). Quando está cheio, responde **429 com `Retry-After` aleatório entre 1 e 10 s**. O remote **já** respeita
-  `Retry-After`, por isso não é preciso mudar o protocolo. O dashboard tem a sua quota de ligações garantida.
+  de BD). Quando está cheio, responde **`RESOURCE_EXHAUSTED` com `RetryInfo` aleatório entre 1 e 10 s** (ADR-0003;
+  antes do gRPC era 429 + `Retry-After`). O remote **já** respeita o `RetryInfo`, por isso não é preciso mudar o contrato. O dashboard tem a sua quota de ligações garantida.
   No remote, acrescentar **jitter inicial** (0–30 s) ao arranque dos workers.
   **Justiça por host (S10, SC5):** além do limite global, cada host tem um *token bucket* de registos/s
-  (`INGEST_HOST_RATE`, por omissão 50 logs/s com rajada de 500). Quando o esgota, só esse host recebe 429.
+  (`INGEST_HOST_RATE`, por omissão 50 logs/s com rajada de 500). Quando o esgota, só esse host recebe `RESOURCE_EXHAUSTED`.
   Os buckets ficam em memória por instância. Com N instâncias, o limite efetivo por host é até N×, o que é
   aceitável porque é um mecanismo de justiça e não de segurança (fica documentado no ADR).
 * **Teoria:** Performance → *Limit Event Response*, *Bound Queue Sizes*, *Schedule Resources*; Availability →
@@ -677,12 +677,12 @@ Não implementamos isto. Documentamos **quando** e **porquê** cada passo se tor
 tem um **gatilho medível** pelas métricas de D4, que funcionam como *fitness functions*. Assim, a decisão
 de escalar fica guiada por dados e não por antecipação (YAGNI, slide 06).
 
-**Estimativa a 10.000 hosts:** 333 req/s de stats; ≈6 GB/dia de stats e ≈14 GB/dia de logs; backlog de
-1 h com 1,8 M linhas; 60.000 avaliações de alertas a cada 15 s.
+**Estimativa a 10.000 hosts:** 333 req/s de stats; ≈6 GB/dia de stats e ≈76 GB/dia de logs; backlog de
+1 h com ≈4,4 M linhas; 60.000 avaliações de alertas a cada 15 s.
 
 | # | Evolução | Gatilho (medido) | Táctica / padrão | Custo / risco |
 |---|---|---|---|---|
-| E1 | **Fila de ingestão** (NATS JetStream ou Kafka) entre a API e a BD: a API só valida e publica, e *consumers* escrevem em lote | p95 de escrita na BD >200 ms **ou** taxa de 429 >5% em regime normal | **Publish-Subscribe / Broker** (slide 04); *Use an Intermediary* | Novo serviço com estado; a deduplicação passa para o *consumer* |
+| E1 | **Fila de ingestão** (NATS JetStream ou Kafka) entre a API e a BD: a API só valida e publica, e *consumers* escrevem em lote | p95 de escrita na BD >200 ms **ou** taxa de rejeições por sobrecarga >5% em regime normal | **Publish-Subscribe / Broker** (slide 04); *Use an Intermediary* | Novo serviço com estado; a deduplicação passa para o *consumer* |
 | E2 | **TimescaleDB**: *hypertables* + *continuous aggregates* (1 min / 1 h) + compressão | Dashboard p95 >1 s em 30 d **ou** armazenamento >500 GB | *Maintain Multiple Copies of Data* (agregados), *Reduce Overhead* | Troca da imagem do Postgres; migração de dados |
 | E3 | **Separar serviços**: `ingest`, `web` e `worker` em deploys independentes (o `APP_ROLE` já o prepara) | Ingestão e dashboard competem por CPU (correlação nas métricas) | *Split Module*; SOA (slide 04) | Mais deploys; o contrato interno passa a ser fronteira de rede |
 | E4 | **Réplicas de leitura** para o dashboard; HA do Postgres (Patroni ou serviço gerido) | CPU da BD >70% com leitura dominante; requisito de RTO | *Maintain Multiple Copies of Data*, *Active/Passive Redundancy* | Leituras ligeiramente desatualizadas (aceitável num dashboard) |
