@@ -9,6 +9,10 @@ version: "2"
 
 run:
   timeout: 5m
+  # Caminhos relativos à raiz do repositório analisado, não à pasta deste ficheiro (o
+  # valor por omissão na v2). Sem isto, no CI o relatório checkstyle é escrito em
+  # .monitor-platform/lint/ com caminhos "../../..." e o SonarQube Cloud não o importa.
+  relative-path-mode: gitroot
   # Inclui os testes de integração do central na análise.
   build-tags:
     - integration
