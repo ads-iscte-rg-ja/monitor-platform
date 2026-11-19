@@ -1,5 +1,6 @@
 # Copiar para <repo>/.github/workflows/ci.yml em cada repositório Go do Monitor.
 # Toda a lógica vive em monitor-platform; aqui só se escolhem as opções do repo.
+# A versão do pipeline é fixada pela tag (@v1) do monitor-platform; para atualizar, mover a tag.
 name: ci
 
 on:
