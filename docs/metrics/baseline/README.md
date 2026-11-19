@@ -59,12 +59,19 @@ Gerado com `scripts/medir.py baseline`.
    ficheiro regular. **Ação:** marcar cada um com `//nolint:gosec // <motivo>`, para que a exceção
    fique escrita e revista, em vez de ficar ruído permanente no lint. Os restantes `gosec` são
    sobretudo `G104` (erros ignorados), que coincidem com os do `errcheck`.
+   **Os erros ignorados são quase só ruído:** 10 dos 11 `errcheck` do central e os 4 do remote são
+   `defer tx.Rollback()`, o idioma Go para anular uma transação que não chegou ao commit. Depois de um
+   commit bem-sucedido, o `Rollback` devolve sempre `sql.ErrTxDone`, e ignorá-lo é intencional. O único
+   caso real era o `Encode` sem verificação em `handlers/health.go` (tratado na iteração 1).
 
 6. **Acoplamento.** `server` tem Ce = 10 e I = 0,91: é a raiz de composição, por isso é esperado.
    `services` tem abstração 0,47 porque declara as interfaces de que precisa, aplicando DIP. É o pacote mais perto
    da sequência principal (D = 0,10). `database` tem Ca = 8. Fora `repositories`, os pacotes que
    dependem dele (handlers, seed e os comandos) são os pontos a rever quando a BD mudar
    (particionamento, D9).
+   No remote, nenhum pacote declara interfaces exceto `collect` (A = 0,25). O `sender` (Ce = 4) depende
+   diretamente do buffer SQLite e do cliente HTTP concretos: trocar o buffer ou simular falhas de rede
+   num teste obriga a mexer nestas implementações. É a lacuna de testabilidade que D14 trata.
 
 ## Nota sobre a medição
 

@@ -1,18 +1,101 @@
 \section{Enquadramento teórico}
 \label{sec:enquadramento}
 
+Este capítulo resume apenas os conceitos que o relatório usa, e como os usa. A referência principal são
+os diapositivos da unidade curricular~\cite{bastofernandes2026}, baseados em Bass et
+al.~\cite{bass2012}.
+
 \subsection{Arquitetura de software, estruturas e vistas}
-\porescrever{definição de arquitetura e estruturas de módulos, C\&C e alocação~\cite{bass2012,bastofernandes2026}.}
+
+A arquitetura de software de um sistema é o conjunto de estruturas necessárias para raciocinar sobre
+ele: elementos de software, as relações entre eles e as propriedades de ambos~\cite{bass2012}. Há três
+categorias de estruturas~\cite{bastofernandes2026}:
+\begin{itemize}
+  \item \textbf{de módulos}: unidades de implementação e as relações de decomposição, uso e camadas.
+        Determinam a modificabilidade, porque definem até onde uma alteração se propaga;
+  \item \textbf{de componentes e conectores} (C\&C): elementos em execução e a forma como interagem.
+        Permitem raciocinar sobre desempenho, disponibilidade e concorrência;
+  \item \textbf{de alocação}: a correspondência entre o software e o ambiente, isto é, máquinas,
+        ficheiros e equipas. A estrutura de \emph{deployment} serve para raciocinar sobre desempenho,
+        integridade dos dados, segurança e disponibilidade.
+\end{itemize}
+Uma vista é a representação documentada de uma estrutura. O capítulo~\ref{sec:sistema} documenta uma
+vista de cada categoria. Segue-se o princípio de só documentar o que traz retorno: as partes que um
+recém-chegado precisa de aprender, as que têm risco e as que mudam com frequência (YAGNI).
 
 \subsection{Atributos de qualidade e cenários}
-\porescrever{cenários de 6 partes; modelo de qualidade~\cite{iso25010}.}
 
-\subsection{Tácticas e padrões}
-\porescrever{tácticas por QA; padrões arquiteturais e GoF~\cite{gamma1994}.}
+Os sistemas são muitas vezes redesenhados não por lhes faltar funcionalidade, mas por serem difíceis de
+manter, escalar ou proteger~\cite{bastofernandes2026}. Os atributos de qualidade (QA) dividem-se em atributos
+\textbf{de execução} (disponibilidade, desempenho, usabilidade) e \textbf{de desenvolvimento}
+(modificabilidade, testabilidade). Os nomes seguem os diapositivos e o modelo de qualidade da ISO/IEC
+25010~\cite{iso25010}. Os QA
+não se atingem isoladamente: melhorar um afeta outros, e desenhar é, em parte, escolher
+\emph{trade-offs}. Por isso o capítulo~\ref{sec:requisitos} os torna explícitos.
+
+Um requisito de qualidade tem de ser inequívoco e testável. Especifica-se como um cenário de seis partes:
+\textbf{fonte} do estímulo, \textbf{estímulo}, \textbf{artefacto} afetado, \textbf{ambiente},
+\textbf{resposta} e \textbf{medida da resposta}. A medida é o que torna o cenário verificável, e é ela que
+os testes de carga e as métricas de código deste trabalho medem.
+
+Três definições dos diapositivos 03 são usadas na avaliação. Quando as responsabilidades de dois módulos
+se sobrepõem, uma única alteração pode afetar ambos; o \textbf{acoplamento} é a probabilidade de isso
+acontecer, e é mau para a modificabilidade. A \textbf{coesão} é a
+probabilidade de uma alteração que afeta uma responsabilidade de um módulo afetar também as outras, e é
+boa quando é alta. A \textbf{testabilidade} é a facilidade com que os testes revelam as faltas que
+existem.
+
+\subsection{Táticas e padrões}
+
+Uma tática é uma decisão de desenho que influencia a resposta de um único atributo de qualidade, sem ter
+em conta os outros. Os \emph{trade-offs} entre táticas têm de ser controlados explicitamente pelo
+arquiteto~\cite{bastofernandes2026}. Os padrões arquiteturais (Layered, Client-Server, Shared-Data,
+Broker, MVC, Publish-Subscribe) já incluem os seus \emph{trade-offs}. O Broker, por exemplo, traz
+indireção e latência, e torna-se um ponto de ataque, de falha e de estrangulamento. Ao nível do desenho
+detalhado usam-se os padrões GoF~\cite{gamma1994}. Neste trabalho os catálogos de táticas por QA
+(disponibilidade, modificabilidade, desempenho, segurança, testabilidade) servem duas vezes: para
+identificar o que o sistema já faz (secção~\ref{sec:tacticas-existentes}) e para justificar cada decisão
+nova.
+
+A análise de um QA pode fazer-se por estimativas \emph{back-of-the-envelope}, por experiências mentais
+ou por \emph{checklists}, como na segurança. A análise feita mais tarde no ciclo de vida, sobre o sistema
+real, dá mais confiança, mas custa mais~\cite{bastofernandes2026}. É essa a relação entre as estimativas
+do capítulo~\ref{sec:requisitos}, baratas e feitas cedo, que apontam os prováveis estrangulamentos, e os
+testes de carga, que os confirmam ou desmentem.
 
 \subsection{Desenho orientado a atributos (ADD) e registo de decisões}
-\porescrever{ADD, utility tree, ADRs~\cite{nygard2011}.}
+
+Os requisitos arquiteturalmente significativos (ASR) são os que alteram profundamente a arquitetura; são
+muitas vezes requisitos de qualidade e derivam frequentemente dos objetivos da própria organização. Uma
+\textbf{utility tree} organiza-os: a raiz é a ``utilidade'' do sistema, o primeiro nível são os QA, o
+segundo são refinamentos, e as folhas são cenários. Cada folha é classificada pelo
+\textbf{valor de negócio} e pelo \textbf{impacto arquitetural}, numa escala de H, M e L. Os cenários (H,H)
+são os primeiros a tratar no desenho~\cite{bastofernandes2026}.
+
+O \emph{Attribute-Driven Design} (ADD) é iterativo. Em cada iteração escolhe-se um elemento, reúnem-se
+os ASR que lhe dizem respeito, gera-se e testa-se uma solução, e escolhe-se o que tratar na iteração
+seguinte. O desenho avança por \emph{generate and test}: cada hipótese é testada e a seguinte parte do
+resultado. Neste trabalho o ``teste'' de cada iteração é uma medição: a mesma medição de baseline,
+repetida depois de cada alteração.
+
+Cada decisão é registada num \emph{Architecture Decision Record} (ADR)~\cite{nygard2011}, com o contexto,
+a decisão e as consequências, a que se acrescentam a teoria que a fundamenta, as alternativas rejeitadas e
+a forma de a verificar. Os ADR estão no anexo~\ref{anx:adrs}.
 
 \subsection{Métricas de qualidade de software}
-\porescrever{GQM~\cite{basili1994}; complexidade ciclomática~\cite{mccabe1976} e cognitiva~\cite{campbell2018};
-acoplamento e instabilidade~\cite{martin2002}.}
+
+As métricas são escolhidas pelo método \emph{Goal--Question--Metric}~\cite{basili1994}: um objetivo gera
+perguntas, e só se mede o que responde a uma delas. As métricas de código usadas são:
+\begin{itemize}
+  \item \textbf{complexidade ciclomática}~\cite{mccabe1976}: o número de caminhos linearmente
+        independentes de uma função, que é também o número de testes necessários para percorrer uma
+        base desses caminhos. Mede o esforço de teste;
+  \item \textbf{complexidade cognitiva}~\cite{campbell2018}: penaliza o aninhamento e as quebras de
+        fluxo, e não a mera sequência de decisões. Mede o esforço de leitura;
+  \item \textbf{métricas de pacote de Martin}~\cite{martin2002}: acoplamento aferente (Ca, quem depende do
+        pacote) e eferente (Ce, de quem o pacote depende), instabilidade $I = Ce/(Ca+Ce)$, abstração $A$
+        (fração de tipos abstratos) e distância à sequência principal $D = |A + I - 1|$. Um pacote estável
+        deve ser abstrato, e um instável deve ser concreto; $D$ próximo de 0 indica esse equilíbrio.
+\end{itemize}
+A aplicação destas métricas ao Monitor, com os limites escolhidos, está na
+secção~\ref{sec:gqm}.

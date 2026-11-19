@@ -15,8 +15,8 @@ relatório trata-os em separado:
   \item \textbf{métricas de código} (complexidade, duplicação, acoplamento, cobertura, vulnerabilidades).
         São \emph{proxies} dos atributos de desenvolvimento: modificabilidade e testabilidade.
 \end{itemize}
-A Tabela~\ref{tab:gqm} mostra o resultado. A coluna \emph{Uso} separa os \textbf{gates}, que bloqueiam um
-\emph{pull request}, das métricas de \textbf{tendência}, que são reportadas na comparação antes/depois
+A Tabela~\ref{tab:gqm} mostra o resultado. A coluna \emph{Uso} separa os \textbf{gates}, que fazem falhar o
+pipeline de um \emph{pull request}, das métricas de \textbf{tendência}, que são reportadas na comparação antes/depois
 do capítulo~\ref{sec:avaliacao} mas não bloqueiam nada. Uma métrica é \emph{gate} só quando tem um
 limite objetivo e aplicável a cada alteração; o acoplamento, por exemplo, não tem um valor certo
 absoluto, e o que interessa é a evolução.
@@ -51,7 +51,7 @@ absoluto, e o que interessa é a evolução.
     \midrule
     \multicolumn{5}{l}{\textit{Scalability, Availability}} \\
     Quanto aguenta o sistema? & Débito, p95/p99, \% de 429/5xx, atraso de ingestão & cenários & tendência & k6, Prometheus \\
-    Perde-se ou duplica-se dados? & Enviados vs.\ recebidos; duplicados & 0 / 0 & tendência & teste E2E \\
+    Perdem-se ou duplicam-se dados? & Enviados vs.\ recebidos; duplicados & 0 / 0 & tendência & teste E2E \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -74,9 +74,15 @@ medido numa amostra (os \emph{services} do central) e só na avaliação final.
 O plano previa o \emph{technical debt ratio} do SonarQube Cloud ($\le 5\,\%$, \emph{rating} A) como
 resposta à pergunta ``a dívida técnica está controlada?''. Na baseline deu 0,0\,\% nos quatro
 repositórios, apesar de 66 \emph{issues} de lint e de funções com complexidade cognitiva até 46
-(secção~\ref{sec:baseline}): as regras da ferramenta para Go são poucas, e a métrica não distingue código
-bom de mau neste sistema. Foi retirada da tabela. A pergunta passa a ser respondida pelas métricas de
-modificabilidade acima, que a baseline mostrou serem sensíveis aos problemas reais.
+(secção~\ref{sec:baseline}). O rácio divide o tempo estimado para corrigir os \emph{code smells} que a
+ferramenta encontra pelo custo estimado de escrever o código, que por omissão é de 30 minutos por linha.
+No central, isso dá cerca de 3\,400 horas de desenvolvimento contra 5 minutos de dívida detetada; para
+passar de A a B seriam precisas perto de 170 horas de correções, o que as poucas regras da ferramenta
+para Go nunca chegam a acumular. O resultado reflete a cobertura das regras, não o estado do código: a
+dívida existe e está quantificada pelas outras métricas (complexidade concentrada, camada HTTP quase
+sem testes, \texttt{sender} do remote sem interfaces, SDK sem testes). A métrica foi, por isso,
+retirada da tabela, e a pergunta passa a ser respondida pelas métricas de modificabilidade e
+testabilidade acima, que a baseline mostrou serem sensíveis aos problemas reais.
 
 \subsection{Ferramentas e alternativas}
 \label{sec:ferramentas}
@@ -109,17 +115,17 @@ escolhas e as alternativas rejeitadas.
 \paragraph{Porque o SonarQube Cloud, se o lint já mede quase tudo.}
 Antes de o integrar, ponderou-se prescindir dele. O lint, o govulncheck e as métricas próprias já
 cobrem a complexidade, a duplicação, os padrões inseguros e o acoplamento, e a cobertura do código novo
-pode ser verificada por uma ferramenta local. Ficaria sem a análise de uma ferramenta exterior à equipa,
-sem análise das linguagens que não são Go e sem histórico consultável. A baseline confirmou que estas
+pode ser verificada por uma ferramenta local. Mas o pipeline ficaria sem a análise de uma ferramenta
+exterior à equipa, sem análise das linguagens que não são Go e sem histórico consultável. A baseline confirmou que estas
 diferenças importam. O SonarQube Cloud chegou de forma independente aos mesmos dois falsos positivos de
-segurança e encontrou três problemas em SQL, JavaScript e HTML que as ferramentas de Go não veem
-(secção~\ref{sec:baseline}). A divisão de papéis ficou, por isso, assim: os \emph{gates} são das ferramentas que
+segurança e assinalou código SQL, JavaScript e HTML que as ferramentas de Go não analisam, incluindo um
+problema real de segurança (secção~\ref{sec:baseline}). A divisão de papéis ficou, por isso, assim: os \emph{gates} são das ferramentas que
 correm também localmente, e o SonarQube Cloud é a segunda opinião, o histórico e o \emph{dashboard}. É
 gratuito, sem limite de projetos, para repositórios públicos.
 
 \paragraph{Versões fixadas.}
-As versões do golangci-lint e do govulncheck estão fixadas no pipeline e no script de medição, e a do
-Go está declarada em cada \texttt{go.mod} (diretiva \texttt{toolchain}). Uma versão nova de uma
+As versões do golangci-lint e do govulncheck estão fixadas no pipeline e no script que corre as mesmas
+verificações localmente; o script de medição regista as versões que usou. A versão do Go está declarada em cada \texttt{go.mod} (diretiva \texttt{toolchain}). Uma versão nova de uma
 ferramenta pode mudar as contagens sem que o código mude, e isso estragaria a comparação
 antes/depois. As atualizações passam, por isso, a ser alterações explícitas e revistas. O govulncheck é
 instalado com a versão de Go de que precisa, mas analisa com a versão do projeto: são as vulnerabilidades
@@ -131,7 +137,7 @@ dessa versão que interessam, porque é ela que vai para produção.
 Os quatro repositórios precisam das mesmas verificações, com os mesmos limites. Em vez de quatro
 cópias do pipeline, que divergiriam à primeira alteração, o pipeline vive num único
 \emph{workflow} reutilizável no repositório \texttt{monitor-platform}, e cada repositório tem apenas um
-\texttt{ci.yml} de cerca de vinte linhas que o invoca e escolhe as suas opções (ADR-0002, anexo~\ref{anx:adrs}).
+\texttt{ci.yml} de 22 a 26 linhas que o invoca e escolhe as suas opções (ADR-0002, anexo~\ref{anx:adrs}).
 É a tática \emph{Abstract Common Services}: o que é comum fica num só sítio. A configuração de lint
 também é única e inclui as regras \texttt{depguard} das camadas de todos os componentes, o que torna
 \emph{Restrict Dependencies} uma verificação executável e não uma convenção. A
@@ -162,14 +168,19 @@ Por isso o lint só falha por \emph{issues} introduzidas na alteração (\texttt
 \emph{quality gate} do SonarQube Cloud compara com o \texttt{main} (\emph{Clean as You Code}). A qualidade
 média sobe à medida que o código é tocado, o crescimento incremental que o ADD
 pressupõe~\cite{bastofernandes2026}. Durante a medição da baseline, um único parâmetro por repositório
-(\texttt{lint-blocking}) põe o lint e o \emph{gate} a reportar sem bloquear; testes, integração e
-vulnerabilidades bloqueiam sempre.
+(\texttt{lint-blocking}) põe o lint e o \emph{gate} a reportar sem falhar; testes, integração e
+vulnerabilidades fazem sempre falhar o pipeline. Para que uma falha impeça de facto o \emph{merge}, como
+pede \cen{TE1}, o \texttt{main} de cada repositório está protegido: só recebe alterações por
+\emph{pull request}, e só com essas fases verdes, mesmo para administradores. Não se exige revisão
+aprovada: com duas pessoas, uma revisão obrigatória bloquearia o trabalho sempre que uma delas não
+estivesse disponível. A proteção de ramo só está disponível para repositórios públicos no plano gratuito do
+GitHub, mais uma razão para os repositórios serem públicos.
 
 \paragraph{Trade-off: acoplamento à plataforma.}
 Centralizar o pipeline cria uma dependência dos quatro repositórios em relação ao
 \texttt{monitor-platform}: um erro no \emph{workflow} partiria os quatro de uma vez. Essa dependência
-é controlada com uma interface versionada. Os repositórios usam a \emph{tag} \texttt{v1}, que só se move
-depois de a alteração ser revista e validada, e nunca o \texttt{main}. O custo é que corrigir o pipeline
+é controlada com uma interface versionada: os repositórios usam a \emph{tag} \texttt{v1}, e não o
+\texttt{main}, e a \emph{tag} só se move depois de a alteração ser revista e validada. O custo é que corrigir o pipeline
 exige um PR e mover a \emph{tag}. O benefício confirmou-se logo na configuração inicial: três
 defeitos do próprio pipeline (a instalação do govulncheck dependia da versão de Go do projeto analisado,
 o relatório do lint era escrito num caminho que o SonarQube Cloud não encontrava, e a severidade dos
@@ -181,7 +192,7 @@ O CI obrigou a declarar uma dependência que até aí era implícita. Os testes 
 \texttt{monitor-hello-world} usam o esquema do \emph{buffer} SQLite, que pertence ao
 \texttt{monitor-remote}: o SDK escreve diretamente nesse esquema, que funciona como interface de dados
 partilhada entre os dois componentes. Localmente funcionava por acaso, porque os repositórios estão lado
-a lado; no CI o \texttt{monitor-remote} passou a ser clonado explicitamente (\texttt{sibling-repos}).
+a lado; no CI, o \texttt{monitor-remote} passou a ser clonado explicitamente (\texttt{sibling-repos}).
 O contrato fica assim verificado em cada alteração ao SDK. Uma alteração incompatível no lado do
 \texttt{monitor-remote} só é apanhada no CI seguinte do SDK, o que fica como limitação conhecida.
 
@@ -204,16 +215,22 @@ que corre em todos os \emph{hosts}.
 A Tabela~\ref{tab:baseline-lint} mostra 66 \emph{issues} no central e 29 no remote. Quase todas são
 de manutenção e não defeitos: convenções (\texttt{revive}, 19 no central), erros ignorados
 (\texttt{errcheck} e \texttt{gosec} G104, que em boa parte coincidem) e complexidade
-(\texttt{gocognit} e \texttt{gocyclo}). O resultado mais relevante para a arquitetura é haver
+(\texttt{gocognit} e \texttt{gocyclo}). Os erros ignorados são, na prática, quase só ruído: 10 dos 11
+\texttt{errcheck} do central e os 4 do remote são \texttt{defer tx.Rollback()}, a forma idiomática
+em Go de anular uma transação que não chegou ao \emph{commit}. Depois de um \emph{commit} bem-sucedido
+esse \texttt{Rollback} devolve sempre \texttt{sql.ErrTxDone}, e ignorá-lo é intencional. Uma contagem
+de lint só é interpretável depois de se ver o que está por trás dela. O resultado mais relevante para a
+arquitetura é haver
 \textbf{uma única violação de camadas}: \texttt{handlers/health.go} importa diretamente
 \texttt{internal/database}, saltando as camadas de serviço e de repositório. A arquitetura em camadas
 do central está, portanto, praticamente respeitada. Até aqui isso era só uma convenção; o
-\texttt{depguard} passa a verificá-lo a cada \emph{pull request}. As duas ocorrências de \texttt{gosec}
-com mais peso para a segurança são falsos positivos já mitigados no código. O G201
+\texttt{depguard} passa a verificá-lo a cada \emph{pull request}. Os dois avisos do \texttt{gosec} com
+mais peso para a segurança (G201, e G703 em duas linhas) são falsos positivos já mitigados no código. O G201
 (\texttt{repositories/retention.go}) monta SQL apenas com constantes da aplicação e passa os valores
 como parâmetros. O G703 (\texttt{templating/pages/pages.go}) já valida o caminho com
-\texttt{filepath.Rel} e verifica que se trata de um ficheiro regular. Vão ser marcados com uma
-justificação explícita, para a exceção ficar registada e não se tornar ruído permanente.
+\texttt{filepath.Rel} e verifica que se trata de um ficheiro regular. Na iteração~1 ficaram marcados no
+código com a justificação (\texttt{//nolint:gosec}), para a exceção ficar registada e não se tornar
+ruído permanente.
 
 \gerado{baseline-lint.tex}
 
@@ -228,13 +245,14 @@ no caminho de entrega de dados, que as decisões de escalabilidade vão alterar.
 
 As duas métricas divergem de forma útil, e é por isso que se usam as duas. \texttt{validateAlert} tem
 ciclomática 23 e cognitiva 23. É uma sequência plana de validações sem aninhamento, por isso a
-cognitiva não passa da ciclomática: o custo está sobretudo nos muitos caminhos para testar. \texttt{(HostHealthService).Check} tem ciclomática 12, mas cognitiva 26, porque o
+cognitiva não passa da ciclomática: o custo está sobretudo nos muitos caminhos para testar.
+\texttt{(HostHealthService).Check} tem ciclomática 12, mas cognitiva 26, porque o
 aninhamento torna-a difícil de compreender, embora não tenha muitos caminhos. A complexidade
 ciclomática~\cite{mccabe1976} indica o esforço de \textbf{teste}; a cognitiva~\cite{campbell2018}
 indica o esforço de \textbf{leitura}. \texttt{validateAlert} e
 \texttt{(AlertsService).EvaluateMetricAlerts} (cognitiva 23) ramificam sobre o tipo de métrica. São
-exatamente o código que a decisão \dec{13} substitui pelo padrão Strategy. A baseline dá, assim, a
-medida de partida do cenário de modificabilidade \cen{MO1}.
+exatamente o código que a decisão \dec{13} substitui pelo padrão Strategy, e a sua complexidade é o
+ponto de partida do cenário de modificabilidade \cen{MO1}.
 
 \gerado{baseline-complexidade.tex}
 
@@ -250,23 +268,23 @@ por pacote (Tabela~\ref{tab:baseline-cobertura-central}) diz mais do que o total
   \item \texttt{handlers} fica em 16,1\,\% e \texttt{server} em 0\,\%, mesmo somando a integração.
         A camada HTTP, que é a fronteira com os agentes e com o \emph{dashboard}, é a menos testada.
         Os \emph{handlers} dependem de \emph{services} concretos, e por isso testá-los obriga a montar
-        o sistema inteiro. É este o problema que \dec{14} resolve: interfaces do lado de quem consome
+        o sistema inteiro. É este o problema que \dec{14} trata: interfaces do lado de quem consome
         e relógio injetável.
 \end{itemize}
 O remote tem 68\,\% de cobertura unitária e o SDK não tem testes. Uma percentagem global mais alta não
-foi tomada como objetivo em si. O que se pretende é testar o código novo e o caminho crítico
-(ingestão e entrega), que é o que o \emph{quality gate} do SonarQube Cloud verifica.
+foi tomada como objetivo em si. O que se pretende é testar o código novo, que o \emph{quality gate}
+verifica, e o caminho crítico de ingestão e entrega, que os testes de integração e E2E exercitam.
 
 \gerado{baseline-cobertura.tex}
 
 \paragraph{Vulnerabilidades.}
 O govulncheck só reporta vulnerabilidades em funções efetivamente \textbf{chamadas} pelo código, o que
-reduz o ruído. Mesmo assim, encontrou 52 no central, 37 no remote e uma no SDK e no hello-world. Todas
+reduz o ruído. Mesmo assim, encontrou 52 no central, 37 no remote e uma em cada um dos restantes (SDK e hello-world). Todas
 vêm da biblioteca padrão, exceto duas. A causa é a versão da linguagem, não o código: os
 \texttt{go.mod} declaram \texttt{go 1.25.0}, o CI instala essa versão e a imagem de produção
 (\texttt{golang:1.25-alpine}) usa a mesma linha. O Go só suporta as duas versões mais recentes
 (1.26 e 1.27), e parte destas correções só foi publicada na 1.26; por isso nem o último patch da 1.25
-as resolve, e a produção estava tão exposta como o CI. A correção, primeira ação da iteração~1, é
+as resolve, e a produção também estava exposta. A correção, primeira ação da iteração~1, é
 declarar \texttt{toolchain go1.27.4} nos quatro módulos e compilar a imagem com a mesma versão, para
 que o CI teste e analise exatamente o Go que vai para produção. As duas restantes, ambas no central,
 estão em \texttt{golang.org/x/text} e resolvem-se com a v0.41.0, a menor versão que corrige as duas
@@ -316,11 +334,11 @@ O central teve \emph{rating} E em fiabilidade e em segurança, o pior da escala,
     \toprule
     \emph{Issue} (ficheiro) & Também no lint & Veredicto \\
     \midrule
-    \emph{Path traversal}, ×2 (\texttt{pages.go}) & \texttt{gosec} G703 & Falso positivo: o caminho fica limitado a um nome de ficheiro sem \texttt{..}, confirmado com \texttt{filepath.Rel} e só para ficheiros regulares \\
+    \emph{Path traversal} e \emph{filesystem oracle} (\texttt{pages.go}) & \texttt{gosec} G703 & Falso positivo: o caminho fica limitado a um nome de ficheiro sem \texttt{..}, confirmado com \texttt{filepath.Rel} e só para ficheiros regulares \\
     SQL formatado (\texttt{retention.go}) & \texttt{gosec} G201 & Falso positivo: só se formatam constantes; os valores vão como parâmetros \\
     \texttt{DELETE} sem \texttt{WHERE} (migração 002) & --- & Intencional: invalida sessões que podiam conter chaves em claro \\
     Script de CDN sem \texttt{integrity} (\texttt{layout.html}) & --- & Real: resolvido por \dec{18} (Tailwind servido localmente) \\
-    \emph{Promise} sem tratamento, ×2 (\texttt{dashboard.js}) & --- & Real, sem efeito: a função já trata os erros internamente; frontend, fronteira com EUVI \\
+    \emph{Promise} sem tratamento, ×2 (\texttt{dashboard.js}) & --- & Real, sem efeito: a função já trata os erros internamente \\
     Contexto recriado (\texttt{server.go}) & --- & Menor (\emph{code smell}) \\
     \bottomrule
   \end{tabularx}
@@ -328,8 +346,10 @@ O central teve \emph{rating} E em fiabilidade e em segurança, o pior da escala,
 
 Três conclusões. Primeira: os dois achados de segurança são os mesmos que o \texttt{gosec} assinalou,
 detetados por um motor diferente, e a análise de cada um confirma que são falsos positivos; a
-justificação ficou registada junto ao código (\texttt{//nolint:gosec}). Segunda: três achados estão em SQL, JavaScript e HTML,
-fora do alcance das ferramentas de Go, o que justifica ter uma análise ao repositório inteiro no pipeline.
+justificação ficou registada junto ao código (\texttt{//nolint:gosec}). Segunda: quatro dos oito
+\emph{issues} estão em SQL, JavaScript e HTML, fora do alcance das ferramentas de Go, e um deles (o
+\emph{script} sem verificação de integridade) é um problema real de segurança; isto justifica ter no
+pipeline uma análise ao repositório inteiro.
 Terceira: o \emph{rating} é determinado pelo pior \emph{issue}, e aqui os piores eram falsos positivos
 ou intencionais. Um \emph{rating} sem triagem pode, portanto, sobrestimar o risco, e é por isso que o
 relatório usa os \emph{issues} triados e não a letra.

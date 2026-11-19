@@ -1,14 +1,199 @@
 \section{O sistema Monitor: arquitetura atual}
 \label{sec:sistema}
 
+Este capítulo descreve o sistema tal como estava no início do trabalho (iteração~0), numa vista de cada
+categoria de estruturas (secção~\ref{sec:enquadramento}). Não havia nenhuma documentação de arquitetura:
+as vistas foram recuperadas a partir do código.
+
 \subsection{Vista de módulos}
-\porescrever{diagrama TikZ da decomposição (plano §5.1) e regras de camadas verificadas por \texttt{depguard}.}
+
+A Figura~\ref{fig:modulos} mostra a decomposição e a relação de uso. O central segue o padrão
+\textbf{Layered}: \texttt{handlers} (HTTP) usam \texttt{services} (regras de negócio), que usam
+\texttt{repositories} (acesso a dados). O pacote \texttt{server} é a raiz de composição: cria todos os
+objetos, liga-os e arranca os \emph{jobs} de fundo. Os \texttt{services} declaram as interfaces dos
+repositórios de que precisam, e por isso dependem de abstrações e não de implementações (inversão de
+dependências). No remote, o \texttt{sender} orquestra a entrega: lê do \emph{buffer} (\texttt{repository})
+e envia pelo cliente HTTP (\texttt{requests}); estes dois pacotes não se conhecem um ao outro.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}[
+      mod/.style={draw=iscte, fill=fundotab, rounded corners=2pt, minimum height=7mm,
+                  minimum width=22mm, font=\small\ttfamily, align=center},
+      dado/.style={mod, fill=white, dashed},
+      usa/.style={-{Stealth[length=2mm]}, thick, iscte},
+      partilha/.style={-{Stealth[length=2mm]}, thick, dashed, acento},
+      grupo/.style={draw=cinza, rounded corners=4pt, inner sep=8pt}]
+    % central
+    \node[mod] (srv) {server};
+    \node[mod, below=6mm of srv] (h) {handlers};
+    \node[mod, below=6mm of h] (s) {services};
+    \node[mod, below=6mm of s] (r) {repositories};
+    \node[dado, below=6mm of r] (pg) {database\\[-1pt]{\scriptsize\rmfamily (PostgreSQL)}};
+    \node[mod, left=6mm of s] (mw) {middleware};
+    \draw[usa] (srv) -- (h);
+    \draw[usa] (h) -- (s);
+    \draw[usa] (s) -- (r);
+    \draw[usa] (r) -- (pg);
+    \draw[usa] (mw) -- (s);
+    \draw[usa, red!70!black] (h.east) to[bend left=40] node[right, font=\scriptsize, text=red!70!black] {violação} (pg.east);
+    \node[grupo, fit=(srv)(h)(s)(r)(pg)(mw), label={[font=\small\bfseries]above:monitor-central}] {};
+    % remote
+    \node[mod, right=48mm of srv] (ag) {cmd/agent};
+    \node[mod, below=6mm of ag] (snd) {sender};
+    \node[mod, below left=6mm and -4mm of snd] (req) {requests};
+    \node[mod, below right=6mm and -4mm of snd] (rep) {repository};
+    \node[dado, below=6mm of rep] (lite) {SQLite};
+    \node[mod, right=6mm of ag] (col) {collect};
+    \draw[usa] (ag) -- (snd);
+    \draw[usa] (ag) -- (col);
+    \draw[usa] (snd) -- (req);
+    \draw[usa] (snd) -- (rep);
+    \draw[usa] (rep) -- (lite);
+    \node[grupo, fit=(ag)(snd)(req)(rep)(lite)(col), label={[font=\small\bfseries]above:monitor-remote}] {};
+    % sdk
+    \node[mod, below=10mm of lite] (sdk) {monitor-go-sdk};
+    \node[mod, left=8mm of sdk] (hw) {hello-world};
+    \draw[usa] (hw) -- (sdk);
+    \draw[partilha] (sdk) -- node[right, font=\scriptsize] {escreve no esquema} (lite);
+  \end{tikzpicture}
+  \caption{Vista de módulos (decomposição e uso). A seta a vermelho é a única violação de camadas
+           encontrada; a tracejado, a dependência de dados entre o SDK e o remote.}
+  \label{fig:modulos}
+\end{figure}
+
+Até aqui, as camadas eram só uma convenção. Passaram a ser regras \texttt{depguard} verificadas em cada
+\emph{pull request} (secção~\ref{sec:pipeline}): no central, \texttt{handlers} não usam
+\texttt{repositories} nem \texttt{database}, \texttt{services} não usam \texttt{handlers} nem
+\texttt{database}, e as camadas inferiores não usam as superiores; no remote, \texttt{requests} e
+\texttt{repository} não se usam um ao outro. A primeira execução encontrou uma única violação,
+\texttt{handlers/health.go} a usar \texttt{database} diretamente, corrigida na iteração~1.
+
+A dependência mais importante entre componentes não é um \emph{import}. O SDK escreve diretamente nas
+tabelas do \emph{buffer} SQLite cujo esquema pertence ao remote. É uma interface de dados partilhada
+(Shared-Data) que não aparece em nenhum \texttt{go.mod}, e por isso tem de ser verificada por testes
+(secção~\ref{sec:pipeline}).
 
 \subsection{Vista de componentes e conectores}
-\porescrever{componentes de execução, conectores e fluxo de telemetria.}
+
+A Tabela~\ref{tab:cc} mostra os componentes em execução e os conectores entre eles.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Componentes e conectores em execução}
+  \label{tab:cc}
+  \begin{tabularx}{\linewidth}{L{0.32\linewidth}Y}
+    \toprule
+    Componente & Conectores \\
+    \midrule
+    Aplicação + SDK & escrita transacional no SQLite do \emph{host} (dados partilhados) \\
+    Remote: 4 \emph{workers} (recolha, envio de estatísticas, envio de erros, limpeza) & SQLite com uma única ligação; HTTP POST JSON com \texttt{X-API-Key} \\
+    Central: servidor HTTP & \emph{browser} (HTML e JSON, sessão e CSRF); remotes (API REST de ingestão) \\
+    Central: 5 \emph{jobs} de fundo (disponibilidade das aplicações, alertas, envio de emails, resumo diário, retenção) & PostgreSQL; HTTP GET ao \texttt{/health} das aplicações; SMTP \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+O fluxo de telemetria é \textbf{store-and-forward}. A recolha e o SDK escrevem no \emph{buffer} local e
+marcam cada registo como pendente na tabela \texttt{delivery\_status}. Os \emph{workers} de envio leem
+lotes de até 100 registos, do mais recente para o mais antigo, e enviam-nos ao central. Se o central não
+responde ou devolve 429/5xx, voltam a tentar com \emph{backoff} exponencial, \emph{jitter} e respeitando
+o \texttt{Retry-After}. Um registo que o central rejeita como inválido é posto em quarentena, para não
+bloquear os restantes. Do lado do central, cada registo é gravado na mesma transação que um
+\textbf{recibo} identificado por \emph{host}, tipo e identificador de origem: um reenvio do mesmo registo
+encontra o recibo e não cria um duplicado. É isto que dá entrega \emph{at-least-once} com deduplicação,
+e que permite cumprir G1 com o central em baixo.
 
 \subsection{Vista de alocação}
-\porescrever{deployment: host monitorizado, servidor central, serviços externos.}
 
-\subsection{Padrões e tácticas já presentes}
-\porescrever{tabela de padrões e tácticas existentes (plano §5.2--5.3).}
+\begin{table}[htbp]
+  \centering\small
+  \caption{Vista de \emph{deployment}}
+  \label{tab:alocacao}
+  \begin{tabularx}{\linewidth}{L{0.25\linewidth}Y}
+    \toprule
+    Nó & Elementos \\
+    \midrule
+    \emph{Host} monitorizado & aplicações, \texttt{monitor-remote}, ficheiro SQLite (mesmo utilizador do sistema operativo) \\
+    Servidor central & Docker Compose: \texttt{backend}, \texttt{migrate} (executa uma vez), \texttt{postgres:16}; portas publicadas apenas em \emph{loopback} \\
+    Externos & servidor SMTP; CDN jsDelivr (Tailwind, carregado pelo \emph{browser}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A vista de alocação (Tabela~\ref{tab:alocacao}) mostra duas propriedades relevantes. O central corre
+como uma única instância, e os \emph{jobs} de fundo vivem dentro do processo HTTP: correr várias
+instâncias, tal como está, duplicaria cada \emph{job} (secção~\ref{sec:lacunas}). E o \emph{buffer} vive no disco do
+\emph{host} monitorizado: o que lá se acumula ocupa recursos do sistema que o Monitor devia proteger.
+
+\subsection{Padrões e táticas já presentes}
+\label{sec:tacticas-existentes}
+
+O sistema usa os padrões \textbf{Layered} (central), \textbf{Client-Server} (remote--central),
+\textbf{Shared-Data} (SQLite entre SDK e remote; PostgreSQL) e \textbf{MVC} no servidor (\emph{templates}
+separados dos \emph{handlers} e dos serviços). Usa também dois padrões de integração: \emph{Transactional
+Outbox}, para os emails, e \emph{Store-and-Forward}, para a telemetria. Ao nível GoF há
+\emph{Chain of Responsibility}/\emph{Decorator} nos \emph{middlewares} HTTP e \emph{Adapter} entre o
+cliente de email e o envio de alertas~\cite{gamma1994}; não há \emph{Singletons}. A
+Tabela~\ref{tab:tacticas-existentes} mostra as táticas já implementadas.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Táticas já presentes no sistema (iteração~0)}
+  \label{tab:tacticas-existentes}
+  \begin{tabularx}{\linewidth}{lY}
+    \toprule
+    QA & Táticas \\
+    \midrule
+    Availability & Heartbeat, Ping/Echo, Timestamp, Sanity Checking, Condition Monitoring; Retry (\emph{backoff}, \emph{jitter}, \texttt{Retry-After}); Ignore Faulty Behavior (quarentena); State Resynchronization (envio do \emph{backlog}); Transactions (registo e recibo) \\
+    Security & Authenticate e Authorize Actors (chaves HMAC, bcrypt, sessões); Limit Access (\emph{loopback}); Separate Entities; Limit Exposure (corpo até 1~MiB); Revoke Access; Audit Trail; Detect Service Denial (só no \emph{login}) \\
+    Performance & Bound Queue Sizes (lotes de 100 e 1~MiB); Bound Execution Times; Prioritize Events (mais recentes primeiro); Introduce Concurrency; Manage Sampling Rate (agregação temporal no \emph{dashboard}) \\
+    Modifiability & Restrict Dependencies (camadas); Encapsulate; Use an Intermediary (SQLite, \emph{outbox}); Defer Binding (configuração por ambiente) \\
+    Testability & Abstract Data Sources (\emph{fakes} dos repositórios); Sandbox (esquema PostgreSQL isolado por teste de integração) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+O sistema estava, portanto, bem desenhado para a disponibilidade e razoavelmente para a segurança. As
+lacunas concentram-se onde a equipa pôs as prioridades: escalabilidade e manutenção.
+
+\subsection{Lacunas identificadas}
+\label{sec:lacunas}
+
+A análise do código, as estimativas do capítulo~\ref{sec:requisitos} e a baseline
+(secção~\ref{sec:baseline}) identificaram as lacunas da Tabela~\ref{tab:lacunas}. São estas lacunas que as
+decisões do capítulo~\ref{sec:decisoes} tratam.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Principais lacunas da arquitetura atual}
+  \label{tab:lacunas}
+  \begin{tabularx}{\linewidth}{lY}
+    \toprule
+    & Lacuna \\
+    \midrule
+    \multicolumn{2}{l}{\textit{Escalabilidade}} \\
+    S1 & Verificação de disponibilidade por páginas de 100 com concorrência fixa de 8: no pior caso, 625~s por ciclo para 1\,000 \emph{hosts}, contra um intervalo de 30~s \\
+    S2 & Escritas linha a linha: um INSERT por registo, mais o recibo \\
+    S3 & Resolução de alertas com um UPDATE por regra não violada, a cada 15~s \\
+    S4 & Sem controlo de admissão: um \emph{backlog} simultâneo satura as ligações à base de dados e bloqueia o \emph{dashboard} \\
+    S5 & \emph{Jobs} de fundo em todas as instâncias: com N instâncias, verificações e alertas duplicados N vezes \\
+    S6 & Limitador de tentativas de \emph{login} em memória: com N instâncias, o limite efetivo é N vezes maior \\
+    S7 & Tabelas de telemetria sem particionamento; retenção por DELETE em lotes, desligada por omissão \\
+    S8 & Nenhuma métrica de execução exposta: os cenários de escalabilidade não se conseguem medir \\
+    S9 & \emph{Buffer} do remote sem limite: com o central em baixo, uma aplicação ruidosa pode encher o disco do \emph{host} \\
+    S10 & Sem justiça entre \emph{hosts} na ingestão: um \emph{host} em rajada consome a capacidade de todos \\
+    \midrule
+    \multicolumn{2}{l}{\textit{Manutenção e testabilidade}} \\
+    M1 & Sem CI: os testes de integração estiveram partidos sem que ninguém desse por isso \\
+    M2 & Protocolo implícito: o remote decide quarentenas pelo texto, em inglês, das mensagens de erro do central \\
+    M3--M4 & Conhecimento duplicado: níveis de log em 10 sítios; cada métrica de alerta espalhada por pelo menos 6 sítios em 3 camadas \\
+    M5--M6 & \emph{Handlers} dependem de serviços concretos; relógio e fuso horário fixos no código \\
+    \midrule
+    \multicolumn{2}{l}{\textit{Disponibilidade, monitorabilidade e segurança}} \\
+    A1 & Uma resposta 4xx pausa a entrega até se reiniciar o remote \\
+    A2--A3 & Quarentena e \emph{backlog} só visíveis no \emph{host}; logs não estruturados; \texttt{/health} não sabe se os \emph{jobs} estão vivos \\
+    X1--X2 & Tailwind carregado de uma CDN, sem CSP; verificação de disponibilidade aceita endereços de \emph{loopback} e \emph{link-local} (SSRF) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}

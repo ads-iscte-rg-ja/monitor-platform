@@ -34,7 +34,7 @@ Os repositórios consomem uma **versão** do pipeline (tag `v1`, movida delibera
 * **Restrict Dependencies** + versionamento: os repos dependem de uma interface versionada (`@v1`), por isso
   uma alteração no CI não parte os 4 pipelines ao mesmo tempo.
 * **Implementation structure** (allocation view, slide 02): mapeamento explícito dos elementos para repositórios.
-* As regras `depguard` tornam a táctica **Restrict Dependencies** executável. É uma verificação automática
+* As regras `depguard` tornam a tática **Restrict Dependencies** executável. É uma verificação automática
   de que *"an implementation conforms to the specified architecture"* (slide 02).
 
 ## Alternativas consideradas
