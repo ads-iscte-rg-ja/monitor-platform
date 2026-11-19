@@ -204,8 +204,11 @@ jobs:
         with:
           go-version-file: go.mod
       - name: govulncheck
+        # A ferramenta compila-se com o Go que ela exigir (GOTOOLCHAIN=auto só no install),
+        # mas analisa com o Go do projeto (go.mod), que é o que vai para produção:
+        # as vulnerabilidades da stdlib reportadas são as dessa versão.
         run: |
-          go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
+          GOTOOLCHAIN=auto go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
           govulncheck ./...
 
   sonar:
