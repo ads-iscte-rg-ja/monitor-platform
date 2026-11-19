@@ -170,8 +170,8 @@ A escalabilidade é o bloco com mais cenários (H,H) e é por isso o eixo do roa
 | Falha de infraestrutura | central em baixo 1 h | remote + buffer SQLite | apps continuam a gerar logs | o remote guarda tudo e entrega quando o central volta | 0 perdas, 0 duplicados (verificado por E2E) |
 
 **Origem dos números:** 1.000 hosts é a escala-alvo escolhida. Os 30 s vêm do intervalo atual do remote.
-Os 300 ms são folgados para um POST assíncrono e servem de sinal de saturação. Os 15 min equivalem a
-4× o tempo de flush teórico (§4.3). O fator 1,8× deixa 10% de overhead de coordenação.
+Os 300 ms são folgados para um POST assíncrono e servem de sinal de saturação. Os 15 min obrigam a absorver ≈435 k linhas a
+≈480 linhas/s mais as ≈120/s normais: ≈5× o débito nominal (§4.3). O fator 1,8× deixa 10% de overhead de coordenação.
 
 ---
 
@@ -243,9 +243,9 @@ ao longo do tempo no relatório.
 |---|---|---|
 | Pedidos de stats | 1.000 / 30 s | **33 req/s** |
 | Linhas de stats | 33/s × 86.400 | 2,9 M/dia ≈ **0,6 GB/dia** (≈200 B/linha com índices) → 17 GB/30 dias |
-| Logs | **Não é constante:** vai de 0 (nada a registar) a "muitos" (rajadas). Usamos o perfil misto de §4.4 | Média do perfil ≈ 100 linhas/s → ≈8,6 M/dia ≈ **9 GB/dia** (≈1 KB/linha; até 64 KB com stack trace). O que dimensiona o sistema é a **cauda** (rajadas), não a média |
-| Backlog após 1 h em baixo | 1.000 × (120 stats + 60 logs) | **180 k linhas** chegam quase de uma vez |
-| Statements SQL hoje | 1 INSERT por linha + recibo + update do host | 180 k linhas → **≈400 k statements** em segundos → 25 ligações saturadas e dashboard bloqueado (motiva D5 e D6) |
+| Logs | **Não é constante:** vai de 0 (nada a registar) a "muitos" (rajadas). Usamos o perfil misto de §4.4 | Média do perfil, sem rajadas, ≈ 90 linhas/s → ≈7,6 M/dia ≈ **7,6 GB/dia** (≈1 KB/linha; até 64 KB com stack trace). O que dimensiona o sistema é a **cauda** (rajadas), não a média |
+| Backlog após 1 h em baixo | 120 k stats + 90/s × 3.600 s de logs | **≈435 k linhas** chegam quase de uma vez |
+| Statements SQL hoje | 1 INSERT por linha + recibo + update do host | 435 k linhas → **≈1 M de statements** em poucos minutos → 25 ligações saturadas e dashboard bloqueado (motiva D5 e D6) |
 | Probes de health, pior caso | 1.000 hosts × timeout 5 s / concorrência 8 | **625 s por ciclo** contra um intervalo de 30 s → **AV2 violado 20×** (motiva D7) |
 | Avaliação de alertas | 1.000 hosts × ~6 regras | 6.000 avaliações a cada 15 s; hoje até **400 UPDATE/s** só para "resolver" (motiva D5) |
 | Ligações à BD com 3 instâncias | 3 × 25 | 75 de 100 do `max_connections` por omissão → reduzir para 20 por instância |
@@ -271,10 +271,10 @@ entra em ciclo de erro. Isto muda três coisas.
 |---|---|---|
 | 70% | silenciosos | 0–1/min |
 | 25% | normais | ~10/min |
-| 4% | ruidosos | ~10/s contínuo |
+| 4% | ruidosos | ~1/s contínuo (taxa fixada a 19/11: erros de aplicação, não logs de acesso; 86 mil/dia já é uma app avariada) |
 | 1% | **rajada** (app em ciclo de erro) | ~200/s durante 2 min |
 
-Os valores são uma **hipótese explícita**. O relatório deve dizê-lo e mostrar a sensibilidade: que acontece se os ruidosos forem 10%.
+Os valores são uma **hipótese explícita**. O relatório deve dizê-lo e mostrar a sensibilidade: o cenário principal repete-se com uma carga de logs 2× e 5× maior (por exemplo, 10% de hosts ruidosos), para ver a partir de onde os cenários falham.
 
 **2. Há um risco novo no host monitorizado (lacuna S9).** O buffer SQLite **não tem limite**. Se uma app
 logar muito enquanto o central está em baixo, o remote enche o disco do host e **o monitor prejudica o
@@ -461,7 +461,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Verificação:** os dashboards Grafana mostram as medidas de SC1–SC3 durante os testes k6.
 
 #### D5. Escritas set-based
-* **Problema:** S2, S3. ≈400 k statements numa recuperação; 400 UPDATE/s nos alertas.
+* **Problema:** S2, S3. ≈1 M de statements numa recuperação; 400 UPDATE/s nos alertas.
 * **Decisão:** inserts multi-linha com `unnest($1::bigint[], …)`: **1 statement por lote** para dados,
   outro para recibos, com `ON CONFLICT DO NOTHING` a manter a idempotência. Resolver alertas com **1 UPDATE
   por ciclo**, que junta os eventos abertos ao resultado da avaliação.
@@ -677,8 +677,8 @@ Não implementamos isto. Documentamos **quando** e **porquê** cada passo se tor
 tem um **gatilho medível** pelas métricas de D4, que funcionam como *fitness functions*. Assim, a decisão
 de escalar fica guiada por dados e não por antecipação (YAGNI, slide 06).
 
-**Estimativa a 10.000 hosts:** 333 req/s de stats; ≈6 GB/dia de stats e ≈14 GB/dia de logs; backlog de
-1 h com 1,8 M linhas; 60.000 avaliações de alertas a cada 15 s.
+**Estimativa a 10.000 hosts:** 333 req/s de stats; ≈6 GB/dia de stats e ≈76 GB/dia de logs; backlog de
+1 h com ≈4,4 M linhas; 60.000 avaliações de alertas a cada 15 s.
 
 | # | Evolução | Gatilho (medido) | Táctica / padrão | Custo / risco |
 |---|---|---|---|---|

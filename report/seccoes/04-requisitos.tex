@@ -81,8 +81,8 @@ estimativas.
     \midrule
     Pedidos de estatísticas & 1\,000 / 30~s & 33~pedidos/s \\
     Linhas de estatísticas & 33/s × 86\,400~s & 2,9~M/dia ($\approx$0,6~GB/dia; 17~GB em 30 dias) \\
-    Linhas de logs & perfil da Tabela~\ref{tab:perfil-logs} & \porescrever{TODO: depende da taxa dos ruidosos} \\
-    \emph{Backlog} após 1~h em baixo & 1\,000 × 120 estatísticas + logs de 1~h & \porescrever{TODO: depende da taxa dos ruidosos} \\
+    Linhas de logs & perfil da Tabela~\ref{tab:perfil-logs}, sem rajadas & $\approx$90/s: 7,6~M/dia ($\approx$7,6~GB/dia, $\approx$1~KB/linha) \\
+    \emph{Backlog} após 1~h em baixo & 120\,000 estatísticas + 90/s × 3\,600~s de logs & $\approx$435\,000 linhas \\
     Verificação de disponibilidade, pior caso & 1\,000 × 5~s de \emph{timeout} / 8 em paralelo & 625~s por ciclo, contra um intervalo de 30~s \\
     Resolução de alertas & 1\,000 \emph{hosts} × $\sim$6 regras, a cada 15~s & até 400 UPDATE/s só para resolver alertas \\
     Ligações à base de dados com 3 instâncias & 3 × 25 & 75 das 100 permitidas por omissão \\
@@ -100,8 +100,7 @@ uma reescrita foi rejeitada e cada ponto é tratado com uma tática localizada.
 O número de logs de um \emph{host} não é constante: é zero quando não há nada a registar e muito alto
 quando uma aplicação entra em ciclo de erro. Dimensionar pela média seria errado; o sistema tem de ser
 desenhado para a cauda. Os testes de carga usam, por isso, o perfil misto da
-Tabela~\ref{tab:perfil-logs}. Os valores são uma hipótese explícita da equipa, e a avaliação mostra a
-sensibilidade a essa hipótese.
+Tabela~\ref{tab:perfil-logs}. Os valores são uma hipótese explícita da equipa.
 
 \begin{table}[htbp]
   \centering\small
@@ -113,11 +112,18 @@ sensibilidade a essa hipótese.
     \midrule
     70\,\% & silenciosos & 0--1 por minuto \\
     25\,\% & normais & $\sim$10 por minuto \\
-    4\,\% & ruidosos & \porescrever{TODO: taxa a alinhar} \\
+    4\,\% & ruidosos & $\sim$1 por segundo \\
     1\,\% & em rajada (aplicação em ciclo de erro) & $\sim$200 por segundo durante 2 minutos \\
     \bottomrule
   \end{tabular}
 \end{table}
+
+Cada categoria fica cerca de uma ordem de grandeza acima da anterior, para que meçam comportamentos
+distintos. Os registos são erros de aplicações, não registos de acesso: um erro por segundo, sem parar (86
+mil por dia), já descreve uma aplicação claramente avariada, e é esse o significado de ``ruidoso''. As
+rajadas não entram na média da Tabela~\ref{tab:estimativas}: são o estímulo do cenário \cen{SC5} e
+medem-se à parte. Como o perfil é uma hipótese, a avaliação repete o cenário principal com uma carga de
+logs duas e cinco vezes maior, para mostrar a partir de onde os cenários deixam de ser cumpridos.
 
 Este perfil revela dois riscos que o desenho original não tratava. No \emph{host}: com o central em baixo,
 uma aplicação ruidosa enche o \emph{buffer} sem limite e, com ele, o disco, e o monitor passa a prejudicar o
@@ -198,7 +204,9 @@ A Tabela~\ref{tab:cenarios} detalha, no formato de seis partes, os cenários que
 
 \paragraph{Origem dos números.}
 Os 1\,000 \emph{hosts} são a escala escolhida pela equipa. Os 300~ms são folgados para um POST assíncrono e
-servem de sinal de saturação, não de requisito de latência. Os 15~minutos de \cen{SC2} são cerca de quatro
-vezes o tempo teórico de envio do \emph{backlog}. O fator 1,8× de \cen{SC3} admite que duas instâncias
+servem de sinal de saturação, não de requisito de latência. Os 15~minutos de \cen{SC2} obrigam a absorver as
+$\approx$435\,000 linhas do \emph{backlog} a $\approx$480 linhas/s, enquanto continuam a chegar as $\approx$120/s
+normais: cerca de cinco vezes o débito nominal, uma margem exigente mas plausível com escritas em lote
+(\dec{5}). O fator 1,8× de \cen{SC3} admite que duas instâncias
 percam 10\,\% para a coordenação; o de 2,5× admite uma perda maior com três. Os limites de \cen{MO1} correspondem a uma alteração confinada a um único
 módulo, que é o que a modificabilidade promete.
