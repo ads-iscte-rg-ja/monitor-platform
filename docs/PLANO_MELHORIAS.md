@@ -191,18 +191,18 @@ Para não medir "porque a ferramenta mede", cada métrica responde a uma pergunt
 
 | QA (objetivo) | Pergunta | Métrica | Limite | Ferramenta |
 |---|---|---|---|---|
-| Modifiability | As funções são fáceis de perceber e mudar? | Complexidade cognitiva por função | ≤15 | `gocognit` (golangci-lint) + SonarCloud |
+| Modifiability | As funções são fáceis de perceber e mudar? | Complexidade cognitiva por função | ≤15 | `gocognit` (golangci-lint) + SonarQube Cloud |
 | Modifiability | Há caminhos demasiado ramificados para testar? | Complexidade ciclomática por função | ≤15 | `gocyclo` (golangci-lint) |
-| Modifiability | Uma mudança tem de ser repetida em vários sítios? | % de linhas duplicadas (código novo) | ≤3% | SonarCloud (+ `dupl` local) |
+| Modifiability | Uma mudança tem de ser repetida em vários sítios? | % de linhas duplicadas (código novo) | ≤3% | SonarQube Cloud (+ `dupl` local) |
 | Modifiability | As camadas respeitam a arquitetura? | Violações de dependência entre camadas | **0** | `depguard` (golangci-lint) |
 | Modifiability | O acoplamento entre pacotes está a crescer? | Ca, Ce e instabilidade I = Ce/(Ca+Ce) por pacote | tendência, sem gate | script `tools/coupling` (`go list -deps -json`) |
-| Maintainability (global) | A dívida técnica está controlada? | *Technical debt ratio* / *Maintainability rating* | ≤5% / **A** | SonarCloud |
-| Testability | O código novo está testado? | Cobertura de linhas no **código novo** | ≥80% | `go test -coverprofile` (unit + integração) → SonarCloud |
+| Maintainability (global) | A dívida técnica está controlada? | *Technical debt ratio* / *Maintainability rating* | ≤5% / **A** | SonarQube Cloud |
+| Testability | O código novo está testado? | Cobertura de linhas no **código novo** | ≥80% | `go test -coverprofile` (unit + integração) → SonarQube Cloud |
 | Testability | Todo o sistema está testado? | Cobertura global | ≥60% no fim (baseline 25,8% central) | idem |
 | Testability | Os testes detetam faltas a sério? | *Mutation score* (amostra: services) | reportado, sem gate | `gremlins` (só na avaliação final) |
 | Reliability | Há bugs detetáveis estaticamente? | Issues de staticcheck/errcheck; *data races* | 0 | golangci-lint; `go test -race` |
 | Security | Há vulnerabilidades conhecidas **alcançáveis**? | Vulns alcançáveis no call graph | 0 | `govulncheck` |
-| Security | O código tem padrões inseguros? | Issues gosec; *security hotspots* revistos | 0 / 100% | `gosec` (golangci-lint) + SonarCloud |
+| Security | O código tem padrões inseguros? | Issues gosec; *security hotspots* revistos | 0 / 100% | `gosec` (golangci-lint) + SonarQube Cloud |
 | Scalability | Quanto aguenta o sistema? | Throughput sustentado, p95/p99, % 429/5xx, lag de ingestão | ver SC1–SC3 | **k6** + `/metrics` (Prometheus) |
 | Scalability | Os dados crescem como previsto? | Bytes/dia por tabela, duração da limpeza | ver SC4 | `pg_total_relation_size`, `pg_stat_statements` |
 | Availability | Perde-se ou duplica-se algo? | Registos enviados vs recebidos, duplicados | 0 / 0 | teste E2E |
@@ -210,7 +210,7 @@ Para não medir "porque a ferramenta mede", cada métrica responde a uma pergunt
 **Porquê limites de 15:** a complexidade ciclomática de McCabe recomenda 10. Em Go, cada
 `if err != nil` soma 1, por isso 10 penalizaria código idiomático. 15 é um meio-termo comum. A
 complexidade cognitiva é a métrica principal porque **não penaliza** o tratamento de erros linear e
-mede melhor a dificuldade de leitura. Usamos 15, que é o valor por omissão do SonarCloud, para que a
+mede melhor a dificuldade de leitura. Usamos 15, que é o valor por omissão do SonarQube Cloud, para que a
 ferramenta local e a remota concordem.
 
 **Porquê *gate* só no código novo** (*Clean as You Code*): a baseline do central tem 25,8% de
@@ -231,7 +231,7 @@ ao longo do tempo no relatório.
 | Necessidade | Escolha | Porquê | Rejeitadas |
 |---|---|---|---|
 | Lint e métricas locais | **golangci-lint** (config única `.golangci.yml` partilhada pelos 4 repos) | Agrega staticcheck, gocyclo, gocognit, dupl, gosec, depguard, errcheck e revive num só passo, que corre **igual** no portátil e no CI | Correr cada linter isoladamente: mais configuração e resultados inconsistentes |
-| Dashboard de qualidade, tendência e *quality gate* em PR | **SonarCloud** (gratuito para repos públicos) | Dívida técnica, rating de manutenção, duplicação, complexidade, cobertura e hotspots, com **histórico** que o professor pode consultar; analisa também o JS do frontend | SonarQube self-hosted: mais um serviço para manter. Codecov: redundante com a cobertura do Sonar. Code Climate: não traz nada além do Sonar para este stack |
+| Dashboard de qualidade, tendência e *quality gate* em PR | **SonarQube Cloud** (gratuito para repos públicos) | Dívida técnica, rating de manutenção, duplicação, complexidade, cobertura e hotspots, com **histórico** que o professor pode consultar; analisa também o JS do frontend | SonarQube self-hosted: mais um serviço para manter. Codecov: redundante com a cobertura do Sonar. Code Climate: não traz nada além do Sonar para este stack |
 | Vulnerabilidades em dependências | **govulncheck** + **Dependabot** | O govulncheck usa a base oficial do Go e só reporta o que é **alcançável** no call graph, por isso dá menos falsos positivos. O Dependabot propõe as atualizações | Só Dependabot alerts: reporta tudo o que está no `go.mod`, mesmo o inalcançável |
 | Testes de carga | **k6** | Cenários em JS, **thresholds como código** (p95, % erros) que fazem o CI passar ou falhar, imagem Docker, relatórios exportáveis | JMeter: pesado, cenários em XML/GUI. Locust: precisa de runtime Python e os thresholds não são nativos. vegeta: só taxa constante, sem cenários |
 | Métricas de runtime | **Prometheus client_golang** em `/metrics` + **Grafana** num *profile* Compose opcional | Formato de exposição padrão de facto; histogramas para p95/p99; sem custo quando não está a ser lido | Só logs: não dão percentis. OpenTelemetry completo: mais peças do que o necessário agora (fica no backlog) |
@@ -421,7 +421,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 
 #### D2. Métricas e ferramentas de qualidade de código
 * **Problema:** prioridade da equipa; M1. Hoje não se mede nada além da cobertura feita à mão.
-* **Decisão:** a de §4: golangci-lint com config partilhada, SonarCloud com *quality gate* no código novo,
+* **Decisão:** a de §4: golangci-lint com config partilhada, SonarQube Cloud com *quality gate* no código novo,
   govulncheck + Dependabot, cobertura unit + integração enviada ao Sonar, `depguard` com as regras de camadas:
   * central: `handlers` ↛ `repositories`/`database`; `services` ↛ `handlers`; `repositories` ↛ `services`/`handlers`;
   * remote: `requests` ↛ `repository`; `collect` ↛ `requests`.
@@ -434,7 +434,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 #### D3. CI em todos os repos
 * **Problema:** M1, TE1.
 * **Decisão:** GitHub Actions: `golangci-lint` → `go test -race` → integração (`services: postgres:16`) →
-  `govulncheck` → SonarCloud. `main` protegido: merge só com CI verde e 1 review da outra pessoa.
+  `govulncheck` → SonarQube Cloud. `main` protegido: merge só com CI verde e 1 review da outra pessoa.
   O job de carga (k6) e o E2E correm **manualmente ou à noite**, porque são lentos.
 * **Teoria:** *"if a fault is present it must fail during testing as soon as possible"* (slide 03).
 * **Verificação:** um PR com um teste partido fica bloqueado.
@@ -747,7 +747,7 @@ de implementação**. Num relatório de arquitetura isso conta como trabalho de 
 
 | Semana | Pessoa A: ingestão e remote | Pessoa B: núcleo do central | Relatório |
 |---|---|---|---|
-| **S1: 18–24 nov** | CI nos 4 repos (D3); harness k6 com perfil misto de logs (D10) | golangci-lint + SonarCloud + **relatório de métricas de baseline** (D2); `/metrics` + slog (D4) | Esqueleto LaTeX; cap. 1–4 (introdução, enquadramento, arquitetura atual, requisitos) |
+| **S1: 18–24 nov** | CI nos 4 repos (D3); harness k6 com perfil misto de logs (D10) | golangci-lint + SonarQube Cloud + **relatório de métricas de baseline** (D2); `/metrics` + slog (D4) | Esqueleto LaTeX; cap. 1–4 (introdução, enquadramento, arquitetura atual, requisitos) |
 | **S2: 25 nov–1 dez** | **Medição de baseline** (k6); D6 admissão + justiça; D5 inserts set-based; D19 buffer com limite | D7 probes; D8 leader election + `APP_ROLE` + login limiter em PG + nginx; retenção; D18 antes de EUVI | Cap. 5 (métricas e ferramentas) e cap. 6 (decisões) à medida que os ADRs são escritos |
 | **S3: 2–6 dez** | **Medição depois** (k6 com 1 e 3 instâncias); D11 contrato; D17 (lado do remote) | D13 Strategy (+ medir MO1); D14; D17 (lado do central); métricas de código **depois** | Cap. 7 (avaliação, com tabelas geradas) e cap. 8 (evolução) |
 | **Fecho: 7–9 dez** | Revisão cruzada | Revisão cruzada | Discussão, conclusões, resumo, anexos; entrega a 9/12 |

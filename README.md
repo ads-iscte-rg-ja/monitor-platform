@@ -17,7 +17,7 @@ Desenho de Software (ADS). A razão de existir deste repositório está no
 
 ```
 .github/workflows/
-  go-ci.yml          workflow reutilizável: higiene, lint, testes, integração, govulncheck, SonarCloud
+  go-ci.yml          workflow reutilizável: higiene, lint, testes, integração, govulncheck, SonarQube Cloud
   self-check.yml     CI deste repositório: actionlint, validação do lint, compilação do relatório
 lint/.golangci.yml   configuração única do golangci-lint (inclui as regras de camadas de todo o sistema)
 scripts/ci-local.sh  as mesmas verificações do CI, para correr localmente

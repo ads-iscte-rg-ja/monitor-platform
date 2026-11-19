@@ -40,7 +40,7 @@ linters:
 
   settings:
     gocognit:
-      # 15 = valor por omissão do SonarCloud, para local e remoto concordarem.
+      # 15 = valor por omissão do SonarQube Cloud, para local e remoto concordarem.
       min-complexity: 15
     gocyclo:
       # McCabe recomenda 10; em Go cada `if err != nil` soma 1, por isso 15.

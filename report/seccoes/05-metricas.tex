@@ -5,10 +5,67 @@
 \porescrever{tabela objetivo--pergunta--métrica--limite (plano §4.1) e separação entre métricas principais e gates.}
 
 \subsection{Ferramentas e alternativas}
-\porescrever{golangci-lint, SonarCloud, govulncheck, k6, Prometheus; alternativas rejeitadas (plano §4.2).}
+\porescrever{golangci-lint, SonarQube Cloud, govulncheck, k6, Prometheus; alternativas rejeitadas (plano §4.2).}
 
 \subsection{Pipeline de integração contínua}
-\porescrever{monitor-platform, workflow reutilizável, gates no código novo (ADR-0002).}
+\label{sec:pipeline}
+
+Os quatro repositórios precisam das mesmas verificações, com os mesmos limites. Em vez de quatro
+cópias do pipeline, que divergiriam à primeira alteração, o pipeline vive num único
+\emph{workflow} reutilizável no repositório \texttt{monitor-platform}, e cada repositório tem apenas um
+\texttt{ci.yml} de cerca de vinte linhas que o invoca e escolhe as suas opções (ADR-0002, anexo~\ref{anx:adrs}).
+É a tática \emph{Abstract Common Services}: o que é comum fica num só sítio. A configuração de lint
+também é única e inclui as regras \texttt{depguard} das camadas de todos os componentes, o que torna
+\emph{Restrict Dependencies} uma verificação executável e não uma convenção. A
+Tabela~\ref{tab:pipeline} mostra o que cada fase garante.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Fases do pipeline e atributo de qualidade que cada uma protege}
+  \label{tab:pipeline}
+  \begin{tabularx}{\linewidth}{l>{\raggedright\arraybackslash}Xl}
+    \toprule
+    Fase & O que verifica & QA \\
+    \midrule
+    Higiene & formatação (\texttt{gofmt}); \texttt{go.mod} arrumado e íntegro & Modifiability \\
+    Lint & golangci-lint com configuração única: complexidade, duplicação, camadas, erros ignorados, \texttt{gosec} & Modifiability, Reliability \\
+    Testes unitários & \texttt{go test -race}, com cobertura & Testability, Reliability \\
+    Integração & testes contra PostgreSQL~16 real (central) & Testability \\
+    Vulnerabilidades & govulncheck: só o que é alcançável no grafo de chamadas & Security \\
+    SonarQube Cloud & análise própria, importação do lint e da cobertura, \emph{quality gate} no código novo & todos (segunda opinião) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Gates no código novo.}
+A baseline mostrou 66 \emph{issues} de lint e 25,9\,\% de cobertura unitária no central
+(secção~\ref{sec:baseline}). Um \emph{gate} absoluto falharia desde o primeiro dia e seria ignorado.
+Por isso o lint só falha por \emph{issues} introduzidas na alteração (\texttt{only-new-issues}) e o
+\emph{quality gate} do SonarQube Cloud compara com o \texttt{main} (\emph{Clean as You Code}). A qualidade
+média sobe à medida que o código é tocado, o crescimento incremental que o ADD
+pressupõe~\cite{bastofernandes2026}. Durante a medição da baseline, um único parâmetro por repositório
+(\texttt{lint-blocking}) põe o lint e o \emph{gate} a reportar sem bloquear; testes, integração e
+vulnerabilidades bloqueiam sempre.
+
+\paragraph{Trade-off: acoplamento à plataforma.}
+Centralizar o pipeline cria uma dependência dos quatro repositórios em relação ao
+\texttt{monitor-platform}: um erro no \emph{workflow} partiria os quatro de uma vez. Essa dependência
+é controlada com uma interface versionada. Os repositórios usam a \emph{tag} \texttt{v1}, que só se move
+depois de a alteração ser revista e validada, e nunca o \texttt{main}. O custo é que corrigir o pipeline
+exige um PR e mover a \emph{tag}. O benefício confirmou-se logo na configuração inicial: três
+defeitos do próprio pipeline (a instalação do govulncheck dependia da versão de Go do projeto analisado,
+o relatório do lint era escrito num caminho que o SonarQube Cloud não encontrava, e a severidade dos
+\emph{issues} importados classificava complexidade como \emph{bugs}) foram corrigidos uma vez e
+chegaram aos quatro repositórios ao mover a \emph{tag}, sem tocar em nenhum deles.
+
+\paragraph{Dependências tornadas explícitas.}
+O CI obrigou a declarar uma dependência que até aí era implícita. Os testes do SDK e do
+\texttt{monitor-hello-world} usam o esquema do \emph{buffer} SQLite, que pertence ao
+\texttt{monitor-remote}: o SDK escreve diretamente nesse esquema, que funciona como interface de dados
+partilhada entre os dois componentes. Localmente funcionava por acaso, porque os repositórios estão lado
+a lado; no CI o \texttt{monitor-remote} passou a ser clonado explicitamente (\texttt{sibling-repos}).
+O contrato fica assim verificado em cada alteração ao SDK. Uma alteração incompatível no lado do
+\texttt{monitor-remote} só é apanhada no CI seguinte do SDK, o que fica como limitação conhecida.
 
 \subsection{Baseline}
 \label{sec:baseline}
@@ -17,7 +74,11 @@ Antes de qualquer alteração arquitetural mediu-se o sistema tal como estava (i
 Sem este ponto de partida, as decisões do capítulo~\ref{sec:decisoes} não poderiam ser avaliadas
 com números, só com afirmações. A medição é automática (\texttt{scripts/medir.py baseline}) e regista
 os \emph{commits} medidos e as versões das ferramentas, para se poder repetir
-(anexo~\ref{anx:reproducao}). Foram medidos os quatro repositórios. Os resultados mais importantes estão no
+(anexo~\ref{anx:reproducao}). O CI, que corre noutra máquina e instala as ferramentas de raiz, reproduz
+os mesmos valores: as mesmas contagens de lint por \emph{linter} (66, 29, 4 e 1), as mesmas
+vulnerabilidades (52, 37, 1 e 1) e a mesma cobertura unitária, a menos de uma décima (25,8\,\% contra
+25,9\,\% no central). Os números seguintes dependem, portanto, do código e não do ambiente de medição.
+Foram medidos os quatro repositórios. Os resultados mais importantes estão no
 \texttt{monitor-central}, que tem cerca de 75\,\% do código de produção, e no \texttt{monitor-remote},
 que corre em todos os \emph{hosts}.
 
@@ -76,7 +137,7 @@ por pacote (Tabela~\ref{tab:baseline-cobertura-central}) diz mais do que o total
 \end{itemize}
 O remote tem 68\,\% de cobertura unitária e o SDK não tem testes. Uma percentagem global mais alta não
 foi tomada como objetivo em si. O que se pretende é testar o código novo e o caminho crítico
-(ingestão e entrega), que é o que o \emph{quality gate} do SonarCloud verifica.
+(ingestão e entrega), que é o que o \emph{quality gate} do SonarQube Cloud verifica.
 
 \gerado{baseline-cobertura.tex}
 
@@ -116,6 +177,46 @@ HTTP concretos. Trocar o buffer ou simular falhas de rede num teste obriga, por 
 a montar estas implementações. Os números confirmam a lacuna de testabilidade que \dec{14} trata.
 
 \gerado{baseline-acoplamento.tex}
+
+\paragraph{Segunda opinião: SonarQube Cloud.}
+A primeira análise do SonarQube Cloud correu sobre o código da baseline apenas com as regras da própria
+ferramenta, sem o relatório do lint, e funciona por isso como uma opinião independente
+(valores em \texttt{docs/metrics/baseline/sonar.csv}). No remote, no SDK e no hello-world não encontrou
+nenhum problema. A duplicação é de 1,9\,\% no central e nula nos restantes, abaixo do limite de 3\,\%:
+os três casos do \texttt{dupl} no central são locais e a duplicação não é um problema do sistema. O
+\emph{maintainability rating} é A, com \emph{technical debt ratio} de 0,0\,\%, nos quatro repositórios.
+Como as regras do SonarQube Cloud para Go são poucas, esta métrica não distingue código bom de mau neste
+sistema. A pergunta GQM sobre dívida técnica passa, por isso, a ser respondida pelas contagens do lint e
+pela complexidade, e não pelo \emph{rating}.
+
+O central teve \emph{rating} E em fiabilidade e em segurança, o pior da escala, por causa de oito
+\emph{issues}. A Tabela~\ref{tab:baseline-sonar} mostra a triagem.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Triagem dos \emph{issues} do SonarQube Cloud no central (baseline)}
+  \label{tab:baseline-sonar}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.36\linewidth}c>{\raggedright\arraybackslash}X}
+    \toprule
+    \emph{Issue} (ficheiro) & Também no lint & Veredicto \\
+    \midrule
+    \emph{Path traversal}, ×2 (\texttt{pages.go}) & \texttt{gosec} G703 & Falso positivo: o caminho fica limitado a um nome de ficheiro sem \texttt{..}, confirmado com \texttt{filepath.Rel} e só para ficheiros regulares \\
+    SQL formatado (\texttt{retention.go}) & \texttt{gosec} G201 & Falso positivo: só se formatam constantes; os valores vão como parâmetros \\
+    \texttt{DELETE} sem \texttt{WHERE} (migração 002) & --- & Intencional: invalida sessões que podiam conter chaves em claro \\
+    Script de CDN sem \texttt{integrity} (\texttt{layout.html}) & --- & Real: resolvido por \dec{18} (Tailwind servido localmente) \\
+    \emph{Promise} sem tratamento, ×2 (\texttt{dashboard.js}) & --- & Real, sem efeito: a função já trata os erros internamente; frontend, fronteira com EUVI \\
+    Contexto recriado (\texttt{server.go}) & --- & Menor (\emph{code smell}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Três conclusões. Primeira: os dois achados de segurança são os mesmos que o \texttt{gosec} assinalou,
+detetados por um motor diferente, e a análise de cada um confirma que são falsos positivos; a
+justificação ficou registada junto ao código (\texttt{//nolint:gosec}). Segunda: três achados estão em SQL, JavaScript e HTML,
+fora do alcance das ferramentas de Go, o que justifica ter uma análise ao repositório inteiro no pipeline.
+Terceira: o \emph{rating} é determinado pelo pior \emph{issue}, e aqui os piores eram falsos positivos
+ou intencionais. Um \emph{rating} sem triagem pode, portanto, sobrestimar o risco, e é por isso que o
+relatório usa os \emph{issues} triados e não a letra.
 
 \paragraph{Síntese.}
 Os resultados da baseline originam quatro ações na iteração~1, por ordem de custo e benefício:

@@ -8,7 +8,7 @@
 ## Contexto
 O sistema está dividido em 4 repositórios Go (`monitor-central`, `monitor-remote`, `monitor-go-sdk`,
 `monitor-hello-world`) que precisam das **mesmas** verificações de qualidade: formatação, lint com os
-mesmos limites, testes com `-race`, vulnerabilidades e SonarCloud. Há também artefactos que não
+mesmos limites, testes com `-race`, vulnerabilidades e SonarQube Cloud. Há também artefactos que não
 pertencem a nenhum repositório, porque dizem respeito ao **sistema inteiro**: testes E2E, testes de carga,
 regras de dependência entre camadas, ADRs e o relatório de ADS.
 
@@ -19,7 +19,7 @@ repositório git, por isso perder-se-iam.
 ## Decisão
 Criar o repositório `monitor-platform` com:
 * `.github/workflows/go-ci.yml`: **workflow reutilizável** (`workflow_call`) com todo o pipeline. Cada repo
-  tem só um `ci.yml` de ~10 linhas que o chama com `@v1`;
+  tem só um `ci.yml` de ~20 linhas que o chama com `@v1`;
 * `lint/.golangci.yml`: configuração **única** de lint, incluindo as regras `depguard` das camadas de todos os repos;
 * `scripts/ci-local.sh`: as mesmas verificações, para correr localmente;
 * `templates/`: o que o GitHub obriga a ter em cada repo (`ci.yml`, `dependabot.yml`, `sonar-project.properties`);
@@ -53,8 +53,10 @@ Os repositórios consomem uma **versão** do pipeline (tag `v1`, movida delibera
   * testar uma alteração ao CI exige um PR aqui e mover a tag;
   * o `monitor-platform` conhece os caminhos internos dos outros repos (regras `depguard`), por isso mover um
     pacote exige também um PR aqui. Aceite: essas mudanças são **arquiteturais** e devem ser revistas como tal;
-  * o workflow reutilizável só pode ser chamado de repositórios de **outro dono** se o `monitor-platform` for
-    **público**. Isto é coerente com a decisão de tornar todos os repos públicos.
+  * o pipeline faz *checkout* de outros repositórios (a configuração de lint do `monitor-platform` e, no SDK
+    e no hello-world, o esquema do `monitor-remote`). O `GITHUB_TOKEN` de cada job só dá acesso ao próprio
+    repositório, mesmo dentro da organização, por isso estes repositórios têm de ser **públicos** (ou seria
+    preciso uma GitHub App). Isto é coerente com a decisão de tornar todos os repos públicos.
 
 ## Verificação
 * Os 4 repositórios correm o pipeline através de `go-ci.yml@v1` (TE1).

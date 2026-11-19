@@ -72,3 +72,9 @@ O golangci-lint deduplica por omissão os issues que caem na mesma linha (`uniq-
 `gocognit` e o `gocyclo` apontam ambos para a assinatura da função, o `gocyclo` ficava escondido.
 Com a deduplicação ativa o central dava 61 issues; com ela desligada dá 66. A configuração partilhada
 desliga-a, porque estas contagens são métricas do relatório.
+
+## SonarQube Cloud
+
+`sonar.csv`: medidas da primeira análise do SonarQube Cloud ao código da baseline (commit e data da
+análise em cada linha), obtidas da API `measures/search_history`. Só regras da própria ferramenta: o
+relatório do golangci-lint ainda não era importado. Triagem dos 8 issues do central no relatório, §5.4.

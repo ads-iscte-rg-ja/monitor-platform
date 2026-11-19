@@ -8,7 +8,7 @@
 #       secrets: inherit
 #
 # Fases (docs/PLANO_MELHORIAS.md §4): higiene -> lint -> testes unitários ->
-# testes de integração -> vulnerabilidades -> SonarCloud.
+# testes de integração -> vulnerabilidades -> SonarQube Cloud.
 # Com lint-blocking=false (fase de baseline) o lint reporta mas não bloqueia.
 name: go-ci
 
@@ -24,7 +24,7 @@ on:
         type: boolean
         default: false
       sonar:
-        description: "Envia análise ao SonarCloud (requer sonar-project.properties e o secret SONAR_TOKEN)."
+        description: "Envia análise ao SonarQube Cloud (requer sonar-project.properties e o secret SONAR_TOKEN)."
         type: boolean
         default: true
       sibling-repos:
@@ -212,7 +212,7 @@ jobs:
           govulncheck ./...
 
   sonar:
-    name: SonarCloud
+    name: SonarQube Cloud
     needs: [lint, test, integration]
     # Corre mesmo que a integração não exista (skipped), mas só com os testes verdes.
     if: >-
@@ -230,7 +230,7 @@ jobs:
         with:
           pattern: "{coverage-*,golangci-report}"
           merge-multiple: true
-      - name: Análise SonarCloud
+      - name: Análise SonarQube Cloud
         if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@v8
         env:
@@ -240,4 +240,4 @@ jobs:
             -Dsonar.qualitygate.wait=${{ inputs.lint-blocking }}
       - name: Aviso
         if: env.SONAR_TOKEN == ''
-        run: echo "::warning::SONAR_TOKEN não definido; análise SonarCloud ignorada."
+        run: echo "::warning::SONAR_TOKEN não definido; análise SonarQube Cloud ignorada."
