@@ -47,49 +47,56 @@ forma.
 \subsection{Escalabilidade: antes e depois}
 \label{sec:aval-escala}
 
-\paragraph{Baseline de carga (iteração~3).}
-A baseline de carga foi medida com o código da iteração~3 (contrato gRPC e métricas), antes de qualquer
-decisão de escalabilidade (\dec{5}--\dec{8}). É o ``antes'' com que essas decisões vão ser comparadas.
+As tabelas desta secção comparam duas iterações, medidas da mesma forma (secção~\ref{sec:metodo}): a
+iteração~3, com o contrato gRPC e as métricas mas antes de qualquer decisão de escalabilidade (a
+\emph{baseline} de carga), e a iteração~4, depois de \dec{5} (escritas em lote) e \dec{6} (controlo de admissão).
 
 \gerado{carga-sc1.tex}
 
-Em regime normal (Tabela~\ref{tab:carga-sc1}), \cen{SC1} cumpre-se com uma folga muito grande: p95 da
-ingestão de 6~ms contra um limite de 300~ms, e o central usa 4\,\% dos 2 vCPU. O débito medido, 122 registos
+\paragraph{Regime normal (\cen{SC1}).}
+Já na \emph{baseline}, \cen{SC1} cumpria-se com uma folga muito grande (Tabela~\ref{tab:carga-sc1}): p95 da
+ingestão de 6~ms contra um limite de 300~ms, e o central a usar 4\,\% dos 2 vCPU. O débito medido, 122 registos
 por segundo, coincide com a estimativa feita antes de qualquer medição (cerca de 90 logs e 33 estatísticas por
-segundo, secção~\ref{sec:estimativas}). A medição confirma a estimativa \emph{back-of-the-envelope} e a
-conclusão que se tirou dela: a ingestão nominal não é o problema de escala. Todos os registos confirmados ao
-agente estão na base de dados, sem duplicados.
+segundo, secção~\ref{sec:estimativas}): a medição confirmou a estimativa e a conclusão que se tirou dela, de que
+a ingestão nominal não era o problema de escala. Depois de \dec{5}, o p95 desce para 5~ms e o CPU para 3\,\%.
 
 \gerado{carga-sensibilidade.tex}
 
-Como o perfil de logs é uma hipótese, a medição repetiu-se com o dobro e o quíntuplo da taxa de logs
-(Tabela~\ref{tab:carga-sensibilidade}). Com cinco vezes mais logs, o p95 sobe para 10~ms e o CPU para 8\,\%:
-\cen{SC1} continua cumprido. A conclusão anterior não depende, portanto, de a hipótese estar certa.
+\paragraph{Sensibilidade ao perfil de logs.}
+Como o perfil de logs é uma hipótese, cada medição nominal repetiu-se com o dobro e o quíntuplo da taxa de logs
+(Tabela~\ref{tab:carga-sensibilidade}). Na \emph{baseline}, com cinco vezes mais logs, o p95 subia para 10~ms e o
+CPU para 8\,\%; depois de \dec{5} ficam em 5~ms e 4\,\%, praticamente iguais ao regime normal, porque o custo de
+um lote deixou de crescer com o número de registos. \cen{SC1} cumpre-se em todos os casos: a conclusão não
+depende de a hipótese estar certa.
 
 \gerado{carga-sc5.tex}
 
-O cenário do vizinho ruidoso (Tabela~\ref{tab:carga-sc5}) também se cumpre: enquanto 1\,\% dos \emph{hosts}
-envia 200 logs por segundo, o atraso p95 dos restantes fica em 6~ms. O risco que motivava a parte
-de justiça entre \emph{hosts} de \dec{6} (lacuna S10) não se materializa a esta escala. É o \emph{generate and
-test} a funcionar: a medição refutou uma hipótese da análise, e essa parte de \dec{6} perde prioridade.
+\paragraph{Vizinho ruidoso (\cen{SC5}).}
+Enquanto 1\,\% dos \emph{hosts} envia 200 logs por segundo, o atraso p95 dos restantes foi de 6~ms na
+\emph{baseline} e de 5~ms depois (Tabela~\ref{tab:carga-sc5}). O risco que motivava a parte de justiça entre
+\emph{hosts} de \dec{6} (lacuna S10) não se materializou a esta escala. É o \emph{generate and test} a funcionar: a
+medição refutou uma hipótese da análise, e essa parte de \dec{6} ficou desenhada mas não implementada
+(secção~\ref{sec:d6}). Os próprios \emph{hosts} em rajada também ganharam: o seu atraso p95 desceu de 43 para 11~ms.
 
 \gerado{carga-sc2.tex}
 
-A recuperação (Tabela~\ref{tab:carga-sc2}) é o único cenário que falha, e falha onde a análise previa. Os
-1\,000 \emph{hosts} entregaram as 441\,000 linhas do \emph{backlog} em 1,4~minutos, sem perdas nem duplicados,
-mesmo com cerca de 540 pedidos a chegar ao \emph{timeout} e a ser repetidos: os recibos de deduplicação
-funcionam sob carga. Mas o \emph{dashboard} ficou inutilizável durante esse tempo, com um p95 de pelo menos
-10~s, o limite superior do histograma. O CPU do central nunca passou de 30\,\%; o estrangulamento foi o
-\emph{pool} de ligações à base de dados, sempre esgotado (25 de 25), com mais de 11\,000 esperas por ligação. A
-ingestão ocupou todas as ligações, porque cada registo é uma escrita separada (S2) e nada limita quantos
-pedidos entram ao mesmo tempo (S4), e o \emph{dashboard} ficou à espera de uma ligação livre. São exatamente as
-lacunas que \dec{5} (escritas em lote, que reduzem o tempo de ocupação de cada ligação) e \dec{6} (controlo de
-admissão e uma reserva de ligações para o \emph{dashboard}) tratam.
+\paragraph{Recuperação (\cen{SC2}).}
+Era o único cenário que falhava, e falhava onde a análise previa (Tabela~\ref{tab:carga-sc2}). Na
+\emph{baseline}, os 1\,000 \emph{hosts} entregavam as 441\,000 linhas do \emph{backlog} em 1,4~minutos, sem perdas
+nem duplicados, mas o \emph{dashboard} ficava inutilizável, com p95 de pelo menos 10~s (o limite superior do
+histograma). O CPU do central nunca passou de 30\,\%; o recurso esgotado era o \emph{pool} de ligações à base de
+dados (25 de 25), com mais de 11\,000 esperas por uma ligação livre, e 9,5\,\% das tentativas de envio
+acabavam em \emph{timeout}.
 
-O limite de 15~minutos de \cen{SC2} revelou-se folgado: o \emph{backlog} absorve-se em menos de 2. O critério
-que o cenário de facto exige é o outro, o \emph{dashboard} continuar utilizável durante a recuperação. Isto
-também significa que \dec{6} pode trocar velocidade de absorção por estabilidade (rejeitar parte dos pedidos com
-\texttt{RESOURCE\_EXHAUSTED}) e continuar dentro do limite.
+Depois de \dec{5} e \dec{6}, o \emph{dashboard} tem p95 de 262~ms durante a recuperação, e \cen{SC2} passa a
+cumprir-se. A ingestão nunca ocupa mais de 15 ligações (o limite de \dec{6}), e já não há esperas nem
+\emph{timeouts}. Quase um quarto das tentativas (23,8\,\%) é rejeitado por sobrecarga, mas são rejeições
+intencionais: o agente volta a enviar depois do atraso indicado, e as 441\,000 linhas chegam todas, sem
+duplicados. O resultado menos óbvio é que a recuperação ficou \emph{mais rápida}, 43~s em vez de 1,4~minutos, apesar
+das rejeições. Com escritas em lote cada pedido ocupa uma ligação durante muito menos tempo, e limitar quantos
+pedidos competem pela base de dados ao mesmo tempo elimina a contenção que, antes, fazia cada um demorar
+segundos. O \emph{trade-off} previsto em \dec{6} (recuperação mais lenta em troca de estabilidade) não se
+verificou: as duas decisões juntas melhoraram ambos os critérios.
 
 \subsection{Disponibilidade e integridade dos dados}
 \porescrever{AV1 e AV4: perdas e duplicados.}

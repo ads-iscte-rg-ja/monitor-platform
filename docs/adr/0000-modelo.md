@@ -26,3 +26,6 @@ Táctica(s) e/ou padrão(ões) dos slides de ADS que a decisão aplica, e porqu�
 
 ## Verificação
 Como sabemos que a decisão cumpre o objetivo: cenário de QA, métrica, teste ou medição, e o limite que tem de cumprir.
+
+## Histórico
+Correções que não mudam a decisão (ADR-0001): data, o que mudou e porquê. Uma decisão que muda exige um ADR novo.

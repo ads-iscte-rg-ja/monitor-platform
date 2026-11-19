@@ -63,3 +63,10 @@ Os repositórios consomem uma **versão** do pipeline (tag `v1`, movida delibera
 * `golangci-lint config verify` e `actionlint` passam no CI do próprio `monitor-platform` (`self-check.yml`).
 * Validação local a 2026-11-18: a configuração deteta a violação real `handlers → database`
   (`monitor-central/internal/handlers/health.go:8`) e não dá falsos positivos entre repos.
+
+## Histórico
+* **2026-11-19, correção:** a consequência sobre repositórios públicos foi reescrita. Dizia que o *workflow*
+  reutilizável só podia ser chamado de repositórios de outro dono se o `monitor-platform` fosse público; a
+  experiência mostrou que, mesmo dentro da organização, o *checkout* da configuração de lint e dos repositórios
+  irmãos com o `GITHUB_TOKEN` exige repositórios públicos. A decisão não muda. Também se corrigiu o tamanho do
+  `ci.yml` de cada repositório (~10 para ~20 linhas).

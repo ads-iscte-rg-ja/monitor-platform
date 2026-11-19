@@ -18,8 +18,10 @@ ADR; o texto completo de cada um está em \url{\Repositorio/tree/main/docs/adr}.
     0002 & Repositório \texttt{monitor-platform} para o CI partilhado e os artefactos transversais & Aceite & Modifiability \\
     0003 & Contrato de ingestão em gRPC, num repositório \texttt{monitor-api} versionado & Aceite & Modifiability, Interoperability \\
     0004 & Medir primeiro: métricas Prometheus num listener interno e logs estruturados & Aceite & Monitorability \\
+    0005 & Escritas em lote na ingestão e na resolução de alertas & Aceite & Scalability \\
+    0006 & Controlo de admissão na ingestão, com ligações reservadas para o resto do central & Aceite & Scalability, Availability \\
     \bottomrule
   \end{tabularx}
 \end{table}
 
-\porescrever{acrescentar os ADR das decisões seguintes (\dec{5}--\dec{19}) à medida que forem tomadas.}
+\porescrever{acrescentar os ADR das decisões seguintes (\dec{7}--\dec{19}) à medida que forem tomadas.}
