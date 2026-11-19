@@ -151,7 +151,62 @@ se cumpriam continuam a cumprir-se, com latências mais baixas. Nas métricas de
 limite cognitivo no central desceram de 10 para 8 e as \emph{issues} de lint de 60 para 56: as alterações não
 deixaram dívida nova, e o arranque do servidor deixou de estar acima dos limites.
 
-\porescrever{\dec{7}--\dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
+\subsubsection{Várias instâncias do central (\dec{8}, ADR-0007)}
+\label{sec:d8}
+
+\paragraph{Problema.}
+\cen{SC3} pede que o débito suba ao acrescentar instâncias e que cada \emph{job} de fundo corra numa só. Cada
+instância corria todos os \emph{jobs} (S5) e contava as tentativas de login na sua memória (S6). A análise do
+código mostrou que os \emph{jobs} já davam resultados corretos com várias instâncias, porque cada um é idempotente
+(\emph{locks}, \texttt{SKIP LOCKED}, índices únicos, chaves de deduplicação). O problema de S5 era o custo: cada
+\emph{host} receberia N verificações de saúde a cada 30~s. S6, pelo contrário, é de segurança: o limite de
+login passaria a ser N vezes maior. O desenho revelou um terceiro problema, que o plano não previa: atrás de
+um balanceador, todos os pedidos chegam com o endereço do balanceador, e o limite de login por IP passaria a
+ser um limite global, que um atacante usaria para bloquear o login a todos.
+
+\paragraph{Decisão.}
+\begin{itemize}
+  \item \textbf{Liderança por \emph{job}} com \texttt{pg\_try\_advisory\_lock}, numa ligação reservada por
+    instância. O \emph{lock} é de sessão: se o líder morre, o PostgreSQL liberta-o e outra instância assume na
+    execução seguinte. A métrica \texttt{monitor\_job\_leader} mostra quem lidera cada \emph{job}. A correção
+    continua a vir da idempotência; a liderança só evita trabalho repetido.
+  \item \textbf{Papéis} (\texttt{APP\_ROLE=all|web|worker}), para separar o serviço web dos \emph{jobs} sem mais
+    um binário. Por omissão, uma instância faz tudo, como antes.
+  \item \textbf{Limitador de login no PostgreSQL}: um \texttt{INSERT … ON CONFLICT DO UPDATE} por tentativa, para o
+    IP e para a conta, numa janela fixa de um minuto, igual para todas as instâncias.
+  \item \textbf{Proxies de confiança} (\texttt{TRUSTED\_PROXIES}): o IP do cliente só é lido de
+    \texttt{X-Forwarded-For} quando o pedido vem do balanceador.
+  \item \textbf{nginx} como balanceador do HTTP e do gRPC (\texttt{docker compose up --scale backend=3}). Com
+    \texttt{grpc\_pass}, distribui cada pedido e não cada ligação: sem isso, cada agente ficaria preso à instância
+    em que abriu a sua ligação HTTP/2.
+\end{itemize}
+
+\paragraph{Teoria.}
+\emph{Increase Resources} e \emph{Maintain Multiple Copies of Computations} (desempenho), com o balanceador como
+\emph{intermediary}. \emph{Active Redundancy} nas instâncias web e \emph{Passive Redundancy} no líder de cada
+\emph{job}, que tem instâncias à espera (disponibilidade). \emph{Defer Binding}: o papel e o número de instâncias
+escolhem-se no \emph{deploy}.
+
+\paragraph{Alternativas.}
+Um coordenador externo (etcd, Consul, Redis) seria mais uma peça de infraestrutura, quando o PostgreSQL já
+oferece \emph{locks} com a semântica certa. Um \emph{lock} por execução, como a retenção já fazia, não chega: os
+temporizadores das instâncias não estão sincronizados, e cada uma obteria o \emph{lock} noutro momento. Um
+balanceador TCP prenderia cada agente a uma instância.
+
+\paragraph{Trade-offs.}
+O PostgreSQL continua a ser um ponto único, de falha e de capacidade. A medição mostrou que é este o limite que
+conta (secção~\ref{sec:aval-sc3}). O limite de admissão de \dec{6} é por instância: com N instâncias, deve ser o
+orçamento total a dividir por N.
+
+\paragraph{Verificação.}
+Os testes de integração verificam, num PostgreSQL real, que só uma instância lidera cada \emph{job} e que outra
+assume quando o líder fecha a sessão ou quando o PostgreSQL a termina. Verificam também que o limite de login é
+partilhado por duas instâncias. Num ensaio no Compose com três réplicas, os pedidos HTTP e gRPC ficaram
+distribuídos por igual. Depois de um \texttt{SIGKILL} ao líder, outra réplica liderava o primeiro \emph{job} ao fim
+de 2~s e os quatro ao fim de 12~s; o limite de \cen{SC3} é 30~s. A medição de débito está na
+secção~\ref{sec:aval-sc3}.
+
+\porescrever{\dec{7}, \dec{9}, \dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
 
 \subsection{Manutenção e testabilidade}
 

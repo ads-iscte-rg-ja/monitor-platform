@@ -3,7 +3,7 @@
 // primeiro, novas tentativas nas falhas transitórias e paragem nas definitivas (ADR-0003).
 //
 // Variáveis (preenchidas por correr.sh):
-//   CENARIO     nominal | recovery-storm | noisy-neighbour
+//   CENARIO     nominal | recovery-storm | noisy-neighbour | capacidade
 //   MULT_LOGS   multiplicador da taxa de logs (análise de sensibilidade: 1, 2, 5)
 //   DURACAO     duração dos cenários contínuos (ex.: 10m)
 //   RESULTADO   ficheiro de saída em /results (sem extensão)
@@ -76,6 +76,8 @@ const continuo = {
 const cenarios = {
   nominal: continuo,
   'noisy-neighbour': continuo,
+  // SC3: cada host envia lotes de 100 erros sem pausa, para a carga ficar acima da capacidade.
+  capacidade: { ...continuo, exec: 'hostCapacidade' },
   'recovery-storm': {
     executor: 'per-vu-iterations', vus: HOSTS.length, iterations: 1, maxDuration: '30m', exec: 'hostComBacklog',
   },
@@ -223,6 +225,17 @@ export function hostContinuo() {
     enviarErros(n, inicio, INTERVALO_ERROS_S * 1000, fase);
     tick++;
     sleep(Math.max(0, Math.min(INTERVALO_ERROS_S - (Date.now() - inicio) / 1000, (fim - Date.now()) / 1000)));
+  }
+}
+
+// ---------------------------------------------------------------- capacidade (SC3)
+// A carga é a mesma com 1, 2 ou 3 instâncias; o que se mede é quantos registos o central confirma.
+export function hostCapacidade() {
+  iniciarHost();
+  const fim = exec.scenario.startTime + duracaoMs(DURACAO);
+  sleep(Math.random() * 2);
+  while (Date.now() < fim) {
+    enviarErros(LOTE, Date.now(), 1000, 'capacidade');
   }
 }
 

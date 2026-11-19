@@ -516,9 +516,13 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
      omissão é `all`, para que o deploy de 1 instância continue igual.
   3. **Limitador de login em PostgreSQL** (janela fixa com `INSERT … ON CONFLICT DO UPDATE`). O login é raro,
      por isso 1 upsert por tentativa é barato e o limite volta a ser global.
-  4. **nginx** como balanceador no Compose (`docker compose up --scale backend=3`), com health check em `/health/ready`.
-     As sessões **já** estão no Postgres, por isso não é preciso *sticky sessions*.
+  4. **nginx** como balanceador no Compose (`docker compose up --scale backend=3`), para HTTP e gRPC (`grpc_pass`
+     distribui cada pedido, não cada ligação), com verificação passiva (`max_fails`; o nginx open source não
+     tem verificações ativas). As sessões **já** estão no Postgres, por isso não é preciso *sticky sessions*.
   5. `POSTGRES_MAX_OPEN_CONNS` por omissão 20 (3 × 20 < 100).
+  6. **`TRUSTED_PROXIES`** (descoberto no desenho): atrás do balanceador todos os pedidos chegam com o IP do
+     nginx, e o limite de login por IP passaria a global. O IP do cliente só é lido de `X-Forwarded-For`
+     quando o pedido vem de um proxy desta lista.
 * **Teoria:** Performance → *Increase Resources*, *Maintain Multiple Copies of Computations*; Availability →
   *Active Redundancy* (instâncias web), *Passive Redundancy* (o líder de cada job tem standby); padrão
   Client-Server com balanceador como *intermediary*.
@@ -530,6 +534,9 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Trade-off:** o Postgres continua a ser um **ponto único**. É aceite para 1.000 hosts; réplicas e HA ficam
   no backlog (§8, E4).
 * **Verificação:** SC3: k6 com 1, 2 e 3 instâncias; contador de execuções por job = 1 por ciclo; matar o líder → outra instância assume.
+* **Estado (19/11):** implementado ([ADR-0007](adr/0007-central-escalavel-horizontalmente.md)). Os *jobs* já eram
+  idempotentes; a liderança elimina o trabalho N× (S5). Ensaio no Compose com 3 réplicas: HTTP e gRPC
+  distribuídos por igual; com `SIGKILL` ao líder, outra réplica liderava os 4 *jobs* em 12 s (limite: 30 s).
 
 #### D9. Particionamento temporal e retenção por partição
 * **Problema:** S7, SC4. 17 GB/30 dias só de stats; `DELETE` em lotes em tabelas grandes causa bloat e concorre com a ingestão.
@@ -698,6 +705,7 @@ de escalar fica guiada por dados e não por antecipação (YAGNI, slide 06).
 | E6 | **OpenTelemetry** (traces distribuídos remote→central→BD) | Diagnóstico de latência entre serviços após E1/E3 | *Monitor* | Coletor e backend de traces |
 | E7 | **Probes particionadas** entre workers (hash consistente por `host_id`) | Um worker não consegue cumprir AV2 mesmo com concorrência máxima | *Introduce Concurrency*, *Schedule Resources* | Coordenação da partição |
 | E8 | **Rollups e amostragem na origem** (agregar stats sem incidentes; amostrar logs repetidos, por exemplo "mesma mensagem ×1.000") | Custo de rede/armazenamento domina **ou** descartes de D19 frequentes | *Manage Sampling Rate* | Perde-se resolução; muda o contrato (v2) |
+| E9 | **Escalar as escritas na BD**: primeiro *group commit* do WAL (`commit_delay`); depois particionar por host em vários nós (ex.: Citus) | Débito sustentado acima de metade da capacidade medida em SC3 (≈ 10.000 registos/s) **ou** p95 de ingestão >200 ms em regime normal | *Increase Resources*, *Maintain Multiple Copies of Data* (partições) | O *group commit* atrasa cada confirmação alguns ms; o particionamento muda a operação da BD e as consultas entre hosts |
 
 **Ordem esperada:** E2 e E3 chegam primeiro (dados e competição de recursos), depois E1 e por fim E4–E8.
 A ordem real é decidida pelos gatilhos.

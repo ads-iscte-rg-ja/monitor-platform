@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-CPUS = 2  # limite do contentor do central (loadtest/compose.yaml)
+CPUS = 2  # limite de cada contentor do central e do PostgreSQL (loadtest/compose.yaml)
 
 
 def consultar(prometheus: str, expressao: str, quando: int) -> list[dict]:
@@ -56,14 +56,54 @@ def servidor(prometheus: str, inicio: int, fim: int) -> dict:
         "pedidos_por_codigo": por_codigo,
         "registos": registos,
         "dashboard_p95_ms": ms(q(f'histogram_quantile(0.95, sum by (le) (increase(monitor_http_request_duration_seconds_bucket{{route="/api/v1/dashboard/summary"}}[{d}])))')),
-        "cpu_media_pct": pct(q(f"increase(process_cpu_seconds_total[{d}]) / {max(fim - inicio, 30)}")),
-        "cpu_max_pct": pct(q(f"max_over_time(rate(process_cpu_seconds_total[30s])[{d}:5s])")),
-        "memoria_max_mb": mb(q(f"max_over_time(process_resident_memory_bytes[{d}])")),
-        "ligacoes_bd_max": q(f"max_over_time(go_sql_in_use_connections[{d}])"),
-        "ligacoes_bd_limite": q("go_sql_max_open_connections"),
-        "esperas_por_ligacao": q(f"increase(go_sql_wait_count_total[{d}])"),
-        "espera_por_ligacao_s": q(f"increase(go_sql_wait_duration_seconds_total[{d}])"),
+        # Com várias instâncias (SC3): CPU e memória por instância (média e máximo entre elas);
+        # ligações e esperas somadas, porque todas usam o mesmo PostgreSQL.
+        "instancias": q('count(up{job="monitor-central"} == 1)'),
+        # Débito do lado do servidor (SC3): registos gravados por segundo no minuto de maior débito
+        # e em média na janela (a janela do k6 inclui o arranque e o fim dos hosts).
+        "registos_por_s_max_1m": q(f'max_over_time(sum(rate(monitor_ingest_records_total{{outcome="inserted"}}[1m]))[{d}:5s])'),
+        "registos_por_s_media": q(f'sum(increase(monitor_ingest_records_total{{outcome="inserted"}}[{d}])) / {max(fim - inicio, 30)}'),
+        "cpu_media_pct": pct(q(f"avg(increase(process_cpu_seconds_total[{d}])) / {max(fim - inicio, 30)}")),
+        "cpu_max_pct": pct(q(f"max(max_over_time(rate(process_cpu_seconds_total[30s])[{d}:5s]))")),
+        "memoria_max_mb": mb(q(f"max(max_over_time(process_resident_memory_bytes[{d}]))")),
+        "ligacoes_bd_max": q(f"max_over_time(sum(go_sql_in_use_connections)[{d}:5s])"),
+        "ligacoes_bd_limite": q("sum(go_sql_max_open_connections)"),
+        "esperas_por_ligacao": q(f"sum(increase(go_sql_wait_count_total[{d}]))"),
+        "espera_por_ligacao_s": q(f"sum(increase(go_sql_wait_duration_seconds_total[{d}]))"),
+        "jobs": jobs(prometheus, d, fim),
     }
+
+
+def jobs(prometheus: str, d: str, fim: int) -> dict:
+    """SC3: quantas instâncias lideraram e executaram cada job na janela (deve ser 1).
+    A etiqueta "job" das métricas do central chega como "exported_job": "job" é a do Prometheus."""
+    lideres = {r["metric"]["exported_job"]: float(r["value"][1]) for r in consultar(
+        prometheus, f"max_over_time(sum by (exported_job) (monitor_job_leader)[{d}:5s])", fim)}
+    executores = {r["metric"]["exported_job"]: float(r["value"][1]) for r in consultar(
+        prometheus, f"count by (exported_job) (increase(monitor_job_duration_seconds_count[{d}]) > 0)", fim)}
+    return {"lideres_max": lideres, "instancias_que_executaram": executores}
+
+
+def cpu_contentores(caminho: Path | None) -> dict:
+    """CPU médio e máximo (em % de 2 vCPU) do PostgreSQL e das instâncias, a partir de docker stats."""
+    if caminho is None or not caminho.exists():
+        return {}
+    amostras: dict[str, dict[int, float]] = {}
+    for linha in caminho.read_text().splitlines():
+        partes = linha.split()
+        if len(partes) != 3 or not partes[2].endswith("%"):
+            continue
+        quando, nome, cpu = int(partes[0]), partes[1], float(partes[2].rstrip("%"))
+        grupo = "postgres" if "postgres" in nome else "central" if "backend" in nome else None
+        if grupo:
+            # Instâncias do central somadas em cada instante; por instância, divide-se pelo número delas.
+            amostras.setdefault(grupo, {}).setdefault(quando, 0.0)
+            amostras[grupo][quando] += cpu
+    resultado = {}
+    for grupo, serie in amostras.items():
+        valores = list(serie.values())
+        resultado[grupo] = {"media_pct": round(sum(valores) / len(valores) / CPUS, 1), "max_pct": round(max(valores) / CPUS, 1)}
+    return resultado
 
 
 def ms(segundos: float | None) -> float | None:
@@ -109,11 +149,17 @@ def main() -> None:
     ap.add_argument("--duplicados", type=int, required=True)
     ap.add_argument("--k6", type=Path, required=True)
     ap.add_argument("--hosts", type=int, required=True)
+    ap.add_argument("--instancias", type=int, default=1)
+    ap.add_argument("--cpu-contentores", type=Path)
     ap.add_argument("--saida", type=Path, required=True)
     a = ap.parse_args()
     medicao = {
         "janela": {"inicio": a.inicio, "fim": a.fim},
         "hosts": a.hosts,
+        "instancias": a.instancias,
+        # docker stats dá % de um CPU; aqui está em % do limite de 2 vCPU (a soma das instâncias do
+        # central é dividida pelo limite de uma só: 300 % = 3 instâncias saturadas).
+        "cpu_contentores": cpu_contentores(a.cpu_contentores),
         "agente": agente(a.k6),
         "servidor": servidor(a.prometheus, a.inicio, a.fim),
         "dashboard_p95_ms_durante_recuperacao": None,
