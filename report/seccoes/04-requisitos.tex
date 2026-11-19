@@ -1,14 +1,204 @@
 \section{Requisitos arquiteturais}
 \label{sec:requisitos}
 
+Este capítulo deriva os requisitos arquiteturalmente significativos a partir dos objetivos da
+Tabela~\ref{tab:objetivos}: primeiro prioriza os atributos de qualidade, depois torna explícitos os
+conflitos entre eles, estima a carga a 1\,000 \emph{hosts} e, por fim, organiza os cenários numa
+\emph{utility tree}.
+
 \subsection{Priorização dos atributos de qualidade}
-\porescrever{ranking e justificação (plano §2.1).}
+
+A Tabela~\ref{tab:ranking} ordena os atributos. A ordem decide onde se investe o tempo disponível e
+qual dos lados ganha quando dois atributos entram em conflito.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Priorização dos atributos de qualidade}
+  \label{tab:ranking}
+  \begin{tabularx}{\linewidth}{rL{0.2\linewidth}lY}
+    \toprule
+    & QA & Prioridade & Justificação \\
+    \midrule
+    1 & Scalability & Alta & G3. É também o atributo com mais impacto arquitetural: passar de uma para N instâncias, ou de tabelas simples para particionadas, é caro de fazer tarde \\
+    2 & Modifiability & Alta & G4. A maior parte do custo do software ocorre depois da primeira versão~\cite{bastofernandes2026}; aqui a mudança é garantida, porque o sistema continua a ser desenvolvido e a interface é a parte que mais muda \\
+    3 & Availability (com integridade dos dados) & Alta & G1, G2. Num monitor é um requisito do domínio. Já está quase toda implementada: o trabalho é prová-la e não a perder ao escalar \\
+    4 & Testability & Alta (habilitador) & Não é um fim: é o que permite mudar e escalar sem regressões. Os testes de integração partidos sem ninguém saber mostraram o risco \\
+    5 & Monitorability & Média-alta & Sem medições não se demonstra escalabilidade, e o monitor tem de mostrar as suas próprias perdas \\
+    6 & Security & Média & G5. A base já é sólida (HMAC, CSRF, bcrypt, auditoria) e o sistema não guarda dados pessoais sensíveis. Avalia-se por \emph{checklist} \\
+    7 & Performance & Média, subordinada & A telemetria é assíncrona: interessa o débito sob carga crescente, medido como escalabilidade, e a latência do \emph{dashboard} \\
+    8 & Interoperability & Baixa-média & Há um único agente. O contrato fica documentado para agentes futuros \\
+    9 & Usability & Baixa & Fora do âmbito deste trabalho; garante-se apenas o suporte arquitetural: a separação MVC \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A performance não aparece como prioridade própria por uma razão de domínio: um operador não nota a
+diferença entre 50 e 200~ms na ingestão de uma amostra. O que importa é que o débito acompanhe o número
+de \emph{hosts}, e isso é escalabilidade. A usabilidade é baixa não por ser irrelevante, mas por estar fora do
+âmbito de um trabalho de arquitetura: o que lhe cabe é o suporte arquitetural, a separação MVC, que
+permite mudar a apresentação sem tocar nos serviços nem nos dados (\cen{MO3}).
 
 \subsection{Trade-offs explícitos}
-\porescrever{tabela de conflitos e tácticas de mitigação (plano §2.2).}
+
+Cada tática melhora um atributo sem olhar aos outros (secção~\ref{sec:enquadramento}), por isso os
+conflitos têm de ser decididos explicitamente. A Tabela~\ref{tab:tradeoffs} regista cada conflito, a
+escolha feita e a tática que mitiga o lado que perde.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Conflitos entre atributos de qualidade e como são resolvidos}
+  \label{tab:tradeoffs}
+  \begin{tabularx}{\linewidth}{L{0.24\linewidth}YL{0.24\linewidth}}
+    \toprule
+    Conflito & Escolha & Tática que mitiga \\
+    \midrule
+    Scalability vs.\ Modifiability & Escalar só até onde as medições exigem (1\,000 \emph{hosts}); o resto fica no plano de evolução, com gatilhos & Defer Binding (papéis por configuração); Encapsulate (particionamento escondido no repositório) \\
+    Availability vs.\ Consistency & Entrega \emph{at-least-once} com deduplicação idempotente (recibos) & Transactions (registo e recibo juntos) \\
+    Scalability vs.\ Availability & O controlo de admissão rejeita pedidos (429), mas sem perder dados: o remote guarda e volta a tentar & Limit Event Response no central; Retry com \texttt{Retry-After} no remote \\
+    Modifiability vs.\ Performance & Estratégias por métrica de alerta, mas uma única consulta \emph{set-based} montada a partir delas & Increase Cohesion sem consultas N+1 \\
+    Security vs.\ Performance & Aceitar o custo: o HMAC custa microssegundos; o bcrypt só corre no \emph{login} & --- \\
+    Security vs.\ Modifiability da UI & CSP primeiro em modo \emph{Report-Only}, depois aplicada quando a interface estiver adaptada & Change Default Settings, faseado \\
+    Testability vs.\ simplicidade & Interfaces pequenas, definidas por quem as consome & Abstract Data Sources; Limit Nondeterminism (relógio injetado) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Estimativas para 1\,000 hosts}
+\label{sec:estimativas}
+
+Os números dos cenários vêm de estimativas \emph{back-of-the-envelope} (Tabela~\ref{tab:estimativas}),
+feitas antes de qualquer medição. O intervalo de 30~s, o \emph{timeout} de 5~s, a concorrência de 8 e
+as 25 ligações vêm do código; o tamanho de cada linha e o número de regras por \emph{host} são
+estimativas.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Estimativas para 1\,000 \emph{hosts}}
+  \label{tab:estimativas}
+  \begin{tabularx}{\linewidth}{L{0.25\linewidth}L{0.32\linewidth}Y}
+    \toprule
+    Grandeza & Cálculo & Resultado \\
+    \midrule
+    Pedidos de estatísticas & 1\,000 / 30~s & 33~pedidos/s \\
+    Linhas de estatísticas & 33/s × 86\,400~s & 2,9~M/dia ($\approx$0,6~GB/dia; 17~GB em 30 dias) \\
+    Linhas de logs & perfil da Tabela~\ref{tab:perfil-logs} & \porescrever{TODO: depende da taxa dos ruidosos} \\
+    \emph{Backlog} após 1~h em baixo & 1\,000 × 120 estatísticas + logs de 1~h & \porescrever{TODO: depende da taxa dos ruidosos} \\
+    Verificação de disponibilidade, pior caso & 1\,000 × 5~s de \emph{timeout} / 8 em paralelo & 625~s por ciclo, contra um intervalo de 30~s \\
+    Resolução de alertas & 1\,000 \emph{hosts} × $\sim$6 regras, a cada 15~s & até 400 UPDATE/s só para resolver alertas \\
+    Ligações à base de dados com 3 instâncias & 3 × 25 & 75 das 100 permitidas por omissão \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A conclusão é que \textbf{a ingestão nominal é trivial}: 33 pedidos por segundo não pesam nem ao Go nem
+ao PostgreSQL. Os problemas de escala estão em pontos concretos: as escritas linha a linha (S2), a falta de
+controlo de admissão quando os \emph{hosts} recuperam ao mesmo tempo (S4), a verificação de
+disponibilidade sequencial (S1), o crescimento dos dados (S7) e os logs sem limite (S9, S10). É por isso que
+uma reescrita foi rejeitada e cada ponto é tratado com uma tática localizada.
+
+\paragraph{Volume de logs imprevisível.}
+O número de logs de um \emph{host} não é constante: é zero quando não há nada a registar e muito alto
+quando uma aplicação entra em ciclo de erro. Dimensionar pela média seria errado; o sistema tem de ser
+desenhado para a cauda. Os testes de carga usam, por isso, o perfil misto da
+Tabela~\ref{tab:perfil-logs}. Os valores são uma hipótese explícita da equipa, e a avaliação mostra a
+sensibilidade a essa hipótese.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Perfil de logs por \emph{host} (hipótese)}
+  \label{tab:perfil-logs}
+  \begin{tabular}{rll}
+    \toprule
+    Fração & Comportamento & Taxa de logs \\
+    \midrule
+    70\,\% & silenciosos & 0--1 por minuto \\
+    25\,\% & normais & $\sim$10 por minuto \\
+    4\,\% & ruidosos & \porescrever{TODO: taxa a alinhar} \\
+    1\,\% & em rajada (aplicação em ciclo de erro) & $\sim$200 por segundo durante 2 minutos \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Este perfil revela dois riscos que o desenho original não tratava. No \emph{host}: com o central em baixo,
+uma aplicação ruidosa enche o \emph{buffer} sem limite e, com ele, o disco, e o monitor passa a prejudicar o
+sistema que devia proteger (S9). No central: sem justiça entre \emph{hosts}, um único \emph{host} em rajada
+consome a capacidade de ingestão e atrasa os alertas de todos os outros (S10).
 
 \subsection{Utility tree}
-\porescrever{árvore com classificação (valor, impacto) (plano §3.1).}
+
+A Tabela~\ref{tab:utility} apresenta a \emph{utility tree}. Cada folha é um cenário, classificado por
+(valor de negócio, impacto arquitetural) na escala H/M/L~\cite{bastofernandes2026}.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{\emph{Utility tree}}
+  \label{tab:utility}
+  \begin{tabularx}{\linewidth}{lL{0.2\linewidth}lcY}
+    \toprule
+    QA & Refinamento & & (V,I) & Cenário \\
+    \midrule
+    Scalability & Crescimento de \emph{hosts} & \cen{SC1} & (H,H) & 1\,000 \emph{hosts} em regime normal: ingestão sem erros, p95 $<$ 300~ms, CPU do central $<$ 70\,\% \\
+     & & \cen{SC2} & (H,H) & Central volta após 1~h em baixo: \emph{backlog} absorvido em $\le$ 15~min, \emph{dashboard} p95 $<$ 1~s \\
+     & Escala horizontal & \cen{SC3} & (H,H) & 2 e 3 instâncias: débito $\ge$ 1,8× e $\ge$ 2,5×; nenhum \emph{job} em duplicado \\
+     & Crescimento dos dados & \cen{SC4} & (H,M) & 30 dias de dados: \emph{dashboard} p95 $<$ 1~s; retenção sem degradar a ingestão \\
+     & Logs imprevisíveis & \cen{SC5} & (H,H) & 1\,\% dos \emph{hosts} em rajada: os restantes mantêm atraso p95 $<$ 5~s \\
+     & & \cen{AV4} & (H,M) & Rajada com o central em baixo: \emph{buffer} nunca passa o limite; só se perdem INFO/WARN, contados \\
+    \midrule
+    Modifiability & Novas regras & \cen{MO1} & (H,H) & Nova métrica de alerta: $\le$ 1 pessoa-dia, $\le$ 3 ficheiros Go e 1 migração \\
+     & Protocolo & \cen{MO2} & (H,M) & Alterar uma regra do protocolo: 1 sítio por repositório; divergência apanhada por teste \\
+     & Apresentação & \cen{MO3} & (H,M) & Mudança de apresentação de uma página: 0 alterações em \texttt{services} e \texttt{repositories} \\
+    \midrule
+    Availability & Central em baixo & \cen{AV1} & (H,H) & 1~h em baixo: 0 registos perdidos, 0 duplicados \\
+     & Deteção & \cen{AV2} & (H,M) & \emph{Host} sem resposta: alerta em $\le$ \emph{timeout} + 60~s, mesmo com 1\,000 \emph{hosts} \\
+     & Recuperação & \cen{AV3} & (M,M) & Erro 4xx transitório: entrega retomada em $\le$ 5~min sem reiniciar o remote \\
+    \midrule
+    Testability & CI & \cen{TE1} & (H,M) & \emph{Push} ou PR: CI em $\le$ 10~min; uma falha bloqueia o \emph{merge} \\
+     & Isolamento & \cen{TE2} & (M,M) & \emph{Handlers} testáveis com \emph{fakes}; cobertura dos \emph{handlers} $\ge$ 60\,\% \\
+     & Tempo & \cen{TE3} & (M,M) & Lógica temporal testada sem esperas (relógio injetado) \\
+    \midrule
+    Monitorability & Perdas visíveis & \cen{MN1} & (H,M) & Quarentena num \emph{host}: visível no central em $\le$ 1 ciclo \\
+     & Saúde interna & \cen{MN2} & (M,M) & \emph{Job} de fundo parado: \texttt{/health/ready} falha em $\le$ 2 intervalos \\
+    \midrule
+    Security & Autenticação & \cen{SE1} & (H,H) & Chave inválida ou revogada: 401 e nada persistido (já cumprido) \\
+     & \emph{Browser} & \cen{SE2} & (M,M) & XSS e \emph{clickjacking} bloqueados por CSP e \texttt{frame-ancestors} \\
+     & SSRF & \cen{SE3} & (M,M) & Verificação de disponibilidade para \emph{loopback} ou metadados de \emph{cloud}: rejeitada \\
+    \midrule
+    Interoperability & Novos agentes & \cen{IO1} & (L,M) & Agente noutra linguagem implementável só com OpenAPI e exemplos \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Os cenários (H,H) são \cen{SC1}--\cen{SC3}, \cen{SC5}, \cen{MO1}, \cen{AV1} e \cen{SE1}. \cen{AV1} e
+\cen{SE1} já são cumpridos pelo desenho atual e só precisam de ser demonstrados. A escalabilidade é o
+ramo com mais cenários (H,H), e é por isso o eixo das iterações ADD.
 
 \subsection{Cenários de qualidade}
-\porescrever{cenários detalhados SC1--SC5, MO1, AV1, AV4 (plano §3.2).}
+
+A Tabela~\ref{tab:cenarios} detalha, no formato de seis partes, os cenários que a avaliação mede.
+
+\begin{table}[htbp]
+  \centering\footnotesize
+  \caption{Cenários detalhados}
+  \label{tab:cenarios}
+  \begin{tabularx}{\linewidth}{lL{0.17\linewidth}L{0.11\linewidth}L{0.13\linewidth}YL{0.2\linewidth}}
+    \toprule
+    & Fonte e estímulo & Artefacto & Ambiente & Resposta & Medida \\
+    \midrule
+    \cen{SC1} & 1\,000 remotes: estatísticas a cada 30~s e logs com o perfil misto & API de ingestão e PostgreSQL & normal; 1 instância com 2~vCPU e 4~GB & todos os pedidos aceites e persistidos; um \emph{host} ruidoso não atrasa os outros & p95 $<$ 300~ms; 0\,\% 5xx; CPU $<$ 70\,\%; atraso p95 $<$ 5~s nos não ruidosos \\ \addlinespace
+    \cen{SC2} & 1\,000 remotes com 1~h de \emph{backlog} enviam ao mesmo tempo & central e base de dados & central acabado de arrancar & aceita até à capacidade; o excesso recebe 429 com \texttt{Retry-After}; nada se perde & \emph{backlog} absorvido em $\le$ 15~min; \emph{dashboard} p95 $<$ 1~s; 0 perdas; 0 duplicados \\ \addlinespace
+    \cen{SC3} & operador acrescenta instâncias atrás do balanceador & central & carga acima da capacidade de 1 instância & o débito sobe; cada \emph{job} corre numa só instância & $\ge$ 1,8× com 2; $\ge$ 2,5× com 3; 0 \emph{jobs} duplicados; troca de líder $\le$ 30~s \\ \addlinespace
+    \cen{SC4} & operador consulta o \emph{dashboard} & \emph{dashboard} e PostgreSQL & 30 dias de dados de 1\,000 \emph{hosts}; retenção ativa & a consulta responde; a retenção não degrada a ingestão & p95 $<$ 1~s; ingestão sem degradação durante a retenção \\ \addlinespace
+    \cen{SC5} & 1\,\% dos \emph{hosts} em rajada de 200 logs/s durante 2~min & ingestão do central & normal, 1\,000 \emph{hosts} & o \emph{host} em rajada recebe 429 e guarda localmente; os outros não são afetados & atraso p95 $<$ 5~s para os restantes \\ \addlinespace
+    \cen{AV4} & aplicação em ciclo de erro gera uma rajada de logs & remote e \emph{buffer} & central indisponível & o \emph{buffer} respeita o limite; descarta primeiro INFO e WARN, e conta o que descarta & tamanho $\le$ limite; perdas só de INFO/WARN, contadas e reportadas \\ \addlinespace
+    \cen{MO1} & programador recebe o pedido de uma métrica de alerta nova & módulo de alertas & desenvolvi\-mento & métrica implementada e testada sem tocar no avaliador genérico & $\le$ 1 pessoa-dia; $\le$ 3 ficheiros Go e 1 migração \\ \addlinespace
+    \cen{AV1} & falha de infraestrutura: central em baixo 1~h & remote e \emph{buffer} SQLite & aplicações continuam a registar erros & o remote guarda tudo e entrega quando o central volta & 0 perdas; 0 duplicados (teste E2E) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Origem dos números.}
+Os 1\,000 \emph{hosts} são a escala escolhida pela equipa. Os 300~ms são folgados para um POST assíncrono e
+servem de sinal de saturação, não de requisito de latência. Os 15~minutos de \cen{SC2} são cerca de quatro
+vezes o tempo teórico de envio do \emph{backlog}. O fator 1,8× de \cen{SC3} admite que duas instâncias
+percam 10\,\% para a coordenação; o de 2,5× admite uma perda maior com três. Os limites de \cen{MO1} correspondem a uma alteração confinada a um único
+módulo, que é o que a modificabilidade promete.
