@@ -91,6 +91,21 @@ linters:
               desc: "observability é usado pelas camadas, não as usa"
             - pkg: monitor-central/internal/database
               desc: "recebe um *sql.DB e funções; não conhece o pacote database"
+        central-alertmetric:
+          # Métricas de alerta como Strategy (ADR-0008): domínio, usado pelas camadas e sem as conhecer.
+          list-mode: lax
+          files: ["**/internal/alertmetric/**"]
+          deny:
+            - pkg: monitor-central/internal/handlers
+              desc: "as métricas são domínio: não conhecem o HTTP"
+            - pkg: monitor-central/internal/grpcapi
+              desc: "as métricas são domínio: não conhecem o gRPC"
+            - pkg: monitor-central/internal/services
+              desc: "os services usam as métricas, não o contrário"
+            - pkg: monitor-central/internal/repositories
+              desc: "as métricas fornecem a consulta; quem a executa é o repositório"
+            - pkg: monitor-central/internal/database
+              desc: "as métricas não executam SQL"
         central-services:
           list-mode: lax
           files: ["**/internal/services/**"]
