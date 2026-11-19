@@ -69,7 +69,89 @@ não conta como falha). Num teste ponta-a-ponta, com o central, o PostgreSQL e u
 mostraram os valores esperados. A alteração não acrescentou \emph{issues} de lint: as que introduziu na
 complexidade do arranque do servidor foram corrigidas na mesma alteração (60 para 58).
 
-\porescrever{\dec{5}--\dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
+\subsubsection{Escritas em lote (\dec{5}, ADR-0005)}
+\label{sec:d5}
+
+\paragraph{Problema.}
+A baseline de carga (secção~\ref{sec:aval-escala}) mostrou que o único cenário que falha é a recuperação:
+o \emph{pool} de ligações esgota-se (25 de 25) com o CPU abaixo de 30\,\%. Cada lote de ingestão fazia dois
+\emph{statements} por registo, o recibo de deduplicação e o próprio registo: um lote de 100 eram cerca de 200
+idas à base de dados, sempre com a mesma ligação ocupada (S2). O \emph{job} de alertas fazia um UPDATE por cada
+regra não violada, a cada 15~s (S3).
+
+\paragraph{Decisão.}
+Cada lote passa a usar três \emph{statements}, seja qual for o tamanho: os recibos de todo o lote num
+\texttt{INSERT \ldots{} FROM unnest(\ldots) ON CONFLICT DO NOTHING RETURNING}, que diz que registos são novos; os
+registos novos num único \texttt{INSERT} com \emph{arrays} por coluna; e a atualização do \emph{host}. Os alertas
+não violados resolvem-se todos num único UPDATE por ciclo. A idempotência e a atomicidade mantêm-se: dados e
+recibos continuam na mesma transação, e um reenvio devolve os mesmos identificadores.
+
+\paragraph{Teoria.}
+\emph{Reduce Overhead} e \emph{Increase Resource Efficiency} (desempenho): menos trabalho por unidade de
+débito, e cada ligação fica ocupada menos tempo. \emph{Encapsulate} (modificabilidade): a mudança fica dentro
+do repositório, e a interface usada pelos serviços não muda.
+
+\paragraph{Alternativas.}
+\texttt{COPY} é o mais rápido, mas não suporta \texttt{ON CONFLICT} nem devolve os identificadores de que a
+confirmação ao agente precisa. Aumentar o \emph{pool} só adiaria o problema, e passá-lo-ia ao PostgreSQL, cujas
+100 ligações são partilhadas por todas as instâncias (\dec{8}). Uma fila em memória antes da base de dados
+arriscaria perder dados já confirmados ao agente (\cen{AV1}).
+
+\paragraph{Trade-offs.}
+O SQL fica mais complexo. Isso é mitigado por ficar isolado no repositório e coberto pelos testes de
+integração que já existiam (deduplicação, reenvio, \emph{rollback} conjunto de dados e recibos, recibos
+concorrentes), a que se juntaram três: um lote com registos novos e reenviados misturados, a ordem dos
+identificadores devolvidos, e a resolução de alertas em lote.
+
+\subsubsection{Controlo de admissão (\dec{6}, ADR-0006)}
+\label{sec:d6}
+
+\paragraph{Problema.}
+Nada limitava quantos pedidos de ingestão eram servidos ao mesmo tempo (S4). Na recuperação, a ingestão
+ocupava todas as ligações e o \emph{dashboard} esperava por uma livre, com p95 de pelo menos 10~s.
+
+\paragraph{Decisão.}
+O número de pedidos de ingestão em curso é limitado (\texttt{INGEST\_MAX\_INFLIGHT}, por omissão 60\,\% do
+\emph{pool}: 15 de 25). Cada pedido usa no máximo uma ligação de cada vez, por isso ficam sempre pelo menos 10
+para o \emph{dashboard}, as sessões e os \emph{jobs}. Um pedido acima do limite é rejeitado logo, antes da
+autenticação, com \texttt{RESOURCE\_EXHAUSTED} e um atraso aleatório entre 1 e 10~s (\texttt{RetryInfo}). O
+agente guarda os registos no \emph{buffer} e volta a enviá-los, por isso nada se perde, e o atraso aleatório
+evita que 1\,000 agentes rejeitados no mesmo segundo voltem todos no mesmo segundo.
+
+\paragraph{Teoria.}
+\emph{Limit Event Response}, \emph{Bound Queue Sizes} e \emph{Schedule Resources} (desempenho): a ingestão tem
+uma quota fixa do recurso partilhado. \emph{Degradation} (disponibilidade): sob sobrecarga, a ingestão fica mais
+lenta para o \emph{dashboard} continuar utilizável. A degradação é segura porque combina com \emph{Retry} no
+agente.
+
+\paragraph{O que ficou de fora, e porquê.}
+O plano previa também justiça por \emph{host}: um \emph{token bucket} por \emph{host}, para um \emph{host} em rajada
+não atrasar os outros (S10). A baseline refutou esse risco: com 1\,\% dos \emph{hosts} a 200 logs/s, os restantes
+tiveram atraso p95 de 6~ms (Tabela~\ref{tab:carga-sc5}). Implementá-la seria complexidade sem um cenário que a
+peça. Fica desenhada no ADR, com o gatilho que a tornaria necessária: atraso p95 dos restantes \emph{hosts}
+acima de 1~s em \cen{SC5}, ou um \emph{host} com mais de metade das admissões. É o \emph{generate and test} a
+retirar do desenho uma parte que a análise tinha proposto.
+
+\paragraph{Alternativas.}
+Esperar por uma vaga em vez de rejeitar acumularia pedidos em memória até ao \emph{timeout} do agente; rejeitar
+com \texttt{RetryInfo} devolve a espera a quem já guarda os dados. Uma segunda \emph{pool} para o \emph{dashboard}
+teria o mesmo efeito com mais configuração. Uma fila ou \emph{broker} à frente da base de dados é a evolução
+E1, para mais de 10\,000 \emph{hosts}.
+
+\paragraph{Trade-offs.}
+A recuperação fica mais lenta, porque os agentes esperam o \texttt{RetryInfo}, mas há folga: o limite de
+\cen{SC2} é de 15~minutos e a baseline absorveu o \emph{backlog} em 1,4. O limite é por instância, e com
+várias instâncias (\dec{8}) terá de ser dimensionado com o \texttt{max\_connections} do PostgreSQL.
+
+\paragraph{Verificação de \dec{5} e \dec{6}.}
+A iteração~4 repetiu as medições de carga da \emph{baseline} (secção~\ref{sec:aval-escala}). Na recuperação, o p95
+do \emph{dashboard} desceu de pelo menos 10~s para 262~ms, as esperas por ligação de mais de 11\,000 para 0, e o
+\emph{backlog} passou a ser absorvido em 43~s em vez de 1,4~minutos, sem perdas nem duplicados. Os cenários que já
+se cumpriam continuam a cumprir-se, com latências mais baixas. Nas métricas de código, as funções acima do
+limite cognitivo no central desceram de 10 para 8 e as \emph{issues} de lint de 60 para 56: as alterações não
+deixaram dívida nova, e o arranque do servidor deixou de estar acima dos limites.
+
+\porescrever{\dec{7}--\dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
 
 \subsection{Manutenção e testabilidade}
 

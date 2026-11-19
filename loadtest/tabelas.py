@@ -62,6 +62,24 @@ def nao_ok_pct(m: dict | None) -> float | None:
     return 100 * sum(v for c, v in codigos.items() if c != "OK") / total if total else None
 
 
+def pct_codigo(m: dict | None, codigo: int) -> float | None:
+    """Percentagem de tentativas de envio que receberam o código gRPC indicado (contagem do k6)."""
+    total = valor(m, "agente", "grpc_req_duration{ingestao:sim}", "count")
+    if not total:
+        return None
+    return 100 * (valor(m, "agente", f"respostas_nao_ok{{codigo:{codigo}}}", "count") or 0) / total
+
+
+def pct_outros(m: dict | None) -> float | None:
+    """Percentagem de tentativas com erro que não seja rejeição por sobrecarga (código 8)."""
+    total = valor(m, "agente", "grpc_req_duration{ingestao:sim}", "count")
+    if not total:
+        return None
+    nao_ok = valor(m, "agente", "respostas_nao_ok", "count") or 0
+    rejeicoes = valor(m, "agente", "respostas_nao_ok{codigo:8}", "count") or 0
+    return 100 * (nao_ok - rejeicoes) / total
+
+
 def integridade(m: dict | None) -> tuple[float | None, float | None, float | None]:
     confirmados = valor(m, "agente", "registos_confirmados", "count")
     bd = valor(m, "base_de_dados")
@@ -88,9 +106,10 @@ def linhas_sc1(m: dict | None) -> list[tuple[str, str, str, str]]:
         ("Atraso p95 (exceto rajada)", "$<$ 5 s", duracao(atraso),
          cumpre(None if atraso is None else atraso < 5000)),
         ("Registos confirmados / s", "---", num(None if not confirmados or not segundos else confirmados / segundos, 0), "---"),
-        ("Confirmados = gravados, sem duplicados", "sim",
-         "---" if gravados is None else f"{num(confirmados)} / {num(gravados)}, {num(duplicados)} dup.",
-         cumpre(None if gravados is None else confirmados == gravados and duplicados == 0)),
+        ("Confirmados ao agente / gravados", "iguais",
+         "---" if gravados is None else f"{num(confirmados)} / {num(gravados)}",
+         cumpre(None if gravados is None else confirmados == gravados)),
+        ("Duplicados na base de dados", "0", num(duplicados), cumpre(None if duplicados is None else duplicados == 0)),
     ]
 
 
@@ -101,13 +120,13 @@ def tabela(rotulo: str, legenda: str, cabecalho: list[str], linhas: list[list[st
   \\centering\\small
   \\caption{{{legenda}}}
   \\label{{{rotulo}}}
-  \\begin{{tabular}}{{{formato}}}
+  \\begin{{tabularx}}{{\\linewidth}}{{>{{\\raggedright\\arraybackslash}}X{formato[1:]}}}
     \\toprule
     {" & ".join(cabecalho)} \\\\
     \\midrule
 {corpo}
     \\bottomrule
-  \\end{{tabular}}{nota_tex}
+  \\end{{tabularx}}{nota_tex}
 \\end{{table}}
 """
 
@@ -179,20 +198,23 @@ def main() -> None:
              cumpre(None if dash is None else dash < 1000)),
             ("Lotes não entregues", "0", num(None if perdidos is None else perdidos * 100, 2, "\\,\\%"),
              cumpre(None if perdidos is None else perdidos == 0)),
-            ("Pedidos não OK", "---", num(nao_ok_pct(m), 2, "\\,\\%"), "---"),
+            ("Rejeições por sobrecarga (repetidas pelo agente)", "---", num(pct_codigo(m, 8), 1, "\\,\\%"), "---"),
+            ("Erros (\\emph{timeouts} e outros)", "---", num(pct_outros(m), 1, "\\,\\%"), "---"),
             ("Esperas por ligação à BD", "---", num(valor(m, "servidor", "esperas_por_ligacao")), "---"),
-            ("Confirmados = gravados, sem duplicados", "sim",
-             "---" if gravados is None else f"{num(confirmados)} / {num(gravados)}, {num(duplicados)} dup.",
-             cumpre(None if gravados is None else confirmados == gravados and duplicados == 0)),
+            ("Confirmados ao agente / gravados", "iguais",
+             "---" if gravados is None else f"{num(confirmados)} / {num(gravados)}",
+             cumpre(None if gravados is None else confirmados == gravados)),
+            ("Duplicados na base de dados", "0", num(duplicados), cumpre(None if duplicados is None else duplicados == 0)),
         ]
     gerar("recovery-storm", linhas_sc2, "carga-sc2", "Cenário SC2: recuperação após 1 h com o central em baixo")
 
-    # Sensibilidade à hipótese do perfil de logs (relatório, secção 4.3).
-    medicoes = [(m, carregar(a.iteracao, m)) for m in ("nominal", "nominal-x2", "nominal-x5")]
-    medicoes = [(m, d) for m, d in medicoes if d is not None]
-    if len(medicoes) > 1:
+    # Sensibilidade à hipótese do perfil de logs (relatório, secção 4.3), com --antes lado a lado.
+    iteracoes = ([a.antes] if a.antes else []) + [a.iteracao]
+    colunas = [(it, m, carregar(it, m)) for it in iteracoes for m in ("nominal", "nominal-x2", "nominal-x5")]
+    colunas = [(it, m, d) for it, m, d in colunas if d is not None]
+    if len(colunas) > 1:
         def col(f):
-            return [f(d) for _, d in medicoes]
+            return [f(d) for _, _, d in colunas]
         linhas = [
             ["p95 da ingestão (agente)"] + col(lambda d: num(valor(d, "agente", "grpc_req_duration{ingestao:sim}", "p(95)"), 0, " ms")),
             ["CPU média do central"] + col(lambda d: num(valor(d, "servidor", "cpu_media_pct"), 0, "\\,\\%")),
@@ -200,10 +222,26 @@ def main() -> None:
             ["Pedidos não OK"] + col(lambda d: num(nao_ok_pct(d), 2, "\\,\\%")),
             ["Cumpre SC1"] + col(lambda d: cumpre(all(l[3] != "\\Nao" for l in linhas_sc1(d)))),
         ]
-        nomes = {"nominal": "logs ×1", "nominal-x2": "logs ×2", "nominal-x5": "logs ×5"}
-        (destino / "carga-sensibilidade.tex").write_text(tabela(
-            "tab:carga-sensibilidade", f"Sensibilidade ao perfil de logs ({a.iteracao})",
-            ["Medida"] + [nomes[m] for m, _ in medicoes], linhas, "l" + "r" * len(medicoes)))
+        nomes = {"nominal": "×1", "nominal-x2": "×2", "nominal-x5": "×5"}
+        cabecalho = ["Logs"] + [nomes[m] for _, m, _ in colunas]
+        grupos = ""
+        if len(iteracoes) > 1:
+            por_it = [sum(1 for it, _, _ in colunas if it == x) for x in iteracoes]
+            grupos = " & " + " & ".join(f"\\multicolumn{{{n}}}{{c}}{{{x}}}" for n, x in zip(por_it, iteracoes)) + " \\\\\n    "
+        corpo = "\n".join("    " + " & ".join(l) + " \\\\" for l in linhas)
+        (destino / "carga-sensibilidade.tex").write_text(f"""\\begin{{table}}[htbp]
+  \\centering\\small
+  \\caption{{Sensibilidade ao perfil de logs}}
+  \\label{{tab:carga-sensibilidade}}
+  \\begin{{tabular}}{{l{"r" * len(colunas)}}}
+    \\toprule
+    {grupos}{" & ".join(cabecalho)} \\\\
+    \\midrule
+{corpo}
+    \\bottomrule
+  \\end{{tabular}}
+\\end{{table}}
+""")
     print(f"tabelas de carga escritas em {destino}")
 
 

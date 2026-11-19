@@ -105,6 +105,7 @@ let proximoErro = 1;
 let acumulado = 0;
 let tick = 0;
 let avisos = 0;
+let avisosRetry = 0;
 
 function iniciarHost() {
   if (!ligado) {
@@ -136,6 +137,9 @@ function enviar(metodo, pedido, n, t) {
     }
     const codigo = res.error && typeof res.error.code === 'number' ? res.error.code : 2;
     rejeicoes.add(1, { codigo: String(codigo), tipo: t.tipo });
+    if (codigo === 8 && avisosRetry++ < 1) {
+      console.log(`RetryInfo recebido: ${JSON.stringify(res.error.details)} -> ${atrasoPedido(res.error)} s`);
+    }
     if (!TRANSITORIOS.has(codigo)) {
       falhas.add(true, t); // o agente pausaria
       if (avisos++ < 3) {
@@ -143,8 +147,25 @@ function enviar(metodo, pedido, n, t) {
       }
       return;
     }
-    sleep(Math.min(5 * 2 ** Math.min(tentativa, 6), 300) * (0.8 + Math.random() * 0.4));
+    // Como o remote: espera o maior entre o seu backoff e o RetryInfo do central (ADR-0006).
+    const backoff = Math.min(5 * 2 ** Math.min(tentativa, 6), 300) * (0.8 + Math.random() * 0.4);
+    sleep(Math.max(backoff, atrasoPedido(res.error)));
   }
+}
+
+// Atraso de RetryInfo (google.rpc.RetryInfo) em segundos, ou 0. O k6 entrega os detalhes em JSON:
+// "retryDelay" como texto ("3.2s") ou como {seconds, nanos}.
+function atrasoPedido(erro) {
+  for (const d of (erro && erro.details) || []) {
+    const atraso = d.retryDelay || d.retry_delay;
+    if (typeof atraso === 'string') {
+      return parseFloat(atraso) || 0;
+    }
+    if (atraso && typeof atraso === 'object') {
+      return Number(atraso.seconds || 0) + Number(atraso.nanos || 0) / 1e9;
+    }
+  }
+  return 0;
 }
 
 function stat(id, quando) {

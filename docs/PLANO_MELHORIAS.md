@@ -434,7 +434,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 #### D3. CI em todos os repos
 * **Problema:** M1, TE1.
 * **Decisão:** GitHub Actions: `golangci-lint` → `go test -race` → integração (`services: postgres:16`) →
-  `govulncheck` → SonarQube Cloud. `main` protegido: merge só com CI verde e 1 review da outra pessoa.
+  `govulncheck` → SonarQube Cloud. `main` protegido: merge só por PR e com CI verde, também para administradores; 0 aprovações obrigatórias (equipa de 2: uma revisão obrigatória bloquearia o trabalho; ADR-0001, Histórico).
   O job de carga (k6) e o E2E correm **manualmente ou à noite**, porque são lentos.
 * **Teoria:** *"if a fault is present it must fail during testing as soon as possible"* (slide 03).
 * **Verificação:** um PR com um teste partido fica bloqueado.
@@ -461,6 +461,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Verificação:** os dashboards Grafana mostram as medidas de SC1–SC3 durante os testes k6.
 
 #### D5. Escritas set-based
+* **Estado (19/11):** implementado ([ADR-0005](adr/0005-escritas-em-lote.md)): 3 *statements* por lote de ingestão; 1 UPDATE por ciclo de alertas.
 * **Problema:** S2, S3. ≈1 M de statements numa recuperação; 400 UPDATE/s nos alertas.
 * **Decisão:** inserts multi-linha com `unnest($1::bigint[], …)`: **1 statement por lote** para dados,
   outro para recibos, com `ON CONFLICT DO NOTHING` a manter a idempotência. Resolver alertas com **1 UPDATE
@@ -473,6 +474,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Verificação:** k6 compara antes/depois: statements/s (`pg_stat_statements`) e p95 de ingestão em SC1 e SC2.
 
 #### D6. Controlo de admissão na ingestão (*load shedding*)
+* **Estado (19/11):** implementado o limite global ([ADR-0006](adr/0006-controlo-de-admissao.md)). **Não** implementados a justiça por host nem o *jitter* inicial no remote: a baseline de carga refutou o risco (SC5: atraso p95 dos vizinhos de 6 ms com 1 % dos hosts em rajada); ficam desenhados, com gatilho (atraso p95 dos vizinhos > 1 s, ou um host com mais de metade das admissões).
 * **Problema:** S4, SC2. Quando o central volta, 1.000 remotes despejam o backlog ao mesmo tempo.
 * **Decisão:** um semáforo de pedidos de ingestão em curso (`INGEST_MAX_INFLIGHT`, por omissão ≈ 60% do pool
   de BD). Quando está cheio, responde **`RESOURCE_EXHAUSTED` com `RetryInfo` aleatório entre 1 e 10 s** (ADR-0003;
