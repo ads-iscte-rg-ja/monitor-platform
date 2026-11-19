@@ -50,13 +50,21 @@ services:
     # Limites do sistema medido (cenário SC1: 1 instância com 2 vCPU e 4 GB).
     cpus: 2
     mem_limit: 4g
-    ports:
-      - "127.0.0.1:${CARGA_HTTP_PORT:-13333}:3333"
     healthcheck:
       test: ["CMD", "wget", "-q", "-T", "3", "-O", "/dev/null", "http://127.0.0.1:3333/health"]
       interval: 2s
       timeout: 5s
       retries: 30
+
+  # Balanceador do central (ADR-0007), com a mesma configuração do Compose do central. Usado em
+  # SC3 (capacidade com 1, 2 e 3 instâncias: --scale backend=N); os outros cenários falam
+  # diretamente com a única instância, como nas iterações anteriores.
+  nginx:
+    image: nginx:1.28.0-alpine
+    depends_on:
+      backend: {condition: service_healthy}
+    volumes:
+      - ../../monitor-central/deployments/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
 
   prometheus:
     image: prom/prometheus:v3.16.0

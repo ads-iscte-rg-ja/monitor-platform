@@ -98,6 +98,50 @@ pedidos competem pela base de dados ao mesmo tempo elimina a contenção que, an
 segundos. O \emph{trade-off} previsto em \dec{6} (recuperação mais lenta em troca de estabilidade) não se
 verificou: as duas decisões juntas melhoraram ambos os critérios.
 
+\paragraph{Regressão (iteração~5).}
+Depois de \dec{8}, as medições de \cen{SC1}, \cen{SC2}, \cen{SC5} e da sensibilidade repetiram-se com uma
+instância. Todos os cenários continuam a cumprir-se, com valores dentro da variação entre execuções (o p95 do
+\emph{dashboard} durante a recuperação foi de 380~ms, contra 262~ms na iteração~4; o limite é 1~s).
+
+\subsection{Escala horizontal (\cen{SC3})}
+\label{sec:aval-sc3}
+
+\gerado{carga-sc3.tex}
+
+\cen{SC3} mede o débito com 1, 2 e 3 instâncias atrás do nginx, com a mesma carga: os 1\,000 \emph{hosts} enviam
+lotes de 100 erros sem pausa (Tabela~\ref{tab:carga-sc3}). A parte de coordenação cumpre-se: em todas as
+medições, cada \emph{job} teve um único líder e correu numa só instância, e no ensaio da secção~\ref{sec:d8} a
+troca de líder demorou 12~s, contra um limite de 30~s. A parte do débito \textbf{não se cumpre}: duas e três
+instâncias confirmaram 1,01 e 1,03 vezes os registos de uma, contra os 1,8 e 2,5 vezes pedidos.
+
+A tabela mostra porquê. Cada instância do central usa menos de 10\,\% do seu CPU; o que sobe com as instâncias é a
+latência de cada pedido (p95 de 184, 375 e 536~ms), e quase na proporção da concorrência admitida (15, 30 e 45
+pedidos). Pela lei de Little, débito igual com o triplo da concorrência e o triplo da latência quer dizer que os
+pedidos passam a esperar num recurso partilhado: o PostgreSQL. Uma amostragem dos processos ativos do
+PostgreSQL durante a carga confirma-o: 56\,\% das amostras estavam a executar, 26\,\% à espera do registo de
+transações (WAL: inserção, escrita e sincronização) e 11\,\% em contenção nas mesmas páginas de dados. O limite
+é o caminho de escrita da base de dados, e não o central.
+
+A premissa de \cen{SC3}, uma carga acima da capacidade de uma instância, deixou de existir com \dec{5}. As
+escritas em lote tornaram o central tão leve que o estrangulamento passou para a base de dados. Uma instância
+confirmou cerca de 20\,000 registos por segundo no minuto de pico, cerca de 160 vezes os 122 registos por segundo
+do regime normal. Este fator é um limite superior: foi medido com lotes cheios, o caso mais eficiente, e os
+\emph{hosts} reais enviam lotes pequenos. Mesmo assim, a folga cobre com margem os 10\,000 \emph{hosts} do
+\emph{backlog} do projeto (cerca de 1\,200 registos por segundo).
+
+Por isso, a equipa decidiu não escalar a base de dados. Réplicas de leitura não aumentam o débito de escrita;
+\emph{sharding} seria uma complexidade que nenhum cenário pede; e desligar a sincronização do WAL poria em risco
+\cen{AV1}, porque o agente apaga do \emph{buffer} o que o central confirma. Escalar a base de dados fica como
+evolução E9 (secção~\ref{sec:evolucao}), com um gatilho medido: débito sustentado acima de metade da capacidade aqui medida. \dec{8} mantém
+o seu valor pela disponibilidade: o central deixa de ser um ponto único de falha, e um \emph{job} sobrevive à
+morte da instância que o corria. É o \emph{generate and test} outra vez: a medição mostrou que a premissa de um
+cenário deixou de ser verdadeira, e o relatório regista-o em vez de ajustar o alvo.
+
+Com 2 e 3 instâncias, o \emph{dashboard} também piorou sob esta carga extrema (p95 de 4,9 para 9,4~s). O limite
+de admissão de \dec{6} é por instância, e três instâncias metem três vezes mais pedidos em simultâneo na base de
+dados. Com N instâncias, \texttt{INGEST\_MAX\_INFLIGHT} deve ser o orçamento total da ingestão a dividir por N
+(ADR-0007).
+
 \subsection{Disponibilidade e integridade dos dados}
 \porescrever{AV1 e AV4: perdas e duplicados.}
 

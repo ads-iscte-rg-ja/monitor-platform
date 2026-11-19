@@ -1,6 +1,18 @@
 \begin{abstract}
-\porescrever{resumo (150--250 palavras): problema, abordagem orientada a atributos de qualidade,
-principais decisões (escalabilidade para 1\,000 hosts, manutenção, métricas), resultados medidos antes/depois.}
+O Monitor é um sistema de monitorização de máquinas e aplicações: um agente em cada máquina recolhe métricas
+e erros, guarda-os localmente e entrega-os a um servidor central, que avalia alertas e os mostra num
+\emph{dashboard}. O sistema funcionava, mas a arquitetura
+estava implícita no código e não se sabia quanto aguentava. Este trabalho torna-a explícita e melhora-a de
+forma orientada a atributos de qualidade: cenários com medidas verificáveis (escalabilidade para 1\,000
+\emph{hosts}, disponibilidade, manutenção, segurança), decisões tomadas com o ADD, fundamentadas em táticas e
+registadas em ADR, e cada iteração medida antes e depois, com métricas de código e testes de carga. As medições mudaram o desenho. A \emph{baseline} mostrou que, depois de uma hora de indisponibilidade
+do central, a recuperação deixava o \emph{dashboard} inutilizável (p95 de pelo menos 10~s); com escritas em lote
+e controlo de admissão, o p95 desceu para 262~ms e o \emph{backlog} passou a ser absorvido duas vezes mais
+depressa, sem perdas nem duplicados. A medição refutou também o risco de vizinhos ruidosos, cuja proteção não foi
+implementada, e mostrou que, com várias instâncias do central, o estrangulamento passou para a base de dados: o
+relatório regista o resultado e o gatilho para a escalar, em vez de ajustar o alvo.
+
+\porescrever{rever o resumo no fim, com os resultados de \dec{7}, \dec{13} e \dec{19}.}
 
 \medskip
 \noindent\textbf{Palavras-chave:} arquitetura de software, atributos de qualidade, escalabilidade,

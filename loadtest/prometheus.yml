@@ -4,5 +4,9 @@ global:
   evaluation_interval: 5s
 scrape_configs:
   - job_name: monitor-central
-    static_configs:
-      - targets: ["backend:9464"]
+    # Uma série por instância (SC3: --scale backend=N).
+    dns_sd_configs:
+      - names: ["backend"]
+        type: A
+        port: 9464
+        refresh_interval: 5s

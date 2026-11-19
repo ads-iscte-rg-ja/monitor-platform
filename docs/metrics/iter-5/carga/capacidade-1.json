@@ -1,0 +1,263 @@
+{
+  "janela": {
+    "inicio": 1795120087,
+    "fim": 1795120738
+  },
+  "hosts": 1000,
+  "instancias": 1,
+  "cpu_contentores": {
+    "central": {
+      "media_pct": 8.5,
+      "max_pct": 39.5
+    },
+    "postgres": {
+      "media_pct": 48.7,
+      "max_pct": 109.5
+    }
+  },
+  "agente": {
+    "lotes_perdidos": {
+      "rate": 0,
+      "passes": 0,
+      "fails": 45268,
+      "thresholds": {
+        "rate==0": true
+      }
+    },
+    "http_req_duration": {
+      "p(90)": 4342.817236999999,
+      "p(95)": 4831.25731375,
+      "p(99)": 5181.280339449999,
+      "max": 5323.005841,
+      "count": 150,
+      "avg": 2422.2308951800005,
+      "min": 39.780373,
+      "med": 2230.8981624999997
+    },
+    "respostas_nao_ok{codigo:14}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "atraso_central{vizinho:sim}": {
+      "min": 10,
+      "med": 99,
+      "p(90)": 203,
+      "p(95)": 15459.250000000065,
+      "p(99)": 314539.19000000006,
+      "max": 648444,
+      "count": 45268,
+      "avg": 8121.451422638508,
+      "thresholds": {
+        "p(95)<5000": false
+      }
+    },
+    "respostas_nao_ok": {
+      "count": 10907,
+      "rate": 16.769788625500684
+    },
+    "respostas_nao_ok{codigo:6}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:15}": {
+      "rate": 0,
+      "count": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "atraso_central": {
+      "p(99)": 314539.19000000006,
+      "max": 648444,
+      "count": 45268,
+      "avg": 8121.451422638508,
+      "min": 10,
+      "med": 99,
+      "p(90)": 203,
+      "p(95)": 15459.250000000065
+    },
+    "respostas_nao_ok{codigo:1}": {
+      "rate": 0,
+      "count": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:7}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:16}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "min": 39.780373,
+      "med": 2230.8981624999997,
+      "p(90)": 4342.817236999999,
+      "p(95)": 4831.25731375,
+      "p(99)": 5181.280339449999,
+      "max": 5323.005841,
+      "count": 150,
+      "avg": 2422.2308951800005
+    },
+    "respostas_nao_ok{codigo:2}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:3}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:4}": {
+      "rate": 0,
+      "count": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "registos_confirmados": {
+      "count": 4526800,
+      "rate": 6960.069602082745
+    },
+    "respostas_nao_ok{codigo:11}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:13}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:8}": {
+      "count": 10907,
+      "rate": 16.769788625500684,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:9}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:12}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "grpc_req_duration": {
+      "max": 400.033657,
+      "count": 56175,
+      "avg": 78.2835858299774,
+      "min": 0.516339,
+      "med": 90.578908,
+      "p(90)": 183.442148,
+      "p(95)": 192.13628599999998,
+      "p(99)": 282.46532056
+    },
+    "grpc_req_duration{ingestao:sim}": {
+      "p(95)": 192.13628599999998,
+      "p(99)": 282.46532056,
+      "max": 400.033657,
+      "count": 56175,
+      "avg": 78.2835858299774,
+      "min": 0.516339,
+      "med": 90.578908,
+      "p(90)": 183.442148,
+      "thresholds": {
+        "p(95)<300": true
+      }
+    },
+    "iterations": {
+      "count": 1149,
+      "rate": 1.7666165884936542
+    },
+    "respostas_nao_ok{codigo:10}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:5}": {
+      "rate": 0,
+      "count": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "duracao_s": 650.4
+  },
+  "servidor": {
+    "ingestao_p95_ms": 184.5,
+    "ingestao_p99_ms": 245.7,
+    "pedidos_por_codigo": {
+      "OK": 44398.72677209302,
+      "ResourceExhausted": 9964.929265116278
+    },
+    "registos": {
+      "errors_duplicate": 0.0,
+      "errors_inserted": 4439872.677209302,
+      "errors_rejected": 0.0
+    },
+    "dashboard_p95_ms": 4874.7,
+    "instancias": 1.0,
+    "registos_por_s_max_1m": 21007.272727272728,
+    "registos_por_s_media": 6820.080917372199,
+    "cpu_media_pct": 7.3,
+    "cpu_max_pct": 24.2,
+    "memoria_max_mb": 28.6,
+    "ligacoes_bd_max": 19.0,
+    "ligacoes_bd_limite": 25.0,
+    "esperas_por_ligacao": 0.0,
+    "espera_por_ligacao_s": 0.0,
+    "jobs": {
+      "lideres_max": {
+        "host_availability_alerts": 1.0,
+        "host_health": 1.0,
+        "metric_alerts": 1.0,
+        "notifications": 1.0
+      },
+      "instancias_que_executaram": {
+        "host_availability_alerts": 1.0,
+        "host_health": 1.0,
+        "metric_alerts": 1.0,
+        "notifications": 1.0
+      }
+    }
+  },
+  "dashboard_p95_ms_durante_recuperacao": null,
+  "base_de_dados": {
+    "stats": 0,
+    "erros": 4526800,
+    "duplicados": 0
+  }
+}

@@ -10,6 +10,7 @@ Processo em [ADR-0001](0001-registar-decisoes-com-adrs.md); modelo em [0000-mode
 | [0004](0004-metricas-e-logs-estruturados.md) | Medir primeiro: métricas Prometheus num listener interno e logs estruturados | Aceite | Monitorability |
 | [0005](0005-escritas-em-lote.md) | Escritas em lote na ingestão e na resolução de alertas | Aceite | Scalability |
 | [0006](0006-controlo-de-admissao.md) | Controlo de admissão na ingestão, com ligações reservadas para o resto do central | Aceite | Scalability, Availability |
+| [0007](0007-central-escalavel-horizontalmente.md) | Central com várias instâncias: liderança por *job*, limites partilhados e balanceador | Aceite | Scalability, Availability, Security |
 
 ## Por escrever
 

@@ -3,8 +3,8 @@
 
 Uso:  loadtest/tabelas.py <iteração> [--antes <iteração>]
 
-Escreve em docs/metrics/<iteração>/: carga-sc1.tex, carga-sc2.tex, carga-sc5.tex e
-carga-sensibilidade.tex (o relatório inclui-as com \\gerado, depois de "make dados ITER=...").
+Escreve em docs/metrics/<iteração>/: carga-sc1.tex, carga-sc2.tex, carga-sc5.tex,
+carga-sensibilidade.tex e carga-sc3.tex (o relatório inclui-as com \\gerado, depois de "make dados ITER=...").
 Com --antes, cada tabela acrescenta a coluna da iteração anterior (antes/depois).
 """
 
@@ -242,7 +242,51 @@ def main() -> None:
   \\end{{tabular}}
 \\end{{table}}
 """)
+    escala = [(n, carregar(a.iteracao, f"capacidade-{n}")) for n in (1, 2, 3)]
+    escala = [(n, m) for n, m in escala if m is not None]
+    if escala:
+        (destino / "carga-sc3.tex").write_text(tabela_sc3(escala, ambiente))
     print(f"tabelas de carga escritas em {destino}")
+
+
+def tabela_sc3(escala: list[tuple[int, dict]], ambiente: str) -> str:
+    """SC3: a mesma carga de capacidade com 1, 2 e 3 instâncias atrás do nginx."""
+    base = valor(escala[0][1], "agente", "registos_confirmados", "count") if escala[0][0] == 1 else None
+    alvo = {1: "---", 2: "$\\ge$ 1,8×", 3: "$\\ge$ 2,5×"}
+
+    def col(f):
+        return [f(n, m) for n, m in escala]
+
+    def fator(n, m):
+        c = valor(m, "agente", "registos_confirmados", "count")
+        return "---" if not base or c is None else num(c / base, 2, "×")
+
+    def jobs_ok(m):
+        j = valor(m, "servidor", "jobs") or {}
+        lideres, executores = j.get("lideres_max", {}), j.get("instancias_que_executaram", {})
+        return bool(lideres) and all(v == 1 for v in list(lideres.values()) + list(executores.values()))
+
+    def rejeicoes(m):
+        return pct_codigo(m, 8)
+
+    linhas = [
+        ["Registos confirmados no teste"] + col(lambda n, m: num(valor(m, "agente", "registos_confirmados", "count"))),
+        ["Débito face a 1 instância (alvo)"] + col(lambda n, m: f"{fator(n, m)} ({alvo[n]})" if n > 1 else "1×"),
+        ["Débito no minuto de pico (registos/s)"] + col(lambda n, m: num(valor(m, "servidor", "registos_por_s_max_1m"))),
+        ["p95 da ingestão (servidor)"] + col(lambda n, m: p95_servidor(m)),
+        ["Rejeições por sobrecarga"] + col(lambda n, m: num(rejeicoes(m), 1, "\\,\\%")),
+        ["Ligações à BD em uso, máx. (soma)"] + col(lambda n, m: f"{num(valor(m, 'servidor', 'ligacoes_bd_max'))} de {num(valor(m, 'servidor', 'ligacoes_bd_limite'))}"),
+        ["CPU de cada instância, média"] + col(lambda n, m: num((valor(m, "cpu_contentores", "central", "media_pct") or 0) / n, 0, "\\,\\%")),
+        ["CPU do PostgreSQL, média / máx."] + col(lambda n, m: f"{num(valor(m, 'cpu_contentores', 'postgres', 'media_pct'))} / {num(valor(m, 'cpu_contentores', 'postgres', 'max_pct'), 0, chr(92) + ',' + chr(92) + '%')}"),
+        ["p95 do \\emph{dashboard}"] + col(lambda n, m: duracao(valor(m, "servidor", "dashboard_p95_ms"))),
+        ["Cada \\emph{job} numa só instância"] + col(lambda n, m: cumpre(jobs_ok(m))),
+        ["Duplicados na base de dados"] + col(lambda n, m: num(valor(m, "base_de_dados", "duplicados"))),
+    ]
+    cab = ["Medida"] + [f"{n} inst." for n, _ in escala]
+    nota = ("Carga: 1\\,000 \\emph{hosts} a enviar lotes de 100 erros sem pausa, através do nginx, durante 5 min. "
+            "CPU em \\% do limite de 2 vCPU de cada contentor. " + ambiente)
+    return tabela("tab:carga-sc3", "Cenário SC3: a mesma carga com 1, 2 e 3 instâncias do central", cab, linhas,
+                  "l" + "r" * len(escala), nota)
 
 
 if __name__ == "__main__":
