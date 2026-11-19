@@ -54,7 +54,7 @@ escolha feita e a tática que mitiga o lado que perde.
     \midrule
     Scalability vs.\ Modifiability & Escalar só até onde as medições exigem (1\,000 \emph{hosts}); o resto fica no plano de evolução, com gatilhos & Defer Binding (papéis por configuração); Encapsulate (particionamento escondido no repositório) \\
     Availability vs.\ Consistency & Entrega \emph{at-least-once} com deduplicação idempotente (recibos) & Transactions (registo e recibo juntos) \\
-    Scalability vs.\ Availability & O controlo de admissão rejeita pedidos (429), mas sem perder dados: o remote guarda e volta a tentar & Limit Event Response no central; Retry com \texttt{Retry-After} no remote \\
+    Scalability vs.\ Availability & O controlo de admissão rejeita pedidos por sobrecarga, mas sem perder dados: o remote guarda e volta a tentar & Limit Event Response no central; Retry com o atraso indicado pelo central \\
     Modifiability vs.\ Performance & Estratégias por métrica de alerta, mas uma única consulta \emph{set-based} montada a partir delas & Increase Cohesion sem consultas N+1 \\
     Security vs.\ Performance & Aceitar o custo: o HMAC custa microssegundos; o bcrypt só corre no \emph{login} & --- \\
     Security vs.\ Modifiability da UI & CSP primeiro em modo \emph{Report-Only}, depois aplicada quando a interface estiver adaptada & Change Default Settings, faseado \\
@@ -163,7 +163,7 @@ A Tabela~\ref{tab:utility} apresenta a \emph{utility tree}. Cada folha é um cen
      & \emph{Browser} & \cen{SE2} & (M,M) & XSS e \emph{clickjacking} bloqueados por CSP e \texttt{frame-ancestors} \\
      & SSRF & \cen{SE3} & (M,M) & Verificação de disponibilidade para \emph{loopback} ou metadados de \emph{cloud}: rejeitada \\
     \midrule
-    Interoperability & Novos agentes & \cen{IO1} & (L,M) & Agente noutra linguagem implementável só com OpenAPI e exemplos \\
+    Interoperability & Novos agentes & \cen{IO1} & (L,M) & Agente noutra linguagem implementável só com o contrato publicado \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -185,10 +185,10 @@ A Tabela~\ref{tab:cenarios} detalha, no formato de seis partes, os cenários que
     & Fonte e estímulo & Artefacto & Ambiente & Resposta & Medida \\
     \midrule
     \cen{SC1} & 1\,000 remotes: estatísticas a cada 30~s e logs com o perfil misto & API de ingestão e PostgreSQL & normal; 1 instância com 2~vCPU e 4~GB & todos os pedidos aceites e persistidos; um \emph{host} ruidoso não atrasa os outros & p95 $<$ 300~ms; 0\,\% 5xx; CPU $<$ 70\,\%; atraso p95 $<$ 5~s nos não ruidosos \\ \addlinespace
-    \cen{SC2} & 1\,000 remotes com 1~h de \emph{backlog} enviam ao mesmo tempo & central e base de dados & central acabado de arrancar & aceita até à capacidade; o excesso recebe 429 com \texttt{Retry-After}; nada se perde & \emph{backlog} absorvido em $\le$ 15~min; \emph{dashboard} p95 $<$ 1~s; 0 perdas; 0 duplicados \\ \addlinespace
+    \cen{SC2} & 1\,000 remotes com 1~h de \emph{backlog} enviam ao mesmo tempo & central e base de dados & central acabado de arrancar & aceita até à capacidade; o excesso é rejeitado com o atraso para nova tentativa; nada se perde & \emph{backlog} absorvido em $\le$ 15~min; \emph{dashboard} p95 $<$ 1~s; 0 perdas; 0 duplicados \\ \addlinespace
     \cen{SC3} & operador acrescenta instâncias atrás do balanceador & central & carga acima da capacidade de 1 instância & o débito sobe; cada \emph{job} corre numa só instância & $\ge$ 1,8× com 2; $\ge$ 2,5× com 3; 0 \emph{jobs} duplicados; troca de líder $\le$ 30~s \\ \addlinespace
     \cen{SC4} & operador consulta o \emph{dashboard} & \emph{dashboard} e PostgreSQL & 30 dias de dados de 1\,000 \emph{hosts}; retenção ativa & a consulta responde; a retenção não degrada a ingestão & p95 $<$ 1~s; ingestão sem degradação durante a retenção \\ \addlinespace
-    \cen{SC5} & 1\,\% dos \emph{hosts} em rajada de 200 logs/s durante 2~min & ingestão do central & normal, 1\,000 \emph{hosts} & o \emph{host} em rajada recebe 429 e guarda localmente; os outros não são afetados & atraso p95 $<$ 5~s para os restantes \\ \addlinespace
+    \cen{SC5} & 1\,\% dos \emph{hosts} em rajada de 200 logs/s durante 2~min & ingestão do central & normal, 1\,000 \emph{hosts} & o \emph{host} em rajada é rejeitado por sobrecarga e guarda localmente; os outros não são afetados & atraso p95 $<$ 5~s para os restantes \\ \addlinespace
     \cen{AV4} & aplicação em ciclo de erro gera uma rajada de logs & remote e \emph{buffer} & central indisponível & o \emph{buffer} respeita o limite; descarta primeiro INFO e WARN, e conta o que descarta & tamanho $\le$ limite; perdas só de INFO/WARN, contadas e reportadas \\ \addlinespace
     \cen{MO1} & programador recebe o pedido de uma métrica de alerta nova & módulo de alertas & desenvolvi\-mento & métrica implementada e testada sem tocar no avaliador genérico & $\le$ 1 pessoa-dia; $\le$ 3 ficheiros Go e 1 migração \\ \addlinespace
     \cen{AV1} & falha de infraestrutura: central em baixo 1~h & remote e \emph{buffer} SQLite & aplicações continuam a registar erros & o remote guarda tudo e entrega quando o central volta & 0 perdas; 0 duplicados (teste E2E) \\

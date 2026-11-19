@@ -95,6 +95,13 @@ def go_version(repo: Path) -> str:
 
 # --------------------------------------------------------------------------- medições
 
+def apoio_a_testes(caminho: str) -> bool:
+    """Pacotes de apoio aos testes, pela convenção do Go (como o net/http/httptest): o último
+    elemento do caminho termina em "test". Contam como código de teste, não de produção, aqui e no
+    SonarQube Cloud (sonar.exclusions), para as duas medições concordarem."""
+    return Path(caminho).name.endswith("test")
+
+
 def linhas_de_codigo(repo: Path) -> dict:
     prod = teste = ficheiros = 0
     for p in repo.rglob("*.go"):
@@ -102,7 +109,7 @@ def linhas_de_codigo(repo: Path) -> dict:
             continue
         n = sum(1 for linha in p.read_text(errors="ignore").splitlines() if linha.strip())
         ficheiros += 1
-        if p.name.endswith("_test.go"):
+        if p.name.endswith("_test.go") or apoio_a_testes(str(p.parent)):
             teste += n
         else:
             prod += n
@@ -128,7 +135,7 @@ def lint(repo: Path, dados: Path) -> dict:
 
 def funcoes(repo: Path, dados: Path, tmp: Path) -> dict:
     out = sh(["go", "run", ".", "-mode", "functions", "-dir", str(repo)], CODEMETRICS)
-    rows = list(csv.DictReader(out.splitlines()))
+    rows = [r for r in csv.DictReader(out.splitlines()) if not apoio_a_testes(r["package"])]
 
     # Complexidade cognitiva de todas as funções: gocognit com limite 0.
     cfg = tmp / "cognitiva.yml"
@@ -165,8 +172,10 @@ def funcoes(repo: Path, dados: Path, tmp: Path) -> dict:
 
 def acoplamento(repo: Path, dados: Path) -> tuple[dict, list[dict]]:
     out = sh(["go", "run", ".", "-mode", "coupling", "-dir", str(repo)], CODEMETRICS)
-    (dados / f"{repo.name}-acoplamento.csv").write_text(out)
-    rows = list(csv.DictReader(out.splitlines()))
+    linhas = out.splitlines()
+    linhas = linhas[:1] + [l for l in linhas[1:] if not apoio_a_testes(l.split(",", 1)[0])]
+    (dados / f"{repo.name}-acoplamento.csv").write_text("\n".join(linhas) + "\n")
+    rows = list(csv.DictReader(linhas))
     internos = [r for r in rows if not r["package"].startswith("cmd")]
     definidos = [float(r["distance"]) for r in internos if r["distance"]]
     return {
@@ -187,6 +196,8 @@ def perfil_cobertura(path: Path) -> dict[str, list[int]]:
         blocos[bloco] = (bloco.split(":")[0].rsplit("/", 1)[0], int(n), cnt)
     por_pacote: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     for pacote, n, cnt in blocos.values():
+        if apoio_a_testes(pacote):
+            continue
         por_pacote[pacote][0] += n
         por_pacote[pacote][1] += n if cnt > 0 else 0
     return dict(por_pacote)

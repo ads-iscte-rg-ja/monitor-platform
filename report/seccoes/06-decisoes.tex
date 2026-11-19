@@ -5,7 +5,88 @@
 \porescrever{\dec{4}--\dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
 
 \subsection{Manutenção e testabilidade}
-\porescrever{\dec{11}--\dec{15}.}
+
+\subsubsection{Contrato de ingestão explícito em gRPC (\dec{11}, ADR-0003)}
+\label{sec:d11}
+
+\paragraph{Problema.}
+O contrato entre o remote e o central era implícito (lacuna M2). O remote decidia se punha um registo em
+quarentena comparando o \textbf{texto em inglês} da mensagem de erro do central com uma lista fixa de
+frases: mudar uma mensagem no central mudava o comportamento do remote sem que nenhum teste falhasse.
+As estruturas JSON estavam escritas à mão nos dois repositórios, e a classificação das respostas
+(quarentena, dividir o lote, tentar mais tarde, pausar) dependia de pares código HTTP e campo
+\texttt{error} documentados apenas no código. É o acoplamento semântico que o cenário \cen{MO2} proíbe.
+
+\paragraph{Decisão.}
+O contrato passou a ser um serviço gRPC definido em Protocol Buffers, num repositório próprio,
+\texttt{monitor-api}, versionado por \emph{tags} (\texttt{v1.0.0}). O central (servidor) e o remote
+(cliente) dependem dele pelo \texttt{go.mod}. Os erros levam um código gRPC e, quando um único registo é
+inválido, um detalhe com o identificador do registo e um motivo estável (\texttt{RejectionReason}); o
+texto da mensagem deixou de fazer parte do contrato. A Tabela~\ref{tab:erros-grpc} mostra a
+correspondência, que preserva os quatro comportamentos do \emph{store-and-forward}. Os endpoints HTTP de
+ingestão foram removidos; o \emph{dashboard} continua em HTTP.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Erros do contrato de ingestão e reação do remote}
+  \label{tab:erros-grpc}
+  \begin{tabularx}{\linewidth}{L{0.3\linewidth}L{0.3\linewidth}Y}
+    \toprule
+    Situação & Código e detalhe & O remote \\
+    \midrule
+    Um registo inválido & \texttt{INVALID\_ARGUMENT} + \texttt{RecordRejection} & põe esse registo em quarentena e reenvia os restantes \\
+    Lote mal formado & \texttt{INVALID\_ARGUMENT}, sem detalhe & pausa (violação de contrato) \\
+    Mensagem acima de 1~MiB & \texttt{RESOURCE\_EXHAUSTED}, sem \texttt{RetryInfo} & divide o lote \\
+    Sobrecarga (\dec{6}) & \texttt{RESOURCE\_EXHAUSTED} + \texttt{RetryInfo} & tenta depois do atraso indicado \\
+    Falha transitória & \texttt{UNAVAILABLE}, \texttt{INTERNAL} & tenta mais tarde, com \emph{backoff} \\
+    Chave inválida & \texttt{UNAUTHENTICATED} & pausa até a configuração ser corrigida \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Teoria.}
+\emph{Manage Interfaces} (interoperabilidade): o contrato passa a ser um artefacto próprio, com sintaxe e
+semântica explícitas. \emph{Reduce Coupling} e \emph{Encapsulate} (modificabilidade): as duas implementações
+deixam de depender uma da outra e passam a depender de uma interface versionada, como os repositórios
+dependem da \emph{tag} \texttt{v1} do pipeline (secção~\ref{sec:pipeline}).
+
+\paragraph{Alternativas.}
+A decisão original de \dec{11} era manter HTTP/JSON, acrescentar um campo \texttt{code} estável e
+publicar uma especificação OpenAPI com exemplos testados dos dois lados. Resolvia M2, mas a
+especificação ficava ao lado do código: nada obrigava as implementações a segui-la, a não ser os testes.
+Com Protocol Buffers é o compilador que obriga. Inicialmente o gRPC tinha sido rejeitado como ``mudança
+de tecnologia sem ASR''; essa rejeição foi revista porque o ASR existe (\cen{MO2}), e o desempenho
+\emph{não} foi argumento: a ingestão nominal são 33 pedidos por segundo (secção~\ref{sec:estimativas}).
+Também se rejeitou pôr o \texttt{.proto} dentro do central (o remote passaria a depender das versões do
+central), copiá-lo para cada repositório (duas cópias divergem, que é o próprio problema M2) e manter
+HTTP e gRPC em paralelo (duplicaria a autenticação, a validação e o controlo de admissão sem haver
+agentes antigos em produção).
+
+\paragraph{Trade-offs.}
+Há mais um repositório e um passo de geração de código, mitigado por o código gerado ficar versionado no
+\texttt{monitor-api}. O mínimo da linguagem subiu para Go~1.26, exigido pela biblioteca gRPC. Um
+balanceador entre remote e central tem de suportar HTTP/2 (\dec{8}), e os testes de carga usam o
+cliente gRPC do k6 (\dec{10}). No gRPC a mensagem é lida antes de o pedido chegar ao código da aplicação,
+o que permitiria a um cliente sem chave obrigar o central a ler até 1~MiB; para manter a proteção que o
+HTTP já tinha, um pedido sem chave plausível é rejeitado ao nível do transporte, antes de a mensagem ser
+lida, e só depois a chave é verificada na base de dados.
+
+\paragraph{Verificação.}
+\begin{itemize}
+  \item \cen{MO2}: o remote decide apenas pelo código e pelo \texttt{RejectionReason}. Um teste envia uma
+        rejeição com uma mensagem enganadora e confirma que o motivo guardado na quarentena vem só do
+        código. Uma alteração incompatível ao \texttt{.proto} faz falhar o CI do \texttt{monitor-api}
+        (\texttt{buf breaking}), que passa a ser a medida executável de \cen{MO2}.
+  \item \cen{AV1}, numa versão reduzida: com o central parado a meio de um teste ponta-a-ponta (central
+        real com PostgreSQL, remote e SDK), as aplicações continuaram a registar; quando o central voltou,
+        chegaram os 40 erros gerados, com 0 duplicados e 0 registos pendentes ou em quarentena.
+  \item Métricas de código no remote (iteração~2 contra iteração~1): \emph{issues} de lint de 29 para
+        24, funções acima do limite ciclomático de 3 para 1 e acima do limite cognitivo de 6 para 5. A
+        classificação das respostas, que antes interpretava códigos HTTP e textos, passou a uma
+        correspondência direta de códigos.
+\end{itemize}
+
+\porescrever{\dec{12}--\dec{15}.}
 
 \subsection{Disponibilidade e monitorabilidade}
 \porescrever{\dec{16}--\dec{17}.}

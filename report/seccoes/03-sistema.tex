@@ -102,7 +102,8 @@ o \texttt{Retry-After}. Um registo que o central rejeita como inválido é posto
 bloquear os restantes. Do lado do central, cada registo é gravado na mesma transação que um
 \textbf{recibo} identificado por \emph{host}, tipo e identificador de origem: um reenvio do mesmo registo
 encontra o recibo e não cria um duplicado. É isto que dá entrega \emph{at-least-once} com deduplicação,
-e que permite cumprir G1 com o central em baixo.
+e que permite cumprir G1 com o central em baixo. Na iteração~2 o conector entre remote e central passou
+de HTTP/JSON a gRPC, com um contrato explícito, mantendo este comportamento (secção~\ref{sec:d11}).
 
 \subsection{Vista de alocação}
 

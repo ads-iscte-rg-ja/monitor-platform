@@ -1,4 +1,25 @@
 \section{Registo de decisões arquiteturais}
 \label{anx:adrs}
 
-\porescrever{ADRs completos (docs/adr/).}
+Cada decisão está registada num ADR em \texttt{docs/adr/} do repositório \texttt{monitor-platform}, com
+o contexto e a evidência, a decisão, a teoria que a fundamenta, as alternativas rejeitadas, as
+consequências e a forma de verificação (secção~\ref{sec:enquadramento}). A Tabela~\ref{tab:adrs} lista os
+ADR; o texto completo de cada um está em \url{\Repositorio/tree/main/docs/adr}.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Decisões arquiteturais registadas}
+  \label{tab:adrs}
+  \begin{tabularx}{\linewidth}{lYlL{0.25\linewidth}}
+    \toprule
+    ADR & Decisão & Estado & QA \\
+    \midrule
+    0001 & Registar as decisões arquiteturais em ADR & Aceite & Modifiability \\
+    0002 & Repositório \texttt{monitor-platform} para o CI partilhado e os artefactos transversais & Aceite & Modifiability \\
+    0003 & Contrato de ingestão em gRPC, num repositório \texttt{monitor-api} versionado & Aceite & Modifiability, Interoperability \\
+    0004 & Medir primeiro: métricas Prometheus num listener interno e logs estruturados & Aceite & Monitorability \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\porescrever{acrescentar os ADR das decisões seguintes (\dec{5}--\dec{19}) à medida que forem tomadas.}

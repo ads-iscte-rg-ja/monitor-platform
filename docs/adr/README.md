@@ -7,6 +7,7 @@ Processo em [ADR-0001](0001-registar-decisoes-com-adrs.md); modelo em [0000-mode
 | [0001](0001-registar-decisoes-com-adrs.md) | Registar as decisões arquiteturais em ADRs | Aceite | Modifiability |
 | [0002](0002-repositorio-monitor-platform.md) | Repositório `monitor-platform` para CI partilhado e artefactos transversais | Aceite | Modifiability |
 | [0003](0003-contrato-ingestao-grpc.md) | Contrato de ingestão em gRPC, num repositório `monitor-api` versionado | Aceite | Modifiability, Interoperability |
+| [0004](0004-metricas-e-logs-estruturados.md) | Medir primeiro: métricas Prometheus num listener interno e logs estruturados | Aceite | Monitorability |
 
 ## Por escrever
 
