@@ -590,6 +590,12 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
   * *amostragem no SDK*: põe a decisão em cada app e obriga a mudar todas as integrações; fica no backlog (E8).
 * **Trade-off:** perdem-se logs de baixa severidade em situações extremas. É aceite, documentado e visível no central.
 * **Verificação:** AV4 com um teste de integração no remote: buffer pequeno, rajada de INFO + ERROR. Fica abaixo do limite, com 0 ERROR perdidos e os descartes contados.
+* **Estado (20/11):** implementado ([ADR-0009](adr/0009-buffer-do-remote-com-limite.md)). Tamanho medido em
+  páginas em uso; *worker* próprio a cada 10 s; fase suave (entregues → INFO → WARN → estatísticas) e fase
+  rígida (quarentena → ERROR → CRITICAL → PANIC, com evento CRITICAL no próprio *buffer*); contadores
+  `buffer_drops` na mesma transação. AV4 provado (`docs/metrics/iter-6/av4.txt`): 12 ciclos de rajada num
+  *buffer* de 1 MiB, tamanho ≤ limite depois de cada ciclo, 0 de 240 ERROR perdidos, 11.500 INFO descartados
+  e contados (também depois de reabrir o ficheiro).
 
 ### 7.3 Manutenção e testabilidade
 
