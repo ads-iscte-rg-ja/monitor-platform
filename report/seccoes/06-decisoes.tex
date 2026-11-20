@@ -379,6 +379,83 @@ métrica nova real, é feita com \dec{17}.
 \porescrever{\dec{12}, \dec{14}, \dec{15}.}
 
 \subsection{Disponibilidade e monitorabilidade}
+
+\subsubsection{\emph{Buffer} do remote com limite (\dec{19}, ADR-0009)}
+\label{sec:d19}
+
+\paragraph{Problema.}
+O remote guarda tudo num SQLite local até o central confirmar, e a limpeza só apagava registos já entregues.
+Não havia limite: com o central em baixo e uma aplicação em ciclo de erro, o \emph{buffer} crescia até encher o
+disco, e o monitor deitava abaixo o host que devia proteger (\cen{AV4}). Medimos o custo de um log típico no
+esquema do remote: 358~bytes, contando a tabela, a fila de entrega e os índices. A rajada do modelo de carga
+(200 logs/s durante 2~min) ocupa 8,6~MB; a mesma rajada durante uma hora de central em baixo, 258~MB. Um ciclo
+de erro sem fim passa qualquer valor fixo.
+
+\paragraph{Decisão.}
+O tamanho do \emph{buffer} passa a ser medido pelas páginas em uso do ficheiro SQLite (páginas menos páginas
+livres), uma leitura que não toca nos dados. Há dois limites: um suave (\texttt{BUFFER\_MAX\_MB}, 512~MiB por
+omissão) e um rígido (por omissão o dobro). Um \emph{worker} próprio verifica-os a cada 10~s e descarta sempre
+os registos mais antigos, em lotes curtos de 500 (Figura~\ref{fig:d19}). Acima do limite suave, apaga primeiro
+os registos já entregues, que não são uma perda, e depois os pendentes INFO, WARN e as estatísticas da máquina.
+ERROR, CRITICAL e PANIC só saem acima do limite rígido; nesse caso, o remote grava no próprio \emph{buffer} um
+log CRITICAL com o que descartou, que chega ao central como qualquer log e dispara as regras de alerta por
+nível. Cada descarte é contado por nível numa tabela, na mesma transação que o apaga: um registo nunca
+desaparece sem ser contado. Estes contadores são o que \dec{17} vai reportar ao central.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}[
+      fase/.style={draw=iscte, fill=fundotab, rounded corners=2pt, font=\scriptsize, minimum height=6mm,
+                   inner sep=3pt, align=center},
+      seta/.style={-{Stealth[length=2mm]}, thick, iscte}]
+    \node[fase] (a) {entregues\\(não é perda)};
+    \node[fase, right=4mm of a] (b) {INFO};
+    \node[fase, right=4mm of b] (c) {WARN};
+    \node[fase, right=4mm of c] (d) {estatísticas};
+    \node[fase, below=9mm of a] (e) {quarentena};
+    \node[fase, right=4mm of e] (f) {ERROR};
+    \node[fase, right=4mm of f] (g) {CRITICAL};
+    \node[fase, right=4mm of g] (h) {PANIC};
+    \node[fase, right=6mm of h, fill=white] (ev) {evento\\CRITICAL};
+    \foreach \x/\y in {a/b, b/c, c/d, e/f, f/g, g/h, h/ev} \draw[seta] (\x) -- (\y);
+    \node[font=\scriptsize, anchor=west] at ($(d.east)+(3mm,0)$) {acima do limite suave, até 90\,\%};
+    \node[font=\scriptsize, anchor=south west] at ($(e.north west)+(0,0.5mm)$) {só se ainda acima do limite rígido, até 90\,\%};
+  \end{tikzpicture}
+  \caption{\dec{19}: ordem de descarte do \emph{buffer}, sempre dos registos mais antigos para os mais recentes}
+  \label{fig:d19}
+\end{figure}
+
+\paragraph{Teoria.}
+Nas táticas de desempenho, \emph{Bound Queue Sizes}: o \emph{buffer} é uma fila e passa a ter tamanho máximo; e
+\emph{Prioritize Events}: quando é preciso descartar, a severidade decide a ordem. Nas de disponibilidade,
+\emph{Degradation}: perde-se o menos importante para manter o essencial e, acima de tudo, o host. A contagem e o
+evento CRITICAL são \emph{Inform Actors}: a perda deixa de ser silenciosa.
+
+\paragraph{O que ficou de fora, e porquê.}
+O ficheiro não encolhe: o SQLite reutiliza as páginas libertadas, mas devolvê-las ao disco exigiria um
+\texttt{VACUUM}, que reescreve a base inteira, precisa do dobro do espaço e bloqueia as escritas das aplicações,
+precisamente quando o disco está a acabar. O limite impede o ficheiro de crescer; não o reduz. A amostragem na
+origem (``a mesma mensagem 1.000 vezes'') fica como evolução E8, com o gatilho de descartes frequentes.
+
+\paragraph{Alternativas.}
+Bloquear a aplicação quando o \emph{buffer} enche (\emph{backpressure}) poria a aplicação monitorizada à espera
+do monitor, o que é inaceitável num instrumento de observação. Um descarte FIFO sem olhar à severidade perderia,
+numa tempestade de INFO, exatamente os ERROR que explicam o incidente. Um limite em número de registos não
+protege o disco, porque um registo vai de cerca de 300~bytes a mais de 100~KB (\emph{stack trace} e
+metadados). Um \emph{trigger} no SQLite poria a política no caminho de cada escrita da aplicação.
+
+\paragraph{Trade-offs.}
+Em situações extremas perdem-se INFO, WARN e amostras; é aceite, documentado e contado. O limite é aplicado
+periodicamente, por isso entre duas verificações o \emph{buffer} pode passar o limite pelo que as aplicações
+escrevem num intervalo: a 1.000 logs/s, cerca de 3,6~MB em 10~s, 0,7\,\% de 512~MiB. \cen{AV1} mantém-se: o
+limite suave só atua acima de cerca de 1,5 milhões de logs, muito acima de uma hora de central em baixo com a
+carga do modelo.
+
+\paragraph{Verificação.}
+\cen{AV4} é provado por um teste de integração no remote, descrito na secção~\ref{sec:av1-av4}. Outros testes
+fixam a ordem de cada fase, o evento CRITICAL do limite rígido e que um descarte que não pode ser contado não é
+gravado.
+
 \porescrever{\dec{16}--\dec{17}.}
 
 \subsection{Segurança}

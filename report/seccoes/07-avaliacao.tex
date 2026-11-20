@@ -143,7 +143,39 @@ dados. Com N instâncias, \texttt{INGEST\_MAX\_INFLIGHT} deve ser o orçamento t
 (ADR-0007).
 
 \subsection{Disponibilidade e integridade dos dados}
-\porescrever{AV1 e AV4: perdas e duplicados.}
+\label{sec:av1-av4}
+
+\paragraph{\cen{AV4}: rajada com o central em baixo.}
+Um teste de integração no remote usa um \emph{buffer} SQLite real com um limite de 1~MiB (o rígido a 4~MiB) e
+simula 12 ciclos de rajada com o central em baixo: em cada ciclo, uma aplicação escreve 1.000 INFO, 50 WARN e
+20 ERROR, e o \emph{worker} de \dec{19} corre uma vez. Cada ciclo escreve metade do limite de uma só vez, muito
+mais do que uma rajada real escreve em 10~s, para forçar descartes em quase todos os ciclos.
+A Tabela~\ref{tab:av4} resume o resultado (dados em \texttt{docs/metrics/iter-6/av4.txt}).
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{\cen{AV4}: \emph{buffer} de 1~MiB, 12 ciclos de rajada com o central em baixo}
+  \label{tab:av4}
+  \begin{tabular}{lrl}
+    \toprule
+    Medida & Valor & Alvo \\
+    \midrule
+    Logs escritos (INFO / WARN / ERROR) & 12.000 / 600 / 240 & --- \\
+    Tamanho depois de cada ciclo (máximo) & 0,88~MiB & $\le$ 1~MiB \Sim \\
+    ERROR perdidos & 0 de 240 & 0 \Sim \\
+    WARN perdidos & 0 de 600 & só depois dos INFO \Sim \\
+    INFO descartados, contados e persistidos & 11.500 & todos contados \Sim \\
+    INFO que restam & os 500 mais recentes & mais antigos primeiro \Sim \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+O tamanho antes de cada verificação chegou a 1,36~MiB: é o excesso entre duas verificações, aqui exagerado de
+propósito (meio limite por ciclo). Com o limite por omissão de 512~MiB e uma rajada real, o excesso estimado é
+inferior a 1\,\%. Os contadores sobrevivem a reabrir o ficheiro, como num reinício do agente. \cen{AV4} cumpre-se.
+
+\porescrever{AV1: perdas e duplicados (E2E de \dec{15}).}
 
 \subsection{Manutenção: cenário MO1 e métricas de código}
 \gerado{metricas-codigo-antes-depois.tex}

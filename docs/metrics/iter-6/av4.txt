@@ -1,0 +1,24 @@
+# AV4 (D19, ADR-0009): rajada com o central em baixo, buffer de 1 MiB (limite rígido 4 MiB)
+# 2026-11-20T18:45Z; monitor-remote main=3b8bc01 + alterações do D19 (por commitar); go version go1.27.4 linux/amd64; AMD Ryzen 7 3700X 8-Core Processor
+# cd monitor-remote && go test -race -count=1 -run 'TestBufferLimit' -v ./internal/repository/
+
+    buffer_limit_test.go:122: cycle  1: before= 552960 after= 552960 limit=1048576 dropped=
+    buffer_limit_test.go:122: cycle  2: before=1052672 after= 831488 limit=1048576 dropped=INFO=500
+    buffer_limit_test.go:122: cycle  3: before=1331200 after= 872448 limit=1048576 dropped=INFO=1000
+    buffer_limit_test.go:122: cycle  4: before=1376256 after= 925696 limit=1048576 dropped=INFO=1000
+    buffer_limit_test.go:122: cycle  5: before=1421312 after= 720896 limit=1048576 dropped=INFO=1500
+    buffer_limit_test.go:122: cycle  6: before=1220608 after= 765952 limit=1048576 dropped=INFO=1000
+    buffer_limit_test.go:122: cycle  7: before=1269760 after= 811008 limit=1048576 dropped=INFO=1000
+    buffer_limit_test.go:122: cycle  8: before=1310720 after= 851968 limit=1048576 dropped=INFO=1000
+    buffer_limit_test.go:122: cycle  9: before=1347584 after= 892928 limit=1048576 dropped=INFO=1000
+    buffer_limit_test.go:122: cycle 10: before=1392640 after= 925696 limit=1048576 dropped=INFO=1000
+    buffer_limit_test.go:122: cycle 11: before=1425408 after= 741376 limit=1048576 dropped=INFO=1500
+    buffer_limit_test.go:122: cycle 12: before=1236992 after= 778240 limit=1048576 dropped=INFO=1000
+    buffer_limit_test.go:151: AV4: written INFO=12000 WARN=600 ERROR=240; dropped INFO=11500; ERROR lost=0; peak=1425408 limit=1048576
+--- PASS: TestBufferLimitAV4Burst (1.17s)
+--- PASS: TestBufferLimitSoftPhaseOrder (0.38s)
+--- PASS: TestBufferLimitHardLimit (0.28s)
+--- PASS: TestBufferLimitBelowLimitAndInvalid (0.08s)
+--- PASS: TestBufferLimitDatabaseErrors (0.09s)
+PASS
+ok  	monitor-remote/internal/repository	3.014s
