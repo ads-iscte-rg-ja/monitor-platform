@@ -68,3 +68,10 @@ o que pertence a uma métrica está em sete sítios, e cada um tem de ser encont
   as regras avaliadas (estatísticas antigas e regras desativadas ficam de fora). Passa antes e depois.
 * Testes unitários de cada estratégia; teste de consistência registo ↔ `CHECK`.
 * MO1 medido em D17: implementar a métrica `buffer_quarantined` e registar ficheiros tocados e tempo.
+
+## Histórico
+* 2026-11-21 (alternativa que já estava no plano, §9 e E5, e faltava aqui): **avaliar os alertas à entrada dos
+  dados** (*streaming*, padrão Observer), em vez de a cada 15 s. Rejeitada nesta decisão: o *polling* cumpre AV2
+  (o atraso até ao alerta inclui um ciclo de 15 s e fica em 50,4 s, contra 60 s; ADR-0013) e mantém as
+  estratégias sem estado por regra, que é o que torna MO1 barato. **Gatilho (E5):** um ciclo de avaliação acima
+  de 5 s. O ADR-0019 descreve o registo de estratégias como o microkernel interno do central.

@@ -63,6 +63,56 @@ real, dá mais confiança, mas custa mais~\cite{bastofernandes2026}. É essa a r
 do capítulo~\ref{sec:requisitos}, baratas e feitas cedo, que apontam os prováveis estrangulamentos, e os
 testes de carga, que os confirmam ou desmentem.
 
+\subsection{Estilos arquiteturais e sistemas distribuídos}
+\label{sec:estilos}
+
+Um estilo descreve a topologia de todo o sistema e as suas características, positivas e negativas; um padrão
+resolve um problema mais localizado dentro de um estilo~\cite{bastofernandes2026}. Os estilos dividem-se em
+\textbf{monolíticos}, com uma só unidade de \emph{deployment} (em camadas, \emph{pipeline}, microkernel), e
+\textbf{distribuídos}, com várias unidades ligadas por protocolos de rede (\emph{service-based},
+\emph{event-driven}, \emph{space-based}, SOA e microserviços). O estilo em camadas tem \textbf{partição técnica}:
+agrupa o código pelo que faz (apresentação, negócio, dados), e não pelo domínio; é simples e barato, mas a
+manutenção e a testabilidade degradam-se quando a aplicação cresce. O microkernel separa um núcleo de
+\emph{plug-ins} independentes, obtidos de um registo, e é o único estilo que pode ter partição técnica e por
+domínio ao mesmo tempo. A escolha guia-se por critérios explícitos: o domínio, as características
+arquiteturais, a arquitetura dos dados, os fatores organizacionais e a maturidade operacional da equipa; e
+responde a três perguntas: monólito ou distribuído, onde vivem os dados, comunicação síncrona ou assíncrona.
+
+Os estilos distribuídos são mais poderosos em desempenho, escalabilidade e disponibilidade, mas pagam-no.
+Têm de contrariar as \textbf{oito falácias da computação distribuída} (a rede é fiável, a latência é zero, a
+largura de banda é infinita, a rede é segura, a topologia não muda, há um só administrador, o custo de
+transporte é zero, a rede é homogénea) e enfrentam desafios que um monólito não tem: os logs distribuídos, as
+transações distribuídas e a manutenção e o versionamento dos contratos. O slide~08 acrescenta um indicador de
+granularidade: uma transação que atravessa a fronteira entre serviços sugere que a fronteira está no sítio
+errado.
+
+A \textbf{conascência} mede o acoplamento pelo que tem de mudar em conjunto: dois componentes são conascentes se
+uma alteração num obriga a alterar o outro para o sistema continuar correto. A \textbf{estática} vê-se no
+código (de nome, de tipo, de significado, de posição, de algoritmo); a \textbf{dinâmica} só aparece em execução
+(de execução, de tempo, de valores, de identidade). Reduzi-la, ou trocar uma forma forte por uma mais fraca e
+verificável, reduz o custo da mudança~\cite{bastofernandes2026}.
+
+\subsection{Documentação, conformidade e testes}
+\label{sec:documentacao}
+
+As notações de documentação podem ser \textbf{informais} (diagramas com a semântica em texto),
+\textbf{semiformais} (UML) ou \textbf{formais} (ADL). A escolha é um \emph{trade-off} entre o esforço e a
+ambiguidade, e as vistas a documentar resultam de uma decisão de custo e benefício. Além das vistas
+estruturais, uma \textbf{vista de qualidade} junta o que um atributo precisa de mostrar e que está espalhado por
+várias estruturas, como uma vista de segurança~\cite{bastofernandes2026}.
+
+O código e a arquitetura afastam-se com facilidade (\textbf{erosão}). Há duas formas de manter a conformidade:
+\emph{por construção}, gerando código a partir da arquitetura, de aplicabilidade limitada; e \emph{por análise},
+verificando o código e assinalando o que não está conforme. A segunda tem um limite conhecido: as estruturas
+estáticas do código (pacotes) não mostram as estruturas de execução (processos, instâncias), que são a
+essência da maioria das descrições de arquitetura. Ajuda escrever a arquitetura no próprio código
+(\emph{architecturally-evident coding style}), por exemplo dizendo em cada pacote a que camada pertence.
+
+A arquitetura define as unidades dos testes unitários e as interfaces que os testes de integração exercitam;
+nos testes de aceitação, o seu papel é pôr à prova os atributos de qualidade. Por fim, a
+\textbf{variabilidade} é o atributo das linhas de produtos, e os seus mecanismos (\emph{extension points},
+parâmetros, substituição de componentes, \emph{plug-ins}) também servem um só produto que tem de mudar.
+
 \subsection{Desenho orientado a atributos (ADD) e registo de decisões}
 
 Os requisitos arquiteturalmente significativos (ASR) são os que alteram profundamente a arquitetura; são

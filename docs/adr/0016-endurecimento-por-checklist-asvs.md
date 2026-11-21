@@ -123,3 +123,8 @@ provisória como `host_id`, e o painel de métricas nunca carregava no navegador
 Corrigido, com teste.
 
 ## Histórico
+* 2026-11-21 (alternativa implícita, registada agora): **sessões guardadas no servidor** (tabela `sessions` no
+  PostgreSQL, *cookie* opaco `__Host-session`), e não *tokens* autocontidos (JWT). Um *token* autocontido não se
+  revoga antes de expirar sem uma lista de revogação, e o `cmd/seed` e o `Clear-Site-Data` dependem de terminar
+  sessões de imediato. Com N instâncias (ADR-0007), as sessões no PostgreSQL já são partilhadas. O ASVS N1 dá
+  os requisitos de *tokens* autocontidos como "não se aplica" por esta razão.

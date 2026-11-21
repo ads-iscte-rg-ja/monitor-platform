@@ -14,8 +14,8 @@ ADR; o texto completo de cada um está em \url{\Repositorio/tree/main/docs/adr}.
     \toprule
     ADR & Decisão & Estado & QA \\
     \midrule
-    0001 & Registar as decisões arquiteturais em ADR & Aceite & Modifiability \\
-    0002 & Repositório \texttt{monitor-platform} para o CI partilhado e os artefactos transversais & Aceite & Modifiability \\
+    0001 & Registar as decisões arquiteturais em ADRs & Aceite & Modifiability \\
+    0002 & Repositório \texttt{monitor-platform} para CI partilhado e artefactos transversais & Aceite & Modifiability \\
     0003 & Contrato de ingestão em gRPC, num repositório \texttt{monitor-api} versionado & Aceite & Modifiability, Interoperability \\
     0004 & Medir primeiro: métricas Prometheus num listener interno e logs estruturados & Aceite & Monitorability \\
     0005 & Escritas em lote na ingestão e na resolução de alertas & Aceite & Scalability \\
@@ -25,8 +25,21 @@ ADR; o texto completo de cada um está em \url{\Repositorio/tree/main/docs/adr}.
     0009 & \emph{Buffer} do remote com limite e descarte por severidade & Aceite & Availability, Performance \\
     0010 & Estado do \emph{buffer} reportado ao central; \texttt{/health/live} e \texttt{/health/ready} & Aceite & Monitorability, Availability \\
     0011 & O remote retoma a entrega sem reinício & Aceite & Availability \\
+    0012 & Higiene dos repositórios e testes ponta a ponta em Compose & Aceite & Testability, Availability \\
+    0013 & \emph{Probes} de saúde escaláveis: só os \emph{hosts} devidos, espalhados no tempo & Aceite & Availability, Performance \\
+    0014 & \emph{Handlers} testáveis com interfaces mínimas; relógio e fuso horário injetados & Aceite & Testability \\
+    0015 & Uma fonte única por repositório para os níveis de log e o endereço do central & Aceite & Modifiability \\
+    0016 & Endurecimento por \emph{checklist} (ASVS 5.0 N1): cabeçalhos, CSP, Tailwind local e guarda SSRF & Aceite & Security \\
+    0017 & Com 30 dias de dados, consultas do \emph{dashboard} com custo limitado e um \emph{bulkhead} no \emph{pool}; particionar só se a retenção o exigir & Aceite & Scalability, Performance \\
+    0018 & PostgreSQL como base de dados única do central, para a telemetria e para o resto & Aceite (retroativo) & Scalability, Availability, Modifiability \\
+    0019 & Estilo arquitetural: agentes \emph{store-and-forward} e um central monolítico em camadas, replicado sobre uma base de dados partilhada & Aceite (retroativo) & todos \\
+    0020 & \emph{Store-and-forward} em SQLite no remote, com entrega \emph{at-least-once} e recibos de deduplicação no central & Aceite (retroativo) & Availability \\
+    0021 & O SDK escreve diretamente no \emph{buffer} SQLite do remote, cujo esquema pertence ao remote & Aceite (retroativo) & Availability, Modifiability \\
+    0022 & \emph{Outbox} transacional para os emails dos alertas & Aceite (retroativo) & Availability \\
+    0023 & Chaves dos \emph{hosts} aleatórias de 256 bits, guardadas como \emph{digest} HMAC-SHA256 & Aceite (retroativo) & Security, Performance \\
     \bottomrule
   \end{tabularx}
 \end{table}
 
-\porescrever{acrescentar os ADR das decisões seguintes (\dec{7}--\dec{19}) à medida que forem tomadas.}
+Os ADR marcados como retroativos registam decisões que já estavam no código quando o trabalho começou, com a
+justificação e a evidência que as medições entretanto deram (ADR-0001).

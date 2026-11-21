@@ -22,6 +22,7 @@ Processo em [ADR-0001](0001-registar-decisoes-com-adrs.md); modelo em [0000-mode
 | [0016](0016-endurecimento-por-checklist-asvs.md) | Endurecimento por *checklist* (ASVS 5.0 N1): cabeçalhos, CSP, Tailwind local e guarda SSRF | Aceite | Security |
 | [0017](0017-consultas-limitadas-e-bulkhead-do-dashboard.md) | Com 30 dias de dados, consultas do *dashboard* com custo limitado e um *bulkhead* no *pool*; particionar só se a retenção o exigir | Aceite | Scalability, Performance |
 | [0018](0018-postgresql-base-de-dados-unica-do-central.md) | PostgreSQL como base de dados única do central, para a telemetria e para o resto | Aceite (retroativo) | Scalability, Availability, Modifiability |
+| [0019](0019-estilo-arquitetural.md) | Estilo arquitetural: agentes *store-and-forward* e um central monolítico em camadas, replicado sobre uma base de dados partilhada | Aceite (retroativo) | todos |
 | [0020](0020-store-and-forward-em-sqlite-no-remote.md) | *Store-and-forward* em SQLite no remote, com entrega *at-least-once* e recibos de deduplicação no central | Aceite (retroativo) | Availability |
 | [0021](0021-sdk-escreve-no-buffer-do-remote.md) | O SDK escreve diretamente no *buffer* SQLite do remote, cujo esquema pertence ao remote | Aceite (retroativo) | Availability, Modifiability |
 | [0022](0022-outbox-transacional-para-os-emails.md) | *Outbox* transacional para os emails dos alertas | Aceite (retroativo) | Availability |
@@ -29,9 +30,7 @@ Processo em [ADR-0001](0001-registar-decisoes-com-adrs.md); modelo em [0000-mode
 
 ## Por escrever
 
-**Retroativos** (decisões que já existem no código):
-* ADR-0019 (Passo 10 do roteiro): estilo arquitetural, que inclui o monólito em camadas no central, os *jobs*
-  de fundo dentro do processo, Go como linguagem e a interface feita no servidor (*templates*, sem SPA).
-  O número 0019 fica reservado para ele.
+**Retroativos:** nenhum por escrever (o ADR-0019 cobre o monólito em camadas, os *jobs* dentro do processo, Go
+e a interface feita no servidor).
 
-**Novas** (decisões D2–D19 de `../PLANO_MELHORIAS.md` §7).
+**Novas:** nenhuma (todas as decisões D1–D20 do plano têm ADR).

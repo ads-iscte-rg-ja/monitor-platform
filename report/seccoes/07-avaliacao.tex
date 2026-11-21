@@ -38,6 +38,28 @@ Prometheus, que perdem o que acontece antes da primeira recolha.
 \emph{dashboard} é consultado a cada 2~s. \cen{SC3} (várias instâncias) só se mede depois de \dec{8}, e
 \cen{SC4} (30 dias de dados) depois de \dec{9}.
 
+\paragraph{Arquitetura e níveis de teste.}
+A arquitetura define as unidades e as interfaces que cada nível de teste exercita
+(secção~\ref{sec:documentacao}). A Tabela~\ref{tab:niveis-teste} diz em que nível se verifica cada grupo de
+cenários.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Cenários de qualidade por nível de teste}
+  \label{tab:niveis-teste}
+  \begin{tabularx}{\linewidth}{L{0.2\linewidth}L{0.3\linewidth}Y}
+    \toprule
+    Nível & O que exercita & Cenários \\
+    \midrule
+    Unitário & uma unidade da vista de módulos, com \emph{fakes} das interfaces (\dec{14}) & \cen{TE2}, \cen{TE3}, \cen{MO1}, \cen{MO2}, \cen{AV3}, \cen{AV4}, \cen{MN2} \\
+    Integração & as interfaces entre elementos: os repositórios num PostgreSQL real, o contrato (\texttt{buf}), o SDK contra o esquema do remote & \cen{AV2}, \cen{SC3} (liderança), \cen{SE1}, \cen{SE3}, \cen{MO2} \\
+    Aceitação de QA: carga & o sistema inteiro sob carga, com os limites de recursos (k6) & \cen{SC1}--\cen{SC5}, \cen{IO1} \\
+    Aceitação de QA: ponta a ponta & remote, SDK, nginx com TLS e central reais em Compose & \cen{AV1}, \cen{MN1}, \cen{SE1} \\
+    Inspeção & \emph{checklist}, regras estáticas, experiência controlada & \cen{SE2} (ASVS), \cen{MO3}, camadas (\texttt{depguard}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
 \paragraph{Limitações.}
 O gerador de carga corre na mesma máquina que o sistema medido. Os limites de CPU do central e da base de
 dados impedem que o k6 lhes tire recursos, mas não isolam totalmente a memória e o disco partilhados. Os
@@ -255,7 +277,7 @@ o código ainda por commitar; a medição final, a partir do \texttt{main}, é f
 host e identificador de origem); o que o teste prova é que o remote não cria identificadores novos ao repetir
 um envio e que não marca como entregue nada que o central não tenha gravado. \cen{AV1} cumpre-se.
 
-\subsection{Manutenção e testabilidade: MO1, MO2, TE2, TE3 e métricas de código}
+\subsection{Manutenção, testabilidade e interoperabilidade: MO1--MO3, TE2, TE3, IO1 e métricas de código}
 \label{sec:mo1}
 
 \paragraph{\cen{MO1}: uma métrica de alerta nova.}
@@ -316,6 +338,30 @@ passaram a uma. \cen{MO2} cumpre-se.
     \bottomrule
   \end{tabular}
 \end{table}
+
+\paragraph{\cen{MO3}: uma mudança de apresentação.}
+Medimo-lo com uma experiência controlada, numa cópia do central descartada no fim (dados e \emph{diff} em
+\texttt{docs/metrics/iter-6/mo3.md}). Fizemos duas alterações de apresentação típicas, escolhidas antes de olhar
+para o código que as serve. No \emph{dashboard}, os incidentes abertos passaram a ser o primeiro cartão, e o
+cartão de erros passou a mostrar quantos dos erros de hoje são críticos. Na página de erros, o nível passou a
+\emph{badge} com uma cor por severidade, e o ambiente ganhou uma coluna própria. As duas tocaram quatro
+ficheiros, todos em \texttt{frontend/} (um modelo HTML por página, o JavaScript do \emph{dashboard} e a folha de
+estilos), e nenhum ficheiro Go: \textbf{0 alterações em \texttt{services} e \texttt{repositories}}. Os testes
+dos \emph{handlers}, que desenham os modelos reais, passaram sem alterações. \cen{MO3} cumpre-se. Não usámos
+o histórico do git como medida porque os \emph{commits} são por iteração e juntam alterações de várias
+naturezas. O limite da medida é o do próprio cenário: uma página que precise de um dado novo já não é só
+apresentação, e toca nas camadas de baixo por desenho.
+
+\paragraph{\cen{IO1}: um agente noutra linguagem.}
+O gerador de carga do D10 é esse agente: está escrito em JavaScript, para o k6, e o único artefacto do sistema
+que usa é o \texttt{.proto} do \texttt{monitor-api}, montado só de leitura (dados em
+\texttt{docs/metrics/iter-6/io1.md}). Tudo o que precisa de saber sobre o comportamento está nos comentários do
+contrato: a autenticação, a deduplicação por \texttt{source\_id}, o que fazer com cada código gRPC e com o
+\texttt{RetryInfo}. A lógica de agente ocupa 101 linhas. Com as mesmas garantias do remote, confirmou 73\,229
+registos na medição de \cen{SC4}, todos gravados, sem duplicados nem lotes perdidos, e fez o mesmo nos
+441\,000 registos de \cen{SC2}. \cen{IO1} cumpre-se, com dois limites: a durabilidade local (o \emph{buffer}) é
+responsabilidade de cada agente e não do contrato, e o agente foi escrito pela mesma equipa que escreveu o
+contrato.
 
 \paragraph{\cen{TE2} e \cen{TE3}: \emph{handlers} e tempo.}
 Com as interfaces de \dec{14}, a cobertura dos \emph{handlers} passou de 9,5\,\% para 95,6\,\% (alvo

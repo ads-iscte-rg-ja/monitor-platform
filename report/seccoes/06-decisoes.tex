@@ -1,6 +1,250 @@
 \section{Decisões arquiteturais}
 \label{sec:decisoes}
 
+\subsection{Estilo e arquitetura final (\dec{20}, ADR-0019)}
+\label{sec:d20}
+
+\paragraph{Problema.}
+Os ADR tratam um atributo de cada vez, mas nenhum dizia que estilo o sistema segue nem porquê, que é a primeira
+decisão dos critérios do slide~08 (secção~\ref{sec:estilos}). O estilo estava no código desde a iteração~0 e
+foi recuperado na reconstrução (capítulo~\ref{sec:sistema}). Também as falácias da computação distribuída e a
+conascência estavam tratadas, mas espalhadas por várias decisões e sem nome.
+
+\paragraph{Decisão.}
+O ADR-0019 regista o estilo, de forma retroativa, com os critérios do slide~08: o domínio (telemetria com picos
+imprevisíveis, recolhida em muitos \emph{hosts}), as características (escalabilidade, disponibilidade,
+manutenção; capítulo~\ref{sec:requisitos}), a arquitetura dos dados (registo e recibo na mesma transação), os
+fatores organizacionais (duas pessoas, três semanas) e a operação (Docker Compose, sem orquestrador). O sistema é
+\textbf{distribuído}, com duas unidades de \emph{deployment}, e cada uma segue o estilo que lhe serve:
+\begin{itemize}
+\item o \textbf{agente} é um \emph{pipeline} com um \emph{pipe} persistente: a recolha e o SDK produzem, o
+\emph{buffer} SQLite guarda, os \emph{workers} de envio consomem (ADR-0020, ADR-0021);
+\item o \textbf{central} é um monólito em camadas, com partição técnica, \emph{jobs} de fundo no mesmo processo e
+a interface feita no servidor (\emph{templates}); replica-se horizontalmente sobre uma base de dados partilhada
+(\dec{8}, ADR-0018), e o \texttt{APP\_ROLE} já permite separar quem serve pedidos de quem corre \emph{jobs};
+\item dentro do central, os \textbf{alertas são um microkernel}: um avaliador genérico e as métricas como
+\emph{plug-ins} obtidos de um registo (\dec{13}), o que dá partição por domínio onde mais importa (\cen{MO1});
+\item a comunicação é \textbf{síncrona por pedido} entre o agente e o central (gRPC), mas \textbf{assíncrona para a
+aplicação}, que só escreve no \emph{buffer} local.
+\end{itemize}
+A Figura~\ref{fig:cc-final} mostra a arquitetura final, nas vistas de componentes e conectores e de alocação
+juntas, com os pontos que as duas vistas de qualidade seguintes referem.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  comp/.style={draw=iscte, fill=fundotab, rounded corners=2pt, minimum height=7mm, minimum width=20mm,
+    font=\small, align=center},
+  dado/.style={comp, fill=white, dashed},
+  ext/.style={comp, fill=white},
+  liga/.style={-{Stealth[length=2mm]}, thick, iscte},
+  dados/.style={-{Stealth[length=2mm]}, thick, dashed, acento},
+  no/.style={draw=cinza, rounded corners=4pt, inner sep=6pt},
+  pt/.style={circle, draw=mau, text=mau, font=\scriptsize\bfseries, inner sep=1pt, minimum size=4mm}]
+  % host monitorizado
+  \node[comp] (app) {Aplicação\\[-1pt]{\scriptsize + SDK}};
+  \node[dado, below=7mm of app] (buf) {\emph{buffer}\\[-1pt]{\scriptsize SQLite (WAL)}};
+  \node[comp, below=7mm of buf] (rem) {monitor-remote\\[-1pt]{\scriptsize recolha, envio}};
+  \draw[dados] (app) -- node[left, font=\scriptsize] {escreve} (buf);
+  \draw[dados] (rem) -- node[left, font=\scriptsize] {lê, marca} (buf);
+  \node[no, fit=(app)(buf)(rem), label={[font=\small\bfseries]above:\emph{host} (×1\,000)}] (host) {};
+  % central
+  \node[comp, right=34mm of buf] (nginx) {nginx\\[-1pt]{\scriptsize balanceador}};
+  \node[comp, right=8mm of nginx, yshift=10mm] (c1) {central 1\\[-1pt]{\scriptsize HTTP, gRPC, \emph{jobs}}};
+  \node[comp, right=8mm of nginx, yshift=-10mm] (c2) {central N\\[-1pt]{\scriptsize líder por \emph{job}}};
+  \node[dado, right=10mm of c1, yshift=-10mm] (pg) {PostgreSQL~16\\[-1pt]{\scriptsize telemetria}\\[-2pt]{\scriptsize recibos, \emph{outbox}}};
+  \draw[liga] (nginx) -- (c1);
+  \draw[liga] (nginx) -- (c2);
+  \draw[liga] (c1) -- (pg);
+  \draw[liga] (c2) -- (pg);
+  \node[ext, below=8mm of c2] (prom) {Prometheus};
+  \draw[liga, dashed] (prom) -- node[left, font=\scriptsize] {recolhe} (c2);
+  \node[no, fit=(nginx)(c1)(c2)(pg), label={[font=\small\bfseries, anchor=north east]south east:servidor central (Compose)}] (srv) {};
+  \draw[liga] (rem.east) -| node[pos=0.3, below, font=\scriptsize, align=center] {gRPC, lotes\\\texttt{monitor-api}} (nginx.south);
+  % externos
+  \node[ext, above=24mm of nginx] (br) {\emph{browser}};
+  \node[ext, above=14mm of pg] (smtp) {SMTP};
+  \draw[liga] (br) -- node[right, font=\scriptsize, pos=0.3] {HTTPS} (nginx);
+  \draw[liga] (c1.north) |- (smtp.west);
+  \draw[liga, dashed] (c1.west) to[bend right=10] node[above, font=\scriptsize, pos=0.4] {\emph{probe}} (app.east);
+  % pontos das vistas de qualidade
+  \node[pt] at ($(app.north east)+(1mm,1mm)$) {1};
+  \node[pt] at ($(rem.south east)+(1mm,-1mm)$) {2};
+  \node[pt] at ($(nginx.south west)+(-1mm,-1mm)$) {3};
+  \node[pt] at ($(c1.north east)+(1mm,1mm)$) {4};
+  \node[pt] at ($(pg.south east)+(1mm,-1mm)$) {5};
+  \node[pt] at ($(smtp.north east)+(1mm,1mm)$) {6};
+\end{tikzpicture}
+\caption{Arquitetura final: componentes e conectores sobre os nós de \emph{deployment}. Legenda: caixa = componente
+em execução; caixa a tracejado = base de dados; caixa branca = externo; moldura cinzenta = nó; seta cheia =
+chamada; seta a tracejado azul = dados partilhados; seta a tracejado escuro = verificação
+periódica (a \emph{probe} do central a cada \emph{host}; a recolha de métricas do Prometheus); círculo
+vermelho = ponto das vistas de qualidade (Tabelas~\ref{tab:vista-disp} e~\ref{tab:vista-seg}).}
+\label{fig:cc-final}
+\end{figure}
+
+A Tabela~\ref{tab:modulos-final} é a vista de módulos final. Não é desenhada à mão: cada linha resume uma regra
+do \texttt{depguard}, a mesma que é verificada em cada \emph{pull request}.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Vista de módulos final: os pacotes, a sua camada e o que estão proibidos de usar (regras do \texttt{depguard})}
+  \label{tab:modulos-final}
+  \begin{tabularx}{\linewidth}{lL{0.3\linewidth}Y}
+    \toprule
+    Pacote & Papel & Não pode usar \\
+    \midrule
+    \multicolumn{3}{l}{\textit{monitor-central}} \\
+    \texttt{handlers}, \texttt{grpcapi} & apresentação e transporte (HTTP; gRPC, \dec{11}) & \texttt{repositories}, \texttt{database}; o \texttt{grpcapi} também não usa \texttt{handlers} \\
+    \texttt{services} & regras de negócio e trabalho dos \emph{jobs} & \texttt{handlers}, \texttt{grpcapi}, \texttt{server}, \texttt{templating}, \texttt{database} \\
+    \texttt{alertmetric} & \emph{plug-ins} do microkernel de alertas (\dec{13}) & todas as camadas e \texttt{database} \\
+    \texttt{repositories} & acesso a dados, o único com SQL & \texttt{services}, \texttt{handlers}, \texttt{server} \\
+    \texttt{models} & tipos de domínio partilhados & \texttt{handlers}, \texttt{services}, \texttt{repositories}, \texttt{database} \\
+    \texttt{observability} & métricas e logs, transversal (\dec{4}) & todas as camadas e \texttt{database} \\
+    \texttt{server} & raiz de composição e arranque dos \emph{jobs} & --- \\
+    \multicolumn{3}{l}{\textit{monitor-remote}} \\
+    \texttt{collect} & produtor do \emph{pipeline} & \texttt{requests}, \texttt{sender} \\
+    \texttt{repository} & \emph{pipe} persistente (o \emph{buffer}) & \texttt{requests}, \texttt{sender} \\
+    \texttt{requests} & cliente do contrato & \texttt{repository}, \texttt{database}, \texttt{sender} \\
+    \texttt{sender} & consumidor: liga o \emph{buffer} ao cliente & --- \\
+    \texttt{validation} & regras de domínio & \texttt{requests}, \texttt{repository}, \texttt{sender} \\
+    \multicolumn{3}{l}{\textit{entre repositórios}} \\
+    \texttt{monitor-api} & contrato \texttt{.proto} e código gerado, com versões & usado por central e remote, não usa nenhum \\
+    \texttt{monitor-go-sdk} & biblioteca das aplicações & só o esquema do \emph{buffer} (ADR-0021) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Vistas de qualidade.}
+As vistas estruturais não mostram bem um atributo cuja solução está espalhada por várias estruturas
+(secção~\ref{sec:documentacao}). As Tabelas~\ref{tab:vista-disp} e~\ref{tab:vista-seg} juntam, para a
+disponibilidade e para a segurança, o que importa de cada ponto da Figura~\ref{fig:cc-final}.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Vista de disponibilidade: o caminho de um registo, do SDK à base de dados}
+  \label{tab:vista-disp}
+  \begin{tabularx}{\linewidth}{cL{0.27\linewidth}YL{0.14\linewidth}}
+    \toprule
+    & Falha & Resposta (tática) & Decisão \\
+    \midrule
+    1 & a aplicação cai logo a seguir a registar & o erro e a entrada na fila numa transação local (\emph{Transactions}) & ADR-0021 \\
+    1 & o remote está parado & o SDK escreve no \emph{buffer} na mesma; nada espera pela rede & ADR-0021 \\
+    2 & central ou rede em baixo durante horas & \emph{store-and-forward}, \emph{Retry} com \emph{backoff}; limite do \emph{buffer} com descarte por severidade & \dec{19}, ADR-0020 \\
+    2 & um lote rejeitado como inválido & quarentena (\emph{Ignore Faulty Behavior}), visível no central & \dec{16}, \dec{17} \\
+    3 & uma instância do central cai & o nginx usa outra; a liderança dos \emph{jobs} muda em $\le$ 12~s & \dec{8} \\
+    4 & o central está sobrecarregado & rejeição com o atraso para nova tentativa (\emph{Shed Load}) & \dec{6} \\
+    4 & o mesmo lote chega duas vezes & recibo na mesma transação que o registo (idempotência) & ADR-0020 \\
+    5 & uma consulta lenta do \emph{dashboard} & \emph{bulkhead} do \emph{pool} e prazo por pedido & \dec{9} \\
+    6 & o SMTP está em baixo & \emph{outbox} transacional, com \emph{Retry} & ADR-0022 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Vista de segurança: fronteiras de confiança e os seus controlos}
+  \label{tab:vista-seg}
+  \begin{tabularx}{\linewidth}{cL{0.27\linewidth}YL{0.14\linewidth}}
+    \toprule
+    & Fronteira & Controlo (tática) & Decisão \\
+    \midrule
+    1 & aplicação $\leftrightarrow$ \emph{buffer} & ficheiro privado (0600), do mesmo utilizador; o SDK não guarda segredos & ADR-0021 \\
+    2--3 & remote $\rightarrow$ central (rede não confiável) & chave de 256 bits por \emph{host}, guardada só como \emph{digest} HMAC; revogação imediata; TLS num terminador à frente do central (no E2E, o nginx; o Compose do central só publica em \emph{loopback}) & ADR-0023, \dec{15} \\
+    3 & \emph{browser} $\rightarrow$ central & sessão no servidor (\texttt{\_\_Host-session}), CSRF, CSP, \texttt{frame-ancestors}, limites de \emph{login} partilhados & \dec{18}, \dec{8} \\
+    4 & central $\rightarrow$ \emph{endpoints} dos \emph{hosts} & guarda SSRF no \texttt{Dialer} (sem \emph{loopback}, \emph{link-local} nem metadados) & \dec{18} \\
+    5 & a base de dados & sem chaves utilizáveis; o segredo do HMAC fica fora dela; portas só em \emph{loopback} & ADR-0023 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{As falácias da computação distribuída.}
+Cada fronteira de rede do sistema parte do princípio de que as oito falácias são falsas. A
+Tabela~\ref{tab:falacias} diz como cada uma é tratada.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{As oito falácias da computação distribuída no Monitor}
+  \label{tab:falacias}
+  \begin{tabularx}{\linewidth}{L{0.27\linewidth}YL{0.13\linewidth}}
+    \toprule
+    Falácia & Resposta & Decisão \\
+    \midrule
+    A rede é fiável & \emph{store-and-forward}, \emph{retry} com \emph{backoff}, recibos idempotentes; \cen{AV1}: 0 perdas em 1~h & ADR-0020, \dec{16} \\
+    A latência é zero & lotes de até 100 registos; a aplicação não espera pela rede & \dec{5}, ADR-0021 \\
+    A largura de banda é infinita & lote $\le$ 1~MiB; Protocol Buffers; amostragem na origem como evolução (E8) & \dec{11} \\
+    A rede é segura & chave por \emph{host} com HMAC, TLS no \emph{ingress}, guarda SSRF & ADR-0023, \dec{18} \\
+    A topologia não muda & instâncias sem estado atrás do nginx; liderança por \emph{job} & \dec{8} \\
+    Há um só administrador & o estado do \emph{buffer} de cada \emph{host} chega ao central; \texttt{/health/ready} & \dec{17} \\
+    O custo de transporte é zero & Protocol Buffers e lotes; não medido, é um argumento & \dec{11} \\
+    A rede é homogénea & contrato \texttt{.proto} independente da linguagem (\cen{IO1}) & \dec{11} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Dos outros desafios dos sistemas distribuídos, as \textbf{transações distribuídas} foram evitadas: remote e
+central têm cada um a sua transação, e a idempotência do recibo fecha a lacuna entre elas (o email segue o
+mesmo princípio, com a \emph{outbox}). Os \textbf{contratos} têm versões semânticas e o \texttt{buf breaking}
+no CI (\dec{11}). Os \textbf{logs distribuídos} são estruturados (\dec{4}), mas um pedido do remote não se
+correlaciona com o seu tratamento no central: é uma lacuna assumida, com o gatilho E6 (OpenTelemetry).
+
+\paragraph{Conascência.}
+A Tabela~\ref{tab:conascencia} relê as decisões de manutenção com esta métrica
+(secção~\ref{sec:estilos}). O padrão é o mesmo em todas: trocar uma conascência forte e implícita por uma mais
+fraca, com um dono definido e um teste ou um compilador que a verifica.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Conascência antes e depois das decisões de manutenção}
+  \label{tab:conascencia}
+  \begin{tabularx}{\linewidth}{L{0.22\linewidth}YYl}
+    \toprule
+    Onde & Antes & Depois & Decisão \\
+    \midrule
+    Porque é que o central rejeitou um lote & de significado: o texto, em inglês, das mensagens de erro & de nome e de tipo: \texttt{RejectionReason} no \texttt{.proto}, verificado pelo compilador e pelo \texttt{buf} & \dec{11} \\
+    Níveis de log & de valores: a mesma lista em 10 sítios & uma fonte por repositório e testes de consistência entre eles & \dec{12} \\
+    Uma métrica de alerta nova & de algoritmo e de valores em 7 sítios, 3 camadas & num só \emph{plug-in}, ligado ao núcleo só pelo nome & \dec{13} \\
+    SDK e \emph{buffer} do remote & de nome e de tipo, implícita, entre dois repositórios & igual, com dono (o remote) e testes contra o mesmo esquema & ADR-0021 \\
+    Liderança e \texttt{RetryInfo} & dinâmica, de execução e de tempo & encapsulada (\emph{advisory lock}; o remote espera o maior dos dois atrasos) & \dec{8}, \dec{6} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Conformidade com a arquitetura.}
+As regras de camadas do \texttt{depguard} são \emph{conformance by analysis}: cada \emph{pull request} verifica
+que o código respeita as dependências permitidas entre pacotes. O limite que o slide~07 aponta a esta técnica
+está presente aqui: as estruturas de execução não aparecem no código estático. Por isso o que é de execução
+verifica-se em execução: que cada \emph{job} corre numa só instância mede-se no teste de \cen{SC3}, e o
+caminho do SDK ao central sem perdas mede-se no E2E (\cen{AV1}). Para que a arquitetura se leia no próprio
+código, os pacotes de cada camada (\texttt{handlers}, \texttt{services} e \texttt{repositories} no central;
+\texttt{repository} e \texttt{sender} no remote) passaram a abrir com um comentário que diz a camada, o que
+podem usar e a regra que o garante.
+
+\paragraph{Variabilidade.}
+O Monitor não é uma linha de produtos. Usa, ainda assim, quatro mecanismos de variação do slide~07: um
+\emph{extension point} (o registo das métricas de alerta), parâmetros validados no arranque (incluindo o papel
+de cada instância), a substituição de componentes nos testes (relógio, fuso horário, \texttt{Dialer}) e um
+\emph{core asset} reutilizável por qualquer aplicação Go, o SDK.
+
+\paragraph{Alternativas.}
+Os \textbf{microserviços} foram rejeitados com os argumentos do próprio slide~08: o registo, o recibo e a
+avaliação de alertas partilham uma transação, que é o sinal de que pertencem ao mesmo serviço; uma equipa de
+duas pessoas não sustenta a operação que exigem; e cada fronteira de rede nova traz as oito falácias. A
+\textbf{\emph{service-based architecture}} (\texttt{ingest}, \texttt{web} e \texttt{worker} separados, com a
+mesma base de dados) é o passo seguinte, e fica como E3, com o gatilho de a ingestão e o \emph{dashboard}
+competirem pelo CPU, que as medições não mostraram (o CPU do central não passou de 15\,\% em \cen{SC4}). Um
+\emph{broker} (\emph{event-driven}) fica como E1: na topologia \emph{broker}, o tratamento de erros é difícil e
+não há recuperação da transação, que é o que os recibos dão hoje.
+
+\paragraph{\emph{Trade-offs}.}
+A partição técnica espalha cada funcionalidade pelas três camadas; o microkernel dos alertas resolveu-o onde
+mais custava, e no resto é o custo aceite do estilo. A base de dados partilhada é o estrangulamento das escritas
+(\cen{SC3}) e um ponto único de falha (ADR-0018). Um ADR retroativo descreve uma decisão que não foi tomada com
+este vocabulário, e diz isso.
+
+\paragraph{Verificação.}
+\cen{MO3} e \cen{IO1}, as medidas diretas de dois pontos deste estilo, estão na secção~\ref{sec:mo1}.
+
 \subsection{Escalabilidade}
 
 \subsubsection{Medir primeiro: métricas e logs estruturados (\dec{4}, ADR-0004)}

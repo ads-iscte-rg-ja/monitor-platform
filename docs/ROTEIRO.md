@@ -25,8 +25,8 @@ computação distribuída, conascência). Não invalidam nenhuma decisão; acres
 | 6 | 2/12 | D7 *probes* escaláveis (medir primeiro) | AV2 | 0013 | central | feito |
 | 7 | 3/12 | D14 testabilidade + D12 fonte única | TE2, TE3, MO2 | 0014, 0015 | central, remote, sdk | feito |
 | 8 | 4/12 | D18 endurecimento (ASVS N1) | SE2, SE3 | 0016 | central | feito |
-| 9 | 5/12 | D9 particionamento: medir SC4 e decidir | SC4 | 0017 | central | feito, por commitar (não se particiona) |
-| 10 | 6/12 | D20 estilo, falácias e conascência; vistas finais e de qualidade; conformidade (slides 07–08) | MO3, IO1 | 0019 | platform, central (comentários `// Package`) | |
+| 9 | 5/12 | D9 particionamento: medir SC4 e decidir | SC4 | 0017 | central | feito (não se particiona) |
+| 10 | 6/12 | D20 estilo, falácias e conascência; vistas finais e de qualidade; conformidade (slides 07–08) | MO3, IO1 | 0019 (+ 0018, 0020–0023 retroativos) | platform, central, remote (comentários `// Package`) | feito, por commitar |
 | 11 | 7/12 | Medição final + fecho do relatório | todos | — | platform | |
 | 12 | 8/12 | Revisão final | — | — | platform | |
 | — | 9/12 | **Entrega** | | | | |

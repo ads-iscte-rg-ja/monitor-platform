@@ -2,8 +2,17 @@
 \label{sec:sistema}
 
 Este capítulo descreve o sistema tal como estava no início do trabalho (iteração~0), numa vista de cada
-categoria de estruturas (secção~\ref{sec:enquadramento}). Não havia nenhuma documentação de arquitetura:
-as vistas foram recuperadas a partir do código.
+categoria de estruturas (secção~\ref{sec:enquadramento}). Não havia nenhuma documentação de arquitetura, por
+isso o primeiro passo foi uma \textbf{reconstrução} (secção~\ref{sec:documentacao}): um processo
+interpretativo e iterativo, a partir da leitura do código, do grafo de \emph{imports} de cada repositório e da
+primeira execução das regras de camadas do \texttt{depguard}, que confirmou o que a leitura sugeria. As vistas
+finais, depois das decisões, estão no capítulo~\ref{sec:decisoes} (secção~\ref{sec:d20}).
+
+A notação é \textbf{informal com legenda}: caixas e setas, com o significado de cada uma dado na legenda da
+figura. Foi uma escolha de custo e benefício: UML completo custaria mais do que o que acrescentaria a este
+relatório (ADR-0001). As partes que precisam de ser exatas usam notações verificáveis por máquina: o contrato
+de ingestão é um ficheiro Protocol Buffers, verificado pelo \texttt{buf}, e as regras de camadas são
+configuração do \texttt{depguard}, verificada em cada \emph{pull request}.
 
 \subsection{Vista de módulos}
 
@@ -57,8 +66,9 @@ e envia pelo cliente HTTP (\texttt{requests}); estes dois pacotes não se conhec
     \draw[usa] (hw) -- (sdk);
     \draw[partilha] (sdk) -- node[right, font=\scriptsize] {escreve no esquema} (lite);
   \end{tikzpicture}
-  \caption{Vista de módulos (decomposição e uso). A seta a vermelho é a única violação de camadas
-           encontrada; a tracejado, a dependência de dados entre o SDK e o remote.}
+  \caption{Vista de módulos da iteração~0 (decomposição e uso). Legenda: caixa = pacote Go; caixa a tracejado =
+base de dados; seta cheia = ``usa'' (\emph{import}); seta a vermelho = a única violação de camadas encontrada;
+seta a tracejado = dependência de dados entre o SDK e o remote, que não aparece em nenhum \emph{import}.}
   \label{fig:modulos}
 \end{figure}
 
@@ -130,7 +140,9 @@ instâncias, tal como está, duplicaria cada \emph{job} (secção~\ref{sec:lacun
 \subsection{Padrões e táticas já presentes}
 \label{sec:tacticas-existentes}
 
-O sistema usa os padrões \textbf{Layered} (central), \textbf{Client-Server} (remote--central),
+O estilo do sistema, registado depois no ADR-0019 (secção~\ref{sec:d20}), já era este: distribuído, com um
+agente em \emph{pipeline} por \emph{host} e um central monolítico em camadas. O sistema usa os padrões
+\textbf{Layered} (central), \textbf{Client-Server} (remote--central),
 \textbf{Shared-Data} (SQLite entre SDK e remote; PostgreSQL) e \textbf{MVC} no servidor (\emph{templates}
 separados dos \emph{handlers} e dos serviços). Usa também dois padrões de integração: \emph{Transactional
 Outbox}, para os emails, e \emph{Store-and-Forward}, para a telemetria. Ao nível GoF há
