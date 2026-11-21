@@ -809,6 +809,9 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
   documentar o estilo só no texto, sem ADR (perde-se o *porquê*, ADR-0001).
 * **Trade-offs:** um ADR retroativo descreve uma decisão que não foi tomada com este vocabulário; diz-se
   isso no próprio ADR.
+* **Estado (21/11): feito** ([ADR-0019](adr/0019-estilo-arquitetural.md); relatório §D20 `sec:d20` com a vista
+  final, as vistas de disponibilidade e de segurança, as falácias, a conascência, a conformidade e a
+  variabilidade; cap. 2 com os slides 07–08; MO3 e IO1 medidos, `docs/metrics/iter-6/mo3.md` e `io1.md`).
 * **Verificação:** os cenários que ainda não tinham prova passam a tê-la: **IO1** (o gerador de carga k6 é um
   agente em JavaScript feito só a partir do `.proto` do `monitor-api`) e **MO3** (uma alteração de
   apresentação real a uma página: 0 ficheiros alterados em `services` e `repositories`, com o `depguard` a
