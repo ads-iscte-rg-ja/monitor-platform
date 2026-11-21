@@ -145,6 +145,35 @@ dados. Com N instâncias, \texttt{INGEST\_MAX\_INFLIGHT} deve ser o orçamento t
 \subsection{Disponibilidade e integridade dos dados}
 \label{sec:av1-av4}
 
+\paragraph{\cen{AV2}: \emph{host} sem resposta, com 1.000 \emph{hosts}.}
+Um teste de integração, num PostgreSQL real, regista 1.000 \emph{hosts} com \emph{endpoints} num servidor
+local; metade nunca responde, e as \emph{probes} esgotam os 5~s de \emph{timeout}. O servidor regista quando cada
+\emph{host} recebe cada \emph{probe}. Antes de \dec{7}, o teste corre um ciclo; depois, corre o \emph{job} durante
+3~minutos, como em produção. A Tabela~\ref{tab:av2} compara os dois (dados em
+\texttt{docs/metrics/iter-6/av2-antes.txt} e \texttt{av2-depois.txt}).
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{\cen{AV2}: 1.000 \emph{hosts}, metade sem resposta, antes e depois de \dec{7}}
+  \label{tab:av2}
+  \begin{tabular}{lrrl}
+    \toprule
+    Medida & Antes & Depois & Alvo \\
+    \midrule
+    Intervalo entre \emph{probes} do mesmo \emph{host} (máximo) & 350,7~s & 35,4~s & $\le$ 45~s \Sim \\
+    Pior atraso até ao alerta, além do limiar & 6~min~6~s & 50,4~s & $\le$ 60~s \Sim \\
+    Tempo de cada \emph{host} em ``desconhecido'' por ciclo & 4~min~21~s & 0 & 0 \Sim \\
+    Iteração mais longa do \emph{job} & 350,7~s & 20,2~s & $<$ 60~s \Sim \\
+    \emph{Probes} por segundo (máximo em simultâneo) & --- & 32,4 (128) & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+A mediana do intervalo é 30,3~s e o máximo fica abaixo dos 38~s calculados. A iteração mais longa é a primeira,
+com os 1.000 \emph{hosts} devidos ao mesmo tempo; nas seguintes, o \emph{jitter} já os espalhou. O pior atraso
+soma ao intervalo máximo uma avaliação de alertas (15~s), sem contar com a fase entre a falha e a próxima
+avaliação, que só o reduz. \cen{AV2} cumpre-se.
+
 \paragraph{\cen{AV4}: rajada com o central em baixo.}
 Um teste de integração no remote usa um \emph{buffer} SQLite real com um limite de 1~MiB (o rígido a 4~MiB) e
 simula 12 ciclos de rajada com o central em baixo: em cada ciclo, uma aplicação escreve 1.000 INFO, 50 WARN e
@@ -186,7 +215,45 @@ real, dois \texttt{SIGHUP} seguidos (chave nova e depois um \texttt{.env} sem ch
 com a chave nova no primeiro caso e a anterior no segundo (dados em \texttt{docs/metrics/iter-6/av3.txt}).
 \cen{AV3} cumpre-se.
 
-\porescrever{AV1: perdas e duplicados (E2E de \dec{15}).}
+\paragraph{\cen{AV1}: central em baixo, ponta a ponta.}
+O teste ponta a ponta de \dec{15} mata o central (\texttt{docker compose kill}, sem paragem graciosa), com o
+balanceador de pé, e a aplicação escreve 500 logs com o SDK durante a falha. O remote continua a recolher
+estatísticas e a tentar entregar, recebendo \texttt{UNAVAILABLE}. Quando o central volta, o condutor espera
+que o \emph{buffer} esvazie, para o remote para ter um estado estável e compara os dois lados registo a
+registo, pelo identificador de origem: tudo o que o remote marcou como entregue tem de estar no central, uma só
+vez, e nada no central pode faltar no \emph{buffer}. A comparação abrange o \emph{buffer} inteiro, incluindo os
+500 logs do caminho feliz entregues antes da falha. A Tabela~\ref{tab:av1} resume as execuções (dados em
+\texttt{docs/metrics/iter-6/e2e/}).
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{\cen{AV1}: central morto, 500 logs gerados durante a falha}
+  \label{tab:av1}
+  \begin{tabular}{lrrl}
+    \toprule
+    Medida & 60~s em baixo & 1~h em baixo & Alvo \\
+    \midrule
+    Duração real da falha & 63~s & 3.603~s & --- \\
+    Pendentes quando o central volta (logs / estatísticas) & 500 / 10 & 500 / 599 & --- \\
+    Logs entregues e no central & 1.000 / 1.000 & 1.000 / 1.000 & --- \\
+    Estatísticas entregues e no central & 18 / 18 & 634 / 634 & --- \\
+    Perdidos & 0 & 0 & 0 \Sim \\
+    Duplicados & 0 & 0 & 0 \Sim \\
+    No central sem origem no \emph{buffer} & 0 & 0 & 0 \Sim \\
+    Pendentes ou em quarentena no fim & 0 & 0 & 0 \Sim \\
+    Tempo até entregar tudo, depois de o central voltar & 36,7~s & 202,0~s & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+O tempo de recuperação é o do \emph{backoff} do remote: depois de 60~s de falhas seguidas, a espera entre
+tentativas já ia em cerca de 40~s (32 a 48~s, com a variação aleatória); o limite do \emph{backoff} é 5~minutos, que é por isso o
+atraso máximo depois de uma falha longa. Com 1~h em baixo, a entrega completa demorou 202~s: até 5~minutos de
+espera pela tentativa seguinte, e depois 500 logs e 599 estatísticas em lotes. As duas execuções foram feitas com
+o código ainda por commitar; a medição final, a partir do \texttt{main}, é feita no Passo~10 pelo
+\emph{workflow} noturno. Os duplicados são impossíveis no central por construção (recibos por
+host e identificador de origem); o que o teste prova é que o remote não cria identificadores novos ao repetir
+um envio e que não marca como entregue nada que o central não tenha gravado. \cen{AV1} cumpre-se.
 
 \subsection{Manutenção: cenário MO1 e métricas de código}
 \label{sec:mo1}
@@ -236,8 +303,16 @@ No remote, um teste põe um registo em quarentena com 150 estatísticas pendente
 ciclo levam a mesma fotografia, com a quarentena contada. No central, um teste de integração em PostgreSQL envia
 um lote com três registos em quarentena e lê-os na API do \emph{dashboard}; verifica também que uma fotografia
 mais antiga não substitui a mais recente e que uma inválida é ignorada sem perder as estatísticas. A quarentena
-fica visível no lote seguinte, ou seja, em $\le$ 1 ciclo de estatísticas. O teste ponta a ponta de \dec{15}
-repete-o com os componentes reais.
+fica visível no lote seguinte.
+
+O teste ponta a ponta de \dec{15} repete-o com os componentes reais: corrompe um log pendente no \emph{buffer}
+(metadados que deixam de ser JSON), espera que o remote o ponha em quarentena e mede quanto tempo demora a
+aparecer no central. Na primeira execução falhou, com 10,0~s para ciclos de 5~s: um ciclo de entrega que acorda
+antes da recolha não tem estatísticas para levar a fotografia, e o central ficava dois ciclos atrás
+(secção~\ref{sec:d15}). Depois da correção, três execuções mediram 5,85~s, 0,16~s e 5,82~s. O atraso depende da fase
+entre a quarentena e a recolha seguinte, e o máximo é um ciclo de recolha, que no teste são 6~s: o intervalo
+mais 1~s de amostragem do CPU. O limite do teste é 7~s, com 1~s para a observação pelo condutor; em produção,
+o ciclo é de 31~s. \cen{MN1} cumpre-se, nos testes de cada lado e ponta a ponta.
 
 \paragraph{\cen{MN2}: \emph{job} parado.}
 Um teste corre um \emph{job} liderado com intervalo de 15~s que bloqueia, com o relógio controlado: aos 30~s o
@@ -245,6 +320,18 @@ Um teste corre um \emph{job} liderado com intervalo de 15~s que bloqueia, com o 
 \texttt{/health/live} continua a responder 200. Um \emph{job} liderado por outra instância nunca conta. Quando
 a iteração termina, a instância volta a estar pronta. A deteção acontece em $\le$ 2 intervalos. \cen{MN2}
 cumpre-se (dados em \texttt{docs/metrics/iter-6/mn1-mn2.txt}).
+
+\subsection{Segurança}
+\label{sec:aval-se}
+
+\paragraph{\cen{SE1}: chave inválida ou revogada.}
+O teste ponta a ponta arranca um segundo remote, com o seu próprio \emph{buffer}, duas vezes: com uma chave que
+não existe e com a chave antiga de um host cuja chave foi regenerada (a mesma alteração que a interface faz:
+um \emph{digest} novo na linha do host). Em cada caso, a aplicação escreve 10 logs. Nos dois casos, o remote
+pausa por \texttt{UNAUTHENTICATED} em 0,7~s (\dec{16}); o central não tem nenhuma linha de logs, estatísticas
+ou estado do \emph{buffer} de outro host que não o principal, e o host revogado nunca aparece como visto; no
+\emph{buffer} do remote, os 10 logs e a estatística ficam pendentes, sem quarentena: corrigida a chave,
+seriam entregues. \cen{SE1} cumpre-se.
 
 \subsection{Resumo dos cenários}
 \porescrever{tabela cenário $\rightarrow$ medida-alvo $\rightarrow$ valor medido $\rightarrow$ cumprido (\Sim/\Parc/\Nao).}

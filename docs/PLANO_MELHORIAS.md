@@ -505,6 +505,12 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Alternativas rejeitadas:** só aumentar a concorrência (resolve o médio, mas não distribui a carga);
   eliminar as probes e usar só heartbeat (perde-se a deteção de "host vivo, app morta").
 * **Verificação:** teste com 1.000 endpoints falsos, metade a fazer timeout: cada host verificado em ≤60 s.
+* **Estado (21/11):** medido primeiro: o ciclo atual dura 350,7 s com 1.000 hosts, metade em timeout (os 625 s
+  da estimativa supõem todos em timeout; com metade, as páginas de 100 à espera da mais lenta dão ≈ 350 s), e
+  AV2 falha por um fator de 6. Implementado
+  ([ADR-0013](adr/0013-probes-de-saude-escalaveis.md)) com o *job* a acordar a cada 5 s, reclamação
+  `UPDATE … RETURNING` que marca já a próxima *probe* (30 s ± 10 %), vagas em vez de páginas e prazo por
+  iteração; cumpre AV2 (`docs/metrics/iter-6/av2-depois.txt`).
 
 #### D8. Central horizontalmente escalável (N instâncias)
 * **Problema:** S5, S6, SC3.
@@ -657,6 +663,10 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
     N recebidos e 0 duplicados) e **MN1**.
 * **Teoria:** *Refactor*, *Reduce Size of a Module*; *Sandbox* (testability).
 * **Verificação:** E2E verde no CI noturno.
+* **Estado (21/11):** implementado ([ADR-0012](adr/0012-higiene-e-testes-ponta-a-ponta.md)), em
+  `monitor-platform/e2e/` (a raiz `monitor-ws` não é um repositório; o `go.work` é local, criado por
+  `scripts/go-work.sh`). AV1, SE1 (inválida e revogada) e MN1 passam ponta a ponta; o MN1 encontrou um defeito
+  no remote (um ciclo de estatísticas vazio atrasava a fotografia do *buffer* um ciclo), corrigido.
 
 ### 7.4 Disponibilidade e monitorabilidade
 

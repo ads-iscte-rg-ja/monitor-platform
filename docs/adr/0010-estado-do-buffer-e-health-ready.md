@@ -106,3 +106,14 @@ violado), por isso o central não pode rejeitar um lote por causa do estado do *
 (`docs/metrics/iter-6/mo1.md`): 3 ficheiros Go de produção (1 novo; `embed.go` e `migrate.go` registam a
 migração) + 1 migração, 0 alterações no avaliador, no serviço, no *handler* e no formulário; antes eram 7 sítios
 em 5 ficheiros e 3 camadas. Cumpre.
+
+## Histórico
+* **2026-11-21 — correção encontrada pelo E2E (ADR-0012).** A fotografia só viaja com estatísticas, e a
+  recolha e a entrega correm em temporizadores independentes com o mesmo intervalo. Quando a entrega acorda
+  antes da recolha (sempre no arranque; em regime estável, quando as fases se cruzam), o ciclo não encontra
+  estatísticas e não envia nada: o central ficava **2 ciclos** atrás (MN1 ponta a ponta: 10,0 s com ciclos de
+  5 s). Os testes de cada lado não o viam, porque cada um tinha estatísticas pendentes. Agora um ciclo sem
+  estatísticas espera, no máximo um intervalo, pela próxima recolha (a recolha avisa o *sender*) e envia-a logo,
+  com uma fotografia nova. A decisão não muda: a fotografia continua a seguir com as estatísticas, e o limite
+  de MN1 (≤ 1 ciclo) passa a cumprir-se também ponta a ponta. Teste:
+  `TestIdleStatisticsCycleSendsTheNextStatisticAtOnce` (remote).

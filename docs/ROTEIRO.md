@@ -14,10 +14,10 @@ SC3 (coordenação cumprida; débito não, com diagnóstico), TE1.
 | 0 | 20/11 | *Merge* do D8 | SC3 | 0007 | central, platform | feito |
 | 1 | 20–22/11 | D13 Strategy nos alertas | MO1 (preparação), US1 | 0008 | central, platform (lint) | feito |
 | 2 | 23–24/11 | D19 limite do *buffer* | AV4 | 0009 | remote | feito |
-| 3 | 25–27/11 | D17 estado do *buffer* + `/health` live/ready + **medição de MO1** | MO1, MN1, MN2 | 0010 | api, remote, central | feito, por commitar |
-| 4 | 28/11 | D16 retoma sem reinício | AV3 | 0011 | remote | feito, por commitar |
-| 5 | 29/11–1/12 | D15 higiene + E2E | **AV1**, SE1, MN1 (ponta a ponta) | 0012 | todos + `e2e/` | |
-| 6 | 2/12 | D7 *probes* escaláveis (medir primeiro) | AV2 | 0013 | central | |
+| 3 | 25–27/11 | D17 estado do *buffer* + `/health` live/ready + **medição de MO1** | MO1, MN1, MN2 | 0010 | api, remote, central | feito |
+| 4 | 28/11 | D16 retoma sem reinício | AV3 | 0011 | remote | feito |
+| 5 | 29/11–1/12 | D15 higiene + E2E | **AV1**, SE1, MN1 (ponta a ponta) | 0012 | todos + `e2e/` | feito, por commitar |
+| 6 | 2/12 | D7 *probes* escaláveis (medir primeiro) | AV2 | 0013 | central | feito, por commitar |
 | 7 | 3/12 | D14 testabilidade + D12 fonte única | TE2, TE3, MO2 | 0014, 0015 | central, remote, sdk | |
 | 8 | 4/12 | D18 endurecimento (ASVS N1) | SE2, SE3 | 0016 | central | |
 | 9 | 5/12 | D9 particionamento: medir SC4 e decidir | SC4 | 0017 | central | |
@@ -98,12 +98,18 @@ D17 reporta; D17 traz o dado (quarentena) que dá a métrica nova de MO1; o E2E 
   * **SE1:** chave inválida e chave revogada → `UNAUTHENTICATED`, nada gravado;
   * MN1 ponta a ponta.
 * *Workflow* noturno (`schedule`) no `monitor-platform`, mais `workflow_dispatch`.
+* **Estado (21/11):** feito ([ADR-0012](adr/0012-higiene-e-testes-ponta-a-ponta.md)), em `monitor-platform/e2e/`.
+  LICENSE e testes do SDK já vinham da iteração 1; o `go.work` é local (`scripts/go-work.sh`), porque a pasta-mãe
+  não é um repositório. O MN1 ponta a ponta encontrou um defeito no remote (fotografia 2 ciclos atrás), corrigido.
 
 ### Passo 6: D7, *probes* escaláveis (2/12)
 * **Medir primeiro** (como em D6): 1.000 *endpoints* falsos, metade em *timeout*; medir o ciclo atual contra AV2
   (≤ *timeout* + 60 s).
 * Se falhar: `next_check_at` com *jitter*, só hosts "devidos", `HEALTH_CONCURRENCY`, *deadline* por ciclo; medir
   de novo. Se cumprir: ADR com a medição e o gatilho; não implementar.
+* **Estado (21/11):** a medição falhou (ciclo de 350,7 s, pior atraso 6 min 6 s para um alvo de 60 s);
+  implementado ([ADR-0013](adr/0013-probes-de-saude-escalaveis.md)) e medido de novo: cumpre
+  (`docs/metrics/iter-6/av2-{antes,depois}.txt`).
 
 ### Passo 7: D14 + D12 (3/12)
 * **D14:** interfaces mínimas nos *handlers*; `Clock` injetado; `APP_TIMEZONE`. Provas: TE2 (cobertura dos
