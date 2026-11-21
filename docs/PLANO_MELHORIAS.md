@@ -624,6 +624,9 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
   constantes exportadas no SDK; `validation` como único dono das regras no remote; uma só função `IsLoopbackURL`.
 * **Teoria:** *Increase Semantic Coherence*, *Abstract Common Services*.
 * **Verificação:** 1 definição por repo; teste de consistência SQL↔Go.
+* **Estado (21/11):** implementado ([ADR-0015](adr/0015-fonte-unica-das-regras-de-dominio.md)): constantes de nível
+  em `models` (central), `validation` (remote) e no SDK (v0.2.0); 6 testes de consistência (SQL, *protobuf*);
+  `validation.CentralURL` como única regra do endereço. MO2 cumpre-se.
 
 #### D13. Métricas de alerta como Strategy + registo (Simple Factory), com duração sustentada
 * **Problema:** M4, A4, MO1. Adicionar uma métrica toca ≥6 sítios em 3 camadas, o que mostra baixa coesão.
@@ -649,6 +652,9 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Teoria:** *Abstract Data Sources*, *Limit Nondeterminism*, *Specialized Interfaces*; *Defer Binding*.
 * **Alternativas rejeitadas:** mocks gerados (gomock/mockery): ferramenta extra e testes acoplados à forma das chamadas.
 * **Verificação:** cobertura de handlers ≥60%; 0 `time.Sleep` em testes de lógica temporal.
+* **Estado (21/11):** implementado ([ADR-0014](adr/0014-handlers-testaveis-relogio-e-fuso.md)). Cobertura dos
+  *handlers* 9,5 % → 95,6 %; 0 `time.Sleep` nos testes (era 1); `APP_TIMEZONE`; relógio injetado no serviço de
+  alertas e o resumo diário calculado por uma função pura. TE2 e TE3 cumprem-se.
 
 #### D15. Higiene e E2E
 * **Problema:** M8, M9, M10; não existe um teste que prove AV1.
