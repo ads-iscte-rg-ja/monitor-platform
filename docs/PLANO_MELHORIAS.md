@@ -505,6 +505,12 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Alternativas rejeitadas:** só aumentar a concorrência (resolve o médio, mas não distribui a carga);
   eliminar as probes e usar só heartbeat (perde-se a deteção de "host vivo, app morta").
 * **Verificação:** teste com 1.000 endpoints falsos, metade a fazer timeout: cada host verificado em ≤60 s.
+* **Estado (21/11):** medido primeiro: o ciclo atual dura 350,7 s com 1.000 hosts, metade em timeout (os 625 s
+  da estimativa supõem todos em timeout; com metade, as páginas de 100 à espera da mais lenta dão ≈ 350 s), e
+  AV2 falha por um fator de 6. Implementado
+  ([ADR-0013](adr/0013-probes-de-saude-escalaveis.md)) com o *job* a acordar a cada 5 s, reclamação
+  `UPDATE … RETURNING` que marca já a próxima *probe* (30 s ± 10 %), vagas em vez de páginas e prazo por
+  iteração; cumpre AV2 (`docs/metrics/iter-6/av2-depois.txt`).
 
 #### D8. Central horizontalmente escalável (N instâncias)
 * **Problema:** S5, S6, SC3.

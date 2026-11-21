@@ -206,7 +206,61 @@ distribuídos por igual. Depois de um \texttt{SIGKILL} ao líder, outra réplica
 de 2~s e os quatro ao fim de 12~s; o limite de \cen{SC3} é 30~s. A medição de débito está na
 secção~\ref{sec:aval-sc3}.
 
-\porescrever{\dec{7}, \dec{9}, \dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
+\subsubsection{\emph{Probes} de saúde escaláveis (\dec{7}, ADR-0013)}
+\label{sec:d7}
+
+\paragraph{Problema.}
+Um \emph{host} com \emph{endpoint} de saúde é verificado pelo central a cada 30~s. O \emph{job} percorria
+todos os \emph{hosts} em páginas de 100, com 8 \emph{probes} em paralelo e 5~s de \emph{timeout}, e cada página
+só acabava quando acabava a sua \emph{probe} mais lenta. \cen{AV2} pede o alerta \texttt{host\_offline} em
+$\le$ limiar + 60~s, mesmo com 1.000 \emph{hosts}. O limiar conta desde a primeira \emph{probe} falhada e os
+alertas são avaliados a cada 15~s, por isso os 60~s têm de cobrir o intervalo entre duas \emph{probes} do mesmo
+\emph{host} mais uma avaliação: esse intervalo tem de ser $\le$ 45~s. Como no \dec{6}, medimos antes de mudar
+(secção~\ref{sec:av1-av4}): com 1.000 \emph{hosts}, metade sem resposta, um ciclo durava 350,7~s, e o pior
+atraso até ao alerta, além do limiar, era de 6~min~6~s. Havia dois efeitos a mais. Um \emph{host} com a última
+verificação mais velha do que 90~s passa a ``desconhecido'' e o alerta deixa de o avaliar, o que acontecia
+durante 4~min~21~s de cada ciclo. E o \emph{heartbeat} do \emph{job} (\dec{17}) só bate quando uma iteração
+acaba, por isso o líder deixaria de estar pronto a meio de cada ciclo.
+
+\paragraph{Decisão.}
+Cada \emph{host} passa a ter a hora da próxima verificação, numa coluna nova. O \emph{job} acorda a cada 5~s e
+reclama só os \emph{hosts} devidos, num \texttt{UPDATE} que marca logo a verificação seguinte para daqui a
+30~s $\pm$ 10\,\%: o \emph{jitter} espalha as \emph{probes} ao longo do intervalo, e uma iteração atrasada
+nunca verifica o mesmo \emph{host} duas vezes. Em vez de páginas, há vagas: a concorrência é configurável (por
+omissão, 128), o \emph{job} só reclama tantos \emph{hosts} quantas as vagas livres, e cada \emph{probe} começa
+logo. Um \emph{host} lento ocupa uma vaga durante no máximo 5~s e não atrasa os outros. Cada iteração tem um
+prazo igual ao intervalo; o que ficar por verificar continua devido na seguinte. O pior caso calculado é
+33~s + 5~s = 38~s entre \emph{probes}, e 53~s com a avaliação. A capacidade chega: 500 \emph{probes} em
+\emph{timeout} a cada 30~s ocupam em média 83 das 128 vagas.
+
+\paragraph{Teoria.}
+Nas táticas de desempenho, \emph{Introduce Concurrency} (128 \emph{probes} em paralelo), \emph{Schedule
+Resources} (a vez de cada \emph{host} e o \emph{jitter}) e \emph{Bound Execution Times} (\emph{timeout} por
+\emph{probe} e prazo por iteração). A tática de disponibilidade é a mesma de antes, \emph{Ping/Echo}; o que
+muda é que cumpre o prazo à escala pedida.
+
+\paragraph{Alternativas.}
+Aumentar só a concorrência e manter as páginas daria cerca de 10 páginas $\times$ 5~s = 50~s por ciclo com
+metade em \emph{timeout}: falha \cen{AV2} e mantém a rajada de 1.000 pedidos a cada 30~s. Uma \emph{goroutine}
+por \emph{host}, sem limite, abriria todas as ligações de uma vez e não teria limite a 10.000 \emph{hosts}.
+Agendar em memória perderia o estado quando a liderança muda de instância (\dec{8}): o novo líder voltaria a
+verificar todos de uma vez. Repartir as \emph{probes} por várias instâncias (E7) exige coordenar a partição, e uma
+instância chega com folga para 1.000 \emph{hosts}.
+
+\paragraph{Trade-offs.}
+Cada \emph{probe} acrescenta uma escrita pequena (a reclamação), no PostgreSQL que já é o estrangulamento
+(\cen{SC3}): cerca de 33 por segundo com 1.000 \emph{hosts}, por chave primária. Até 128 \emph{probes}
+gravam o resultado ao mesmo tempo e competem pelo \emph{pool} de ligações. O gatilho para E7 é medido: se o
+intervalo entre \emph{probes} passar de 45~s, as \emph{probes} são repartidas entre instâncias.
+
+\paragraph{Verificação.}
+O resultado de \cen{AV2}, antes e depois, está na secção~\ref{sec:av1-av4}. Testes unitários fixam o limite de
+vagas, o prazo da iteração e o erro de reclamação; um teste de integração fixa o intervalo com \emph{jitter},
+que nenhum \emph{host} é entregue duas vezes e que um \emph{endpoint} alterado volta a ser devido. O lint do
+central desceu de 54 para 53 \emph{issues}, porque a função que corre as \emph{probes} ficou abaixo do limite
+de complexidade.
+
+\porescrever{\dec{9}, \dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
 
 \subsection{Manutenção e testabilidade}
 

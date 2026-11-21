@@ -114,7 +114,8 @@ prová-los" (§3.2). MN1 está provado nos dois lados separadamente (ADR-0010), 
 baixo) e 18 estatísticas: todos no central, 0 perdidos, 0 duplicados,
 0 sem origem, 0 pendentes no fim; a entrega completa 36,7 s depois de o central voltar (a espera do
 *backoff* do remote já ia em cerca de 40 s). **SE1** com a chave inválida e com a revogada: pausa por `UNAUTHENTICATED` em 0,7 s, 0
-linhas no central, os 10 logs e a estatística pendentes no *buffer*. **MN1**: 0,16 s e 5,85 s em duas execuções,
+linhas no central, os 10 logs e a estatística pendentes no *buffer*. **AV1 com 1 h** em baixo (3.603 s): 1.000 logs e 634 estatísticas, 0 perdidos, 0 duplicados,
+entrega completa 202 s depois (o *backoff* chega a 5 min). **MN1**: 5,85 s, 0,16 s e 5,82 s em três execuções,
 para um limite de 7 s (o atraso depende da fase entre a quarentena e a recolha seguinte).
 
 **O E2E encontrou um defeito que os testes de cada repositório não viam.** Na primeira execução, MN1 falhou com

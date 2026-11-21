@@ -9,6 +9,7 @@ imagens.
 | `20261121-091344-antes-da-correcao-mn1.json` | N = 100, paragem 20 s | MN1 **falha**: 10,03 s (2 ciclos). Os outros quatro passam |
 | `20261121-091845-n100.json` | N = 100, paragem 20 s, com a correção | 5/5; MN1 5,85 s |
 | `20261121-092125-oficial.json` | N = 500, paragem 60 s (por omissão) | 5/5; AV1 0 perdidos, 0 duplicados, recuperação 36,7 s; MN1 0,16 s |
+| `20261121-092409-paragem-1h.json` | N = 500, paragem 3.600 s (o cenário AV1 do plano) | 5/5; AV1 1.000 logs + 634 estatísticas, 0 perdidos, 0 duplicados, recuperação 202 s; MN1 5,82 s |
 
 **O defeito de MN1** (histórico do ADR-0010): a fotografia do *buffer* só viaja com estatísticas, e um ciclo de
 entrega que acorda antes da recolha não tem nenhuma para enviar. Corrigido no remote: esse ciclo espera pela

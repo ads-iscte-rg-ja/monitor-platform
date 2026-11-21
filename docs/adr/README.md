@@ -16,6 +16,7 @@ Processo em [ADR-0001](0001-registar-decisoes-com-adrs.md); modelo em [0000-mode
 | [0010](0010-estado-do-buffer-e-health-ready.md) | Estado do *buffer* reportado ao central; `/health/live` e `/health/ready` | Aceite | Monitorability, Availability |
 | [0011](0011-remote-retoma-sem-reinicio.md) | O remote retoma a entrega sem reinício | Aceite | Availability |
 | [0012](0012-higiene-e-testes-ponta-a-ponta.md) | Higiene dos repositórios e testes ponta a ponta em Compose | Aceite | Testability, Availability |
+| [0013](0013-probes-de-saude-escalaveis.md) | *Probes* de saúde escaláveis: só os *hosts* devidos, espalhados no tempo | Aceite | Availability, Performance |
 
 ## Por escrever
 

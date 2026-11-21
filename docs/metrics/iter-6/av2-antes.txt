@@ -1,0 +1,10 @@
+# AV2 (D7, ADR-0013): linha de base, probes antes do D7 (central 7cb48f6, branch do D15)
+# 2026-11-21T10:00Z; go version go1.27.4 linux/amd64; PostgreSQL 16 em contentor; endpoints num httptest local
+# cd monitor-central && MONITOR_MEDIR_AV2=1 MONITOR_TEST_DSN=... go test -tags integration -run TestAV2MeasureProbeCycle -v ./internal/integration
+
+AV2 (1000 hosts, metade em timeout; timeout 5s, concorrência 8, intervalo 30s)
+          ciclo: 5m50.7s
+          início da probe desde o início do ciclo: p50 175.4 s, p95 330.7 s, máx 345.7 s
+          período entre probes do mesmo host: 5m50.7s
+          pior atraso até ao alerta, além do limiar: período + avaliação (15s) = 6m5.7s (alvo ≤ 60 s): FALHA
+          tempo de cada host em "unknown" por período (verificação com mais de 1m30s): 4m20.7s
