@@ -1,0 +1,18 @@
+Migração 8 sobre os 143 GB de iter-6/sc4-antes (psql, PostgreSQL 2 vCPU / 4 GB, central parado).
+Passos por ordem do ficheiro 008_dashboard_30d.sql; os dois longos: preencher error_counts_hourly e recriar idx_machine_stats_host_collected.
+Time: 0.084 ms
+Time: 15.036 ms
+Time: 0.987 ms
+Time: 0.131 ms
+Time: 0.133 ms
+Time: 0.089 ms
+Time: 0.070 ms
+Time: 0.323 ms
+Time: 166876.934 ms (02:46.877)
+Time: 4.055 ms
+Time: 85423.252 ms (01:25.423)
+Time: 171.148 ms
+
+Tentativa anterior pelo cmd/migrate:
+user	0m0.002s
+sys	0m0.006s

@@ -1,0 +1,213 @@
+Timing is on.
+SET
+Time: 0.114 ms
+== CountErrorsToday
+                                                              QUERY PLAN                                                               
+---------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate (actual time=931.991..948.892 rows=1 loops=1)
+   Buffers: shared hit=62917 read=161249
+   ->  Gather (actual time=931.980..948.882 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=62917 read=161249
+         ->  Partial Aggregate (actual time=907.583..907.584 rows=1 loops=3)
+               Buffers: shared hit=62917 read=161249
+               ->  Parallel Index Scan using idx_error_logs_created_at on error_logs (actual time=5.521..607.328 rows=1543544 loops=3)
+                     Index Cond: ((created_at >= CURRENT_DATE) AND (created_at < (CURRENT_DATE + '1 day'::interval)))
+                     Buffers: shared hit=62917 read=161249
+ Planning:
+   Buffers: shared hit=148 read=24
+ Planning Time: 0.970 ms
+ Execution Time: 966.245 ms
+(15 rows)
+
+Time: 968.934 ms
+== AverageLatestCPU
+                                                    QUERY PLAN                                                    
+------------------------------------------------------------------------------------------------------------------
+ Aggregate (actual time=54799.917..54905.101 rows=1 loops=1)
+   Buffers: shared hit=89 read=1102461 dirtied=446 written=3, temp read=1111465 written=1113062
+   ->  Unique (actual time=37570.864..54903.522 rows=1000 loops=1)
+         Buffers: shared hit=89 read=1102461 dirtied=446 written=3, temp read=1111465 written=1113062
+         ->  Gather Merge (actual time=37570.863..51752.562 rows=89087264 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=89 read=1102461 dirtied=446 written=3, temp read=1111465 written=1113062
+               ->  Sort (actual time=37524.513..40992.023 rows=29695755 loops=3)
+                     Sort Key: machine_stats.host_id, machine_stats.collected_at DESC
+                     Sort Method: external merge  Disk: 978040kB
+                     Buffers: shared hit=89 read=1102461 dirtied=446 written=3, temp read=1111465 written=1113062
+                     Worker 0:  Sort Method: external merge  Disk: 997016kB
+                     Worker 1:  Sort Method: external merge  Disk: 988960kB
+                     ->  Parallel Seq Scan on machine_stats (actual time=94.967..6383.348 rows=29695755 loops=3)
+                           Buffers: shared read=1102460 dirtied=446 written=3
+ Planning:
+   Buffers: shared hit=75 read=27
+ Planning Time: 0.439 ms
+ Execution Time: 54999.723 ms
+(20 rows)
+
+Time: 55001.013 ms (00:55.001)
+== ErrorsCountAll
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate (actual time=13323.287..13339.858 rows=1 loops=1)
+   Buffers: shared hit=793 read=330914 dirtied=1253 written=1360
+   ->  Gather (actual time=13322.996..13339.841 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=793 read=330914 dirtied=1253 written=1360
+         ->  Partial Aggregate (actual time=13304.885..13304.886 rows=1 loops=3)
+               Buffers: shared hit=793 read=330914 dirtied=1253 written=1360
+               ->  Parallel Index Only Scan using idx_error_logs_app_name on error_logs el (actual time=0.158..10088.411 rows=79546078 loops=3)
+                     Heap Fetches: 348404
+                     Buffers: shared hit=793 read=330914 dirtied=1253 written=1360
+ Planning:
+   Buffers: shared hit=8 read=1
+ Planning Time: 0.279 ms
+ Execution Time: 13340.126 ms
+(15 rows)
+
+Time: 13342.540 ms (00:13.343)
+== ErrorsCountHost
+                                                                      QUERY PLAN                                                                      
+------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate (actual time=1271.768..1279.275 rows=1 loops=1)
+   Buffers: shared hit=4853 read=16037 dirtied=17
+   ->  Gather (actual time=1271.762..1279.270 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=4853 read=16037 dirtied=17
+         ->  Partial Aggregate (actual time=1258.002..1258.003 rows=1 loops=3)
+               Buffers: shared hit=4853 read=16037 dirtied=17
+               ->  Parallel Index Only Scan using error_logs_host_id_source_id_key on error_logs el (actual time=3.225..1216.998 rows=892100 loops=3)
+                     Index Cond: (host_id = 2)
+                     Heap Fetches: 3918
+                     Buffers: shared hit=4853 read=16037 dirtied=17
+ Planning:
+   Buffers: shared read=5
+ Planning Time: 0.100 ms
+ Execution Time: 1279.297 ms
+(16 rows)
+
+Time: 1279.870 ms (00:01.280)
+== ErrorsList
+                                                        QUERY PLAN                                                        
+--------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.552..0.556 rows=20 loops=1)
+   Buffers: shared hit=28 read=7
+   ->  Incremental Sort (actual time=0.551..0.553 rows=20 loops=1)
+         Sort Key: el.created_at DESC, el.id DESC
+         Presorted Key: el.created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 25kB  Peak Memory: 25kB
+         Buffers: shared hit=28 read=7
+         ->  Nested Loop (actual time=0.391..0.437 rows=21 loops=1)
+               Buffers: shared hit=26 read=6
+               ->  Index Scan using idx_error_logs_created_at on error_logs el (actual time=0.320..0.331 rows=21 loops=1)
+                     Buffers: shared hit=15 read=4
+               ->  Memoize (actual time=0.004..0.004 rows=1 loops=21)
+                     Cache Key: el.host_id
+                     Cache Mode: logical
+                     Hits: 15  Misses: 6  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                     Buffers: shared hit=11 read=2
+                     ->  Index Only Scan using hosts_pkey on hosts h (actual time=0.012..0.012 rows=1 loops=6)
+                           Index Cond: (id = el.host_id)
+                           Heap Fetches: 0
+                           Buffers: shared hit=11 read=2
+ Planning:
+   Buffers: shared hit=106 read=42 dirtied=2
+ Planning Time: 1.899 ms
+ Execution Time: 0.592 ms
+(24 rows)
+
+Time: 3.068 ms
+== AppNames
+                                                                 QUERY PLAN                                                                 
+--------------------------------------------------------------------------------------------------------------------------------------------
+ Unique (actual time=17126.970..17145.898 rows=1 loops=1)
+   Buffers: shared hit=1013 read=330373 dirtied=1
+   ->  Gather Merge (actual time=17126.970..17145.890 rows=3 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=1013 read=330373 dirtied=1
+         ->  Unique (actual time=0.194..11411.156 rows=1 loops=3)
+               Buffers: shared hit=1013 read=330373 dirtied=1
+               ->  Parallel Index Only Scan using idx_error_logs_app_name on error_logs (actual time=0.193..6951.717 rows=79546078 loops=3)
+                     Heap Fetches: 343074
+                     Buffers: shared hit=1013 read=330373 dirtied=1
+ Planning:
+   Buffers: shared hit=3 read=2
+ Planning Time: 0.065 ms
+ Execution Time: 17146.166 ms
+(15 rows)
+
+Time: 17146.649 ms (00:17.147)
+== HostsLateral
+                                                            QUERY PLAN                                                             
+-----------------------------------------------------------------------------------------------------------------------------------
+ Sort (actual time=87.472..87.508 rows=1000 loops=1)
+   Sort Key: h.name, h.id
+   Sort Method: quicksort  Memory: 79kB
+   Buffers: shared hit=2943 read=2370
+   ->  Nested Loop Left Join (actual time=1.611..85.585 rows=1000 loops=1)
+         Buffers: shared hit=2943 read=2370
+         ->  Seq Scan on hosts h (actual time=1.164..2.148 rows=1000 loops=1)
+               Buffers: shared read=313
+         ->  Limit (actual time=0.083..0.083 rows=1 loops=1000)
+               Buffers: shared hit=2943 read=2057
+               ->  Index Scan using idx_machine_stats_host_collected on machine_stats (actual time=0.083..0.083 rows=1 loops=1000)
+                     Index Cond: (host_id = h.id)
+                     Buffers: shared hit=2943 read=2057
+ Planning:
+   Buffers: shared read=5 dirtied=1
+ Planning Time: 0.295 ms
+ Execution Time: 87.570 ms
+(17 rows)
+
+Time: 88.147 ms
+== Metrics1m
+                                                           QUERY PLAN                                                            
+---------------------------------------------------------------------------------------------------------------------------------
+ Sort (actual time=5312.883..5312.886 rows=31 loops=1)
+   Sort Key: (date_bin('1 day'::interval, collected_at, '2000-01-01 00:00:00+00'::timestamp with time zone))
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=1130 read=85565
+   ->  HashAggregate (actual time=5312.793..5312.871 rows=31 loops=1)
+         Group Key: date_bin('1 day'::interval, collected_at, '2000-01-01 00:00:00+00'::timestamp with time zone)
+         Batches: 1  Memory Usage: 793kB
+         Buffers: shared hit=1130 read=85565
+         ->  Index Scan using idx_machine_stats_host_collected on machine_stats (actual time=3.803..5282.713 rows=86202 loops=1)
+               Index Cond: ((host_id = 191) AND (collected_at >= (now() - '30 days'::interval)) AND (collected_at <= now()))
+               Buffers: shared hit=1130 read=85565
+ Planning:
+   Buffers: shared hit=5 read=9
+ Planning Time: 0.528 ms
+ Execution Time: 5313.732 ms
+(15 rows)
+
+Time: 5315.577 ms (00:05.316)
+== Metrics24h
+                                                             QUERY PLAN                                                             
+------------------------------------------------------------------------------------------------------------------------------------
+ Sort (actual time=16.382..16.385 rows=24 loops=1)
+   Sort Key: (date_bin('01:00:00'::interval, collected_at, '2000-01-01 00:00:00+00'::timestamp with time zone))
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared read=2673
+   ->  HashAggregate (actual time=16.369..16.375 rows=24 loops=1)
+         Group Key: date_bin('01:00:00'::interval, collected_at, '2000-01-01 00:00:00+00'::timestamp with time zone)
+         Batches: 1  Memory Usage: 49kB
+         Buffers: shared read=2673
+         ->  Bitmap Heap Scan on machine_stats (actual time=1.825..15.760 rows=2682 loops=1)
+               Recheck Cond: ((host_id = 192) AND (collected_at >= (now() - '24:00:00'::interval)) AND (collected_at <= now()))
+               Heap Blocks: exact=2655
+               Buffers: shared read=2673
+               ->  Bitmap Index Scan on idx_machine_stats_host_collected (actual time=1.514..1.514 rows=2682 loops=1)
+                     Index Cond: ((host_id = 192) AND (collected_at >= (now() - '24:00:00'::interval)) AND (collected_at <= now()))
+                     Buffers: shared read=18
+ Planning:
+   Buffers: shared hit=5 read=5
+ Planning Time: 0.168 ms
+ Execution Time: 16.417 ms
+(19 rows)
+
+Time: 16.849 ms

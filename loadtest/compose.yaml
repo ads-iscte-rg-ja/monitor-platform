@@ -26,9 +26,10 @@ services:
       POSTGRES_DB: monitor
     volumes:
       - ../../monitor-central/deployments/database/init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
-    # Mesmo limite que o central: a base de dados é parte do sistema medido (plano §4.5).
-    cpus: 2
-    mem_limit: 4g
+    # Mesmo limite que o central: a base de dados é parte do sistema medido (plano §4.5). Só a
+    # geração do histórico de SC4 (historico.py) os levanta, para não demorar horas.
+    cpus: ${CARGA_PG_CPUS:-2}
+    mem_limit: ${CARGA_PG_MEM:-4g}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U monitor -d monitor"]
       interval: 2s

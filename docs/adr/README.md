@@ -20,6 +20,7 @@ Processo em [ADR-0001](0001-registar-decisoes-com-adrs.md); modelo em [0000-mode
 | [0014](0014-handlers-testaveis-relogio-e-fuso.md) | *Handlers* testáveis com interfaces mínimas; relógio e fuso horário injetados | Aceite | Testability |
 | [0015](0015-fonte-unica-das-regras-de-dominio.md) | Uma fonte única por repositório para os níveis de log e o endereço do central | Aceite | Modifiability |
 | [0016](0016-endurecimento-por-checklist-asvs.md) | Endurecimento por *checklist* (ASVS 5.0 N1): cabeçalhos, CSP, Tailwind local e guarda SSRF | Aceite | Security |
+| [0017](0017-consultas-limitadas-e-bulkhead-do-dashboard.md) | Com 30 dias de dados, consultas do *dashboard* com custo limitado e um *bulkhead* no *pool*; particionar só se a retenção o exigir | Aceite | Scalability, Performance |
 
 ## Por escrever
 

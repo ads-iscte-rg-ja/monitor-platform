@@ -20,8 +20,16 @@ tabelas em `docs/metrics/<iteração>/carga-*.tex` (`make dados ITER=<iteração
 | `nominal-x2`, `nominal-x5` | sensibilidade | o mesmo com 2× e 5× a taxa de logs (o perfil é uma hipótese) |
 | `noisy-neighbour` | SC5 | 1 % dos hosts em rajada de 200 logs/s durante 2 min: atraso dos restantes |
 | `recovery-storm` | SC2 | 1 h de *backlog* em todos os hosts ao mesmo tempo: tempo de absorção, dashboard, perdas |
+| `capacidade-1..3` | SC3 | a mesma carga acima da capacidade com 1, 2 e 3 instâncias atrás do nginx |
+| `dashboard-30d` | SC4 | carga nominal sobre 31 dias de histórico, com as consultas do *dashboard*; duas fases, sem e com a retenção a 30 dias |
 
-`scale-out` (SC3) só faz sentido depois de D8 (várias instâncias sem *jobs* duplicados).
+`capacidade-*` e `dashboard-30d` não fazem parte do conjunto por omissão (`dashboard-30d` gera ~330 M
+registos: cerca de 1 h e ~150 GB de disco).
+
+```sh
+loadtest/correr.sh iter-6/sc4-antes dashboard-30d           # SC4 completo
+HOSTS=50 DIAS_HISTORICO=2 DURACAO=2m loadtest/correr.sh ensaio dashboard-30d   # ensaio rápido
+```
 
 ## Como funciona
 
@@ -38,6 +46,14 @@ tabelas em `docs/metrics/<iteração>/carga-*.tex` (`make dados ITER=<iteração
 * **Atraso** (`atraso_central`): do primeiro envio de um lote à confirmação, com as novas tentativas. É
   o atraso que o central acrescenta; o intervalo de recolha do agente (até 10 s) é fixo por desenho e
   fica de fora.
+* **Histórico de SC4** (`historico.py`): 31 dias de estatísticas e erros dos hosts de carga, ao mesmo
+  ritmo e com o mesmo perfil do k6, com os recibos de deduplicação que a ingestão grava; as linhas
+  entram por ordem do tempo, com todos os hosts misturados, como na realidade. O PostgreSQL só corre
+  sem limites durante a geração; a medição corre com os 2 vCPU / 4 GB e a cache do PostgreSQL fria.
+  A primeira fase (`dashboard-30d.json`) corre sem retenção; a segunda (`dashboard-30d-retencao.json`),
+  sobre os mesmos dados, com a retenção a 30 dias a cada minuto e o maior lote permitido (10.000). O
+  k6 consulta, uma vez por segundo e à vez, as páginas e APIs do *dashboard* (p95 de cada uma) e
+  `recolher.py` junta as execuções da retenção e os registos fora da janela antes e depois.
 * **Resultados** (`recolher.py`): o k6 dá a visão do agente (latência, atraso, lotes não entregues);
   o Prometheus dá a do servidor (p95, CPU, memória, *pool* de ligações, ADR-0004); a base de dados
   confirma que tudo o que foi confirmado ficou gravado, sem duplicados. As contagens vêm do k6 e da
