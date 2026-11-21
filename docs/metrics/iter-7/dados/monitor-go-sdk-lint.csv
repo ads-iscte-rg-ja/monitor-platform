@@ -1,0 +1,5 @@
+linter,ficheiro,linha,mensagem
+errcheck,monitor.go,122,Error return value of `tx.Rollback` is not checked
+gosec,monitor.go,44,G104: Errors unhandled
+gosec,monitor.go,49,G104: Errors unhandled
+revive,monitor.go,15,"blank-imports: a blank import should be only in a main or test package, or have a comment justifying it"

@@ -1,4 +1,68 @@
 \section{Conclusões}
 \label{sec:conclusoes}
 
-\porescrever{síntese, cumprimento dos objetivos e trabalho futuro.}
+\subsection{Síntese}
+
+O trabalho partiu de um sistema que funcionava, mas cuja arquitetura estava só no código e cuja capacidade
+ninguém conhecia. Seguiu o processo dos slides~06: objetivos de negócio, requisitos arquiteturalmente
+significativos, \emph{utility tree} com 21 cenários de seis partes, decisões tomadas com o ADD e verificadas
+por \emph{generate and test}. Cada uma das 20 decisões está ligada às táticas que aplica, às alternativas que
+rejeitou e ao cenário que a verifica, e as que mudam a arquitetura estão em 23 ADR (anexo~\ref{anx:adrs}).
+A arquitetura final está documentada em vistas, com o estilo escolhido e justificado (\dec{20}), e as regras
+de camadas são verificadas pelo CI em cada \emph{push}.
+
+\subsection{Cumprimento dos objetivos}
+
+\paragraph{Métricas de qualidade.}
+Todas as decisões foram avaliadas com números recolhidos automaticamente: métricas de código derivadas por
+GQM (capítulo~\ref{sec:metricas}), um \emph{pipeline} de CI partilhado com um \emph{quality gate}, e uma
+infraestrutura de testes de carga que repete as mesmas medições em cada iteração. Da \emph{baseline} à versão
+final, as vulnerabilidades alcançáveis passaram de 91 para 0, as \emph{issues} de lint de 100 para 76, as
+violações de camadas de 1 para 0 e a cobertura do central, com os testes de integração, de 40 para
+68\,\% (Tabela~\ref{tab:metricas-antes-depois}). O \emph{quality gate} recusou PR por cobertura insuficiente, e
+nenhum entrou antes de ser corrigido (\cen{TE1}).
+
+\paragraph{Escalabilidade (G3).}
+Os 1\,000 \emph{hosts} estão implementados e medidos. O regime normal tem uma folga muito grande (p95 de 5~ms
+contra 300~ms); a recuperação de uma hora de indisponibilidade, que falhava, cumpre-se com o \emph{dashboard}
+a 145~ms; 30 dias de dados, que paravam a ingestão, cumprem-se com todas as consultas abaixo de 210~ms.
+\cen{SC3} cumpre-se só em parte: a coordenação entre instâncias funciona, mas o débito não cresce com elas,
+porque o limite passou a ser a base de dados. A escala de 10\,000 \emph{hosts} está planeada, com o gatilho
+medido de cada passo (capítulo~\ref{sec:evolucao}): a capacidade medida de uma instância, cerca de 180 vezes
+o regime normal, cobre-a no débito, e é o armazenamento que chega primeiro a um limite.
+
+\paragraph{Manutenção (G4).}
+A métrica de alerta nova de \cen{MO1} tocou um só ficheiro com código da métrica, contra três ficheiros e
+três camadas antes de \dec{13}. As regras do protocolo têm uma definição por repositório, com testes que
+apanham as divergências (\cen{MO2}), uma mudança de apresentação não toca nas camadas de baixo (\cen{MO3}), e
+os \emph{handlers} e a lógica temporal são testáveis sem infraestrutura nem esperas (\cen{TE2}, \cen{TE3}).
+
+\paragraph{Disponibilidade (G1) e os restantes objetivos.}
+A disponibilidade, que o desenho já garantia, ficou provada ponta a ponta: uma hora com o central em baixo,
+0 registos perdidos e 0 duplicados (\cen{AV1}), e não regrediu com nenhuma decisão de escala. A deteção de
+falhas (G2) passou a cumprir-se com 1\,000 \emph{hosts} (\cen{AV2}), a segurança (G5) foi avaliada com o OWASP
+ASVS e os três riscos que ficam estão aceites com um gatilho, e um agente noutra linguagem mostrou que o
+contrato publicado basta para integrar (\cen{IO1}).
+
+\subsection{O que o trabalho ensinou}
+
+A lição principal é a do \emph{generate and test}: as medições contrariaram a análise em quatro pontos, e em
+todos o desenho mudou por causa disso (secção~\ref{sec:tradeoffs-observados}). A justiça entre \emph{hosts}
+e o particionamento, que o plano previa, não foram feitos, porque a medição mostrou que não eram o que
+faltava; o estrangulamento de \cen{SC3} foi registado em vez de escondido. Medir também encontrou defeitos
+que os testes unitários não viam. Por isso os critérios de decisão foram escritos antes das medições sempre
+que possível, e os resultados negativos ficaram no relatório.
+
+A segunda lição é sobre o estilo. Uma arquitetura em camadas, num só serviço com uma base de dados, chegou
+aos 1\,000 \emph{hosts} com táticas locais (lotes, admissão, \emph{bulkhead}, consultas limitadas), sem
+pagar o custo das fronteiras de rede que os microserviços trariam (\dec{20}). O que a vai obrigar a mudar
+não é um gosto de arquitetura, mas os gatilhos medidos do capítulo~\ref{sec:evolucao}.
+
+\subsection{Trabalho futuro}
+
+O trabalho futuro está no plano de evolução (Tabela~\ref{tab:evolucao}), por ordem dos gatilhos esperados:
+o armazenamento primeiro (recibos de deduplicação com um horizonte, E11; particionamento ou TimescaleDB, E10
+e E2), depois a separação da ingestão e do \emph{dashboard} em \emph{deploys} próprios (E3), e só bem depois dos
+10\,000 \emph{hosts} uma fila de ingestão e a escala das escritas (E1, E9). Fora da arquitetura, ficam duas
+medições que reforçariam as conclusões: repetir os cenários de carga para estimar a variância, e medir
+\cen{MO1} com uma pessoa sem assistência de programação.

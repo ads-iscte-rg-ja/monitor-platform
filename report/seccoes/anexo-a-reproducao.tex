@@ -1,4 +1,47 @@
 \section{Reprodução das medições}
 \label{anx:reproducao}
 
-\porescrever{comandos para reproduzir lint, testes, carga e E2E a partir do monitor-platform.}
+Todas as medições do relatório se repetem a partir do repositório \texttt{monitor-platform}, com os outros
+repositórios clonados ao lado (como em \texttt{monitor-ws/}). Requisitos: Go (a versão do \texttt{go.mod}),
+Docker com Compose, Python~3 e \texttt{openssl}. Os resultados ficam em \texttt{docs/metrics/<iteração>/}, e
+as tabelas do relatório copiam-se com \texttt{make dados ITER=<iteração>} na pasta \texttt{report/}.
+
+\paragraph{Verificações do CI, localmente.}
+\begin{verbatim}
+cd ../monitor-central && ../monitor-platform/scripts/ci-local.sh
+# gofmt, go mod tidy, vet, testes, lint e govulncheck; a integração do central
+# corre se MONITOR_TEST_DSN apontar para um PostgreSQL isolado
+\end{verbatim}
+
+\paragraph{Métricas de código (capítulo~\ref{sec:metricas}).}
+\begin{verbatim}
+scripts/medir.py baseline        # iteração 0
+scripts/medir.py iter-7      # compara com a baseline
+\end{verbatim}
+Mede os cinco repositórios de código: \emph{issues} do lint com a configuração partilhada, complexidade,
+acoplamento de Martin, cobertura unitária e de integração (num PostgreSQL~16 temporário) e vulnerabilidades. O
+ficheiro \texttt{ambiente.txt} regista os \emph{commits} medidos e as versões das ferramentas.
+
+\paragraph{Testes de carga (capítulo~\ref{sec:avaliacao}).}
+\begin{verbatim}
+cd loadtest
+./correr.sh iter-7                  # SC1, SC2, SC5, sensibilidade
+./correr.sh iter-7 capacidade-1 capacidade-2 capacidade-3     # SC3
+./correr.sh iter-7 dashboard-30d    # SC4 (~1 h 30 min, ~150 GB)
+./tabelas.py iter-7 --antes iter-3  # tabelas antes/depois
+HOSTS=50 DURACAO=2m ./correr.sh ensaio nominal   # ensaio rápido
+\end{verbatim}
+Cada medição recria o ambiente do zero, com os limites de recursos de \texttt{loadtest/compose.yaml}. O
+\texttt{README.md} de \texttt{loadtest/} descreve cada medição e o que \texttt{recolher.py} junta.
+
+\paragraph{Teste ponta a ponta (\cen{AV1}, \cen{MN1}, \cen{SE1}).}
+\begin{verbatim}
+e2e/correr.py                    # todos os cenários, central em baixo 60 s
+e2e/correr.py --paragem 3600     # AV1 com o central em baixo 1 h
+\end{verbatim}
+Corre também todas as noites no GitHub Actions (\texttt{.github/workflows/e2e.yml}).
+
+\paragraph{Medições pontuais.}
+\cen{AV2} corre com \texttt{MONITOR\_MEDIR\_AV2=1} no teste de integração \texttt{TestAV2MeasureProbeCycle} do
+central. \cen{MO1}, \cen{MO2}, \cen{MO3}, \cen{IO1}, \cen{TE2} e \cen{TE3} estão descritos, com os comandos e
+os dados, em \texttt{docs/metrics/iter-6/}.

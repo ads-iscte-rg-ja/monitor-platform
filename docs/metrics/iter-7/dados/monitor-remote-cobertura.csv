@@ -1,0 +1,11 @@
+pacote,statements,cobertos_unit,pct_unit
+cmd/agent,79,0,0.0
+cmd/seed/main,6,0,0.0
+internal/bufferlimit,17,17,100.0
+internal/collect,13,9,69.2
+internal/config,76,73,96.1
+internal/database,63,46,73.0
+internal/repository,303,217,71.6
+internal/requests,117,104,88.9
+internal/sender,275,250,90.9
+internal/validation,58,49,84.5

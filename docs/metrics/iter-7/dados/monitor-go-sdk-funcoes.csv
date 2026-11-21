@@ -1,0 +1,5 @@
+pacote,ficheiro,linha,funcao,linhas,ciclomatica,cognitiva
+.,levels.go,17,validLevel,8,3,3
+.,monitor.go,20,ConnectDB,35,7,7
+.,monitor.go,56,requireIntegerColumn,23,9,9
+.,monitor.go,89,LogError,47,15,13

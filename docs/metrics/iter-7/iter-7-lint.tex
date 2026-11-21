@@ -1,0 +1,24 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Issues do golangci-lint por linter (iter-7)}
+  \label{tab:iter-7-lint}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Linter & central & remote & SDK & hello-world \\
+    \midrule
+    depguard & 0 & 0 & 0 & 0 \\
+    gocognit & 6 & 4 & 0 & 1 \\
+    gocyclo & 3 & 1 & 0 & 0 \\
+    dupl & 3 & 0 & 0 & 0 \\
+    errcheck & 10 & 4 & 1 & 0 \\
+    gosec & 7 & 9 & 2 & 0 \\
+    govet & 3 & 0 & 0 & 0 \\
+    staticcheck & 3 & 0 & 0 & 0 \\
+    ineffassign & 0 & 0 & 0 & 0 \\
+    unused & 0 & 0 & 0 & 0 \\
+    revive & 17 & 1 & 1 & 0 \\
+    \textbf{Total} & \textbf{52} & \textbf{19} & \textbf{4} & \textbf{1} \\
+    \bottomrule
+  \end{tabular}
+  \par\smallskip\footnotesize Configuração partilhada \texttt{lint/.golangci.yml}; inclui testes; sem deduplicação.
+\end{table}

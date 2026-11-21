@@ -1,0 +1,21 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Cenário SC1: 1\,000 \emph{hosts} em regime normal (iter-7)}
+  \label{tab:carga-sc1}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}Xlrrc}
+    \toprule
+    Medida & Alvo & iter-3 & iter-7 & Cumpre \\
+    \midrule
+    p95 da ingestão (agente) & $<$ 300 ms & 6 ms & 5 ms & \Sim \\
+    p95 da ingestão (servidor) & --- & 7 ms & 5 ms & --- \\
+    Pedidos não OK & 0\,\% & 0,00\,\% & 0,00\,\% & \Sim \\
+    Lotes não entregues & 0 & 0,00\,\% & 0,00\,\% & \Sim \\
+    CPU do central, média / máx. & $<$ 70\,\% & 4 / 6\,\% & 3 / 5\,\% & \Sim \\
+    Atraso p95 (exceto rajada) & $<$ 5 s & 6 ms & 5 ms & \Sim \\
+    Registos confirmados / s & --- & 122 & 122 & --- \\
+    Confirmados ao agente / gravados & iguais & 73\,231 / 73\,231 & 73\,229 / 73\,229 & \Sim \\
+    Duplicados na base de dados & 0 & 0 & 0 & \Sim \\
+    \bottomrule
+  \end{tabularx}
+  \par\smallskip\footnotesize Atraso: do primeiro envio de um lote à confirmação, com as novas tentativas. Ambiente: cpu: AMD Ryzen 7 3700X 8-Core Processor (16 threads), memória: 31 GB
+\end{table}

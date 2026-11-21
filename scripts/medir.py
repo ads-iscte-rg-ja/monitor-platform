@@ -366,11 +366,18 @@ def gerar_antes_depois(it: str, metrics_dir: Path, resumo: dict) -> None:
               ("vulnerabilidades", "Vulnerabilidades alcançáveis"),
               ("distancia_media", "Distância média D")]
 
+    def pt(v) -> str:
+        # Vazio (métrica sem sentido no repositório, p. ex. D com um só pacote) vira "---"; decimal com vírgula.
+        v = str(v)
+        return "---" if v in ("", "None") else v.replace(".", "{,}")
+
     def cel(r: str, k: str) -> str:
-        agora = str(resumo[r].get(k, "---"))
+        agora = pt(resumo[r].get(k, "---"))
         if it == "baseline" or (r, k) not in antes:
             return agora
-        return f"{antes[(r, k)]} $\\to$ {agora}"
+        if agora == "---" and pt(antes[(r, k)]) == "---":
+            return "---"
+        return f"{pt(antes[(r, k)])} $\\to$ {agora}"
 
     titulo = "baseline" if it == "baseline" else f"baseline $\\to$ {it}"
     (metrics_dir / it / "metricas-codigo-antes-depois.tex").write_text(tabela(
