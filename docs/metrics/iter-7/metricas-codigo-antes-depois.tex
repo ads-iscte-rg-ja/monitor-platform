@@ -1,0 +1,20 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Métricas de código (baseline $\to$ iter-7)}
+  \label{tab:metricas-antes-depois}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Métrica & central & remote & SDK & hello-world \\
+    \midrule
+    Issues de lint & 66 $\to$ 52 & 29 $\to$ 19 & 4 $\to$ 4 & 1 $\to$ 1 \\
+    Violações de camadas & 1 $\to$ 0 & 0 $\to$ 0 & 0 $\to$ 0 & 0 $\to$ 0 \\
+    Funções ciclomática $>15$ & 5 $\to$ 3 & 3 $\to$ 1 & 0 $\to$ 0 & 0 $\to$ 0 \\
+    Funções cognitiva $>15$ & 10 $\to$ 6 & 6 $\to$ 4 & 0 $\to$ 0 & 1 $\to$ 1 \\
+    Blocos duplicados & 3 $\to$ 3 & 2 $\to$ 0 & 0 $\to$ 0 & 0 $\to$ 0 \\
+    Cobertura unit.\ (\%) & 25{,}9 $\to$ 48{,}2 & 68{,}0 $\to$ 76{,}0 & 0{,}0 $\to$ 89{,}9 & 56{,}8 $\to$ 56{,}8 \\
+    Cobertura + integr.\ (\%) & 40{,}3 $\to$ 67{,}5 & --- & --- & --- \\
+    Vulnerabilidades alcançáveis & 52 $\to$ 0 & 37 $\to$ 0 & 1 $\to$ 0 & 1 $\to$ 0 \\
+    Distância média D & 0{,}52 $\to$ 0{,}54 & 0{,}66 $\to$ 0{,}65 & --- & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}

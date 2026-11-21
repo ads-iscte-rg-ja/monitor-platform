@@ -1,0 +1,15 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Cenário SC5: 1\,\% dos \emph{hosts} em rajada de 200 logs/s (iter-7)}
+  \label{tab:carga-sc5}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}Xlrrc}
+    \toprule
+    Medida & Alvo & iter-3 & iter-7 & Cumpre \\
+    \midrule
+    Atraso p95 dos outros \emph{hosts}, durante a rajada & $<$ 5 s & 6 ms & 5 ms & \Sim \\
+    Atraso p95 dos \emph{hosts} em rajada & --- & 43 ms & 11 ms & --- \\
+    p95 da ingestão (agente) & --- & 35 ms & 7 ms & --- \\
+    Pedidos não OK & --- & 0,00\,\% & 0,00\,\% & --- \\
+    \bottomrule
+  \end{tabularx}
+\end{table}

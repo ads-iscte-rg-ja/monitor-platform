@@ -1,0 +1,25 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Cenário SC4: \emph{dashboard} e retenção com 30 dias de dados (antes do ADR-0017 $\rightarrow$ iter-7)}
+  \label{tab:carga-sc4}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}Xlrrrr}
+    \toprule
+    Medida & Alvo & antes, sem ret. & antes, com ret. & depois, sem ret. & depois, com ret. \\
+    \midrule
+    p95: Resumo (\texttt{/summary}) & $<$ 1 s & 74,30 s & 72,58 s & 31 ms & 33 ms \\
+    p95: Página do \emph{dashboard} & $<$ 1 s & 70,95 s & 73,63 s & 30 ms & 32 ms \\
+    p95: Métricas de 24 h & $<$ 1 s & 61,00 s & 64,75 s & 15 ms & 16 ms \\
+    p95: Métricas de 1 mês & $<$ 1 s & 65,70 s & 64,66 s & 210 ms & 198 ms \\
+    p95: Erros (\texttt{/errors}) & $<$ 1 s & 64,01 s & 62,15 s & 16 ms & 15 ms \\
+    p95: Erros de um \emph{host} & $<$ 1 s & 67,73 s & 70,07 s & 24 ms & 29 ms \\
+    p95: \emph{Hosts} (\texttt{/hosts}) & $<$ 1 s & 28,88 s & 33,21 s & 60 ms & 59 ms \\
+    p95 da ingestão (agente) & $<$ 300 ms & 1,59 s & 2,18 s & 5 ms & 5 ms \\
+    Rejeições por sobrecarga & --- & 58\,\% & 59\,\% & 0\,\% & 0\,\% \\
+    Registos confirmados em 10 min & --- & 11\,008 & 10\,489 & 73\,228 & 73\,234 \\
+    Retenção: duração média / p95 & --- & --- & 7,4 s / 27,0 s & 0,2 s / 0,5 s & 0,2 s / 0,5 s \\
+    Expirados: variação por hora & $\le$ 0 & 441\,264 & $-$721\,669 & $-$733\,603 & $-$732\,644 \\
+    Lotes perdidos / duplicados & 0 / 0 & 0 / 0 & 0 / 0 & 0 / 0 & 0 / 0 \\
+    \bottomrule
+  \end{tabularx}
+  \par\smallskip\footnotesize 31 dias de histórico de 1\,000 \emph{hosts} (89 M estatísticas, 239 M erros) e a carga nominal durante 10 min, com uma consulta do \emph{dashboard} por segundo, à vez pelas sete. Com retenção: 30 dias, a cada minuto, lotes de 10\,000. Ambiente: cpu: AMD Ryzen 7 3700X 8-Core Processor (16 threads), memória: 31 GB
+\end{table}

@@ -504,7 +504,79 @@ que nenhum \emph{host} é entregue duas vezes e que um \emph{endpoint} alterado 
 central desceu de 54 para 53 \emph{issues}, porque a função que corre as \emph{probes} ficou abaixo do limite
 de complexidade.
 
-\porescrever{\dec{9}, \dec{10}, \dec{19}: problema, tática, alternativas, trade-offs (resumo dos ADRs).}
+\subsubsection{Trinta dias de dados: consultas com custo limitado e um \emph{bulkhead} (\dec{9}, ADR-0017)}
+\label{sec:d9}
+
+\paragraph{Problema.}
+\cen{SC4} pede o \emph{dashboard} com p95 $<$ 1~s e a retenção sem degradar a ingestão, com 30 dias de dados de
+1\,000 \emph{hosts}. O plano previa particionar as tabelas de telemetria por dia e fazer a retenção com
+\texttt{DROP PARTITION}; a regra do roteiro era medir primeiro e só particionar se \cen{SC4} falhasse. Para o
+medir, o gerador de carga ganhou um histórico sintético: 31 dias com o ritmo e o perfil de logs do k6, 89~M
+estatísticas, 239~M erros e os seus recibos, 143~GB. A mesma carga nominal corre por cima durante 10~minutos,
+com uma consulta do \emph{dashboard} por segundo, em duas fases sobre os mesmos dados, sem e com a retenção.
+\cen{SC4} falhava nas duas partes, e a ingestão falhava logo na fase sem retenção: o \emph{dashboard} tinha p95
+entre 29 e 74~s, e só 15\,\% dos registos esperados entravam, com 58\,\% dos pedidos rejeitados. Medidas uma a
+uma, com o sistema parado, quatro consultas explicavam tudo: o CPU médio do último registo de cada
+\emph{host} (55~s, um \texttt{DISTINCT ON} sobre 89~M linhas), os nomes de aplicação distintos (17~s), o total
+de erros da página de erros (13~s) e as métricas de um mês de um \emph{host} (5,3~s, uma leitura aleatória do
+disco por linha). Nenhuma tinha um limite temporal que o particionamento pudesse aproveitar. Cada uma prendia
+uma ligação durante dezenas de segundos, e com uma consulta por segundo ocupavam as 25: a partir daí tudo
+esperava, até as consultas de 16~ms e a ingestão. \dec{6} limitava a ingestão, mas nada limitava o
+\emph{dashboard}.
+
+\paragraph{Decisão.}
+Primeira parte: cada consulta passa a ter um custo que depende do que mostra, e não do volume guardado. O
+último registo de cada \emph{host} lê-se com uma pesquisa no índice por \emph{host} (\texttt{LATERAL}); os nomes
+distintos com um \emph{loose index scan}; o total da página de erros conta até 10\,001 e mostra ``10000+'' acima
+disso; os erros de hoje vêm de contadores por hora, \emph{host} e nível, mantidos por \emph{triggers} na mesma
+transação de cada escrita; e as métricas leem só um índice de cobertura (\texttt{INCLUDE}), que substitui o
+anterior com a mesma chave. A seguir, um \emph{bulkhead}: as rotas do \emph{browser} têm no máximo 20\,\% do
+\emph{pool} e um prazo de 10~s por pedido, que cancela a consulta no PostgreSQL. Com os 60\,\% da ingestão,
+ficam 20\,\% para os \emph{jobs}. Segunda parte: o particionamento decidia-se pela fase com retenção da medição
+seguinte, com um critério escrito antes de a fazer. Particionar se o p95 da ingestão subisse mais de 20\,\%, se
+uma execução da retenção passasse de 15~s, ou se os registos expirados continuassem a crescer.
+
+\paragraph{Teoria.}
+\emph{Increase Resource Efficiency} (consultas proporcionais ao resultado), \emph{Bound Execution Times}
+(contagem com teto e prazo por pedido), \emph{Maintain Multiple Copies of Computations} (os contadores) e
+\emph{Reduce Overhead} (o índice de cobertura). O \emph{bulkhead} aplica \emph{Limit Resources} ao \emph{pool},
+no sentido inverso de \dec{6}. O próprio caminho é a análise tardia por medição do slide~04: a estimativa
+apontava para o volume e para a retenção, e a medição mostrou outra coisa.
+
+\paragraph{Alternativas.}
+Particionar já não teria ajudado nenhuma das quatro consultas, porque nenhuma filtrava por tempo. O
+TimescaleDB resolveria os agregados, mas troca a imagem oficial do PostgreSQL por uma extensão; continua como
+E2, com gatilho. Um \emph{cache} do resumo em memória teria uma cópia por instância, e o primeiro pedido depois
+de expirar voltaria a custar 55~s. Manter os contadores no código da ingestão, em vez de \emph{triggers},
+obrigaria todos os caminhos de escrita a lembrar-se deles. Baixar o \texttt{statement\_timeout} de 30~s que
+o central já tinha cortaria também a retenção e as escritas em lote; e os 30~s já existiam e não impediram a
+saturação, porque uma consulta de 55~s prende a ligação esse tempo todo.
+
+\paragraph{\emph{Trade-offs}.}
+Cada lote de erros faz também um \emph{upsert} nos contadores, e o índice das estatísticas cresceu para
+6,5~GB. A migração lê as tabelas inteiras: demorou 4~min~12~s sobre os 143~GB, com o central parado. A
+primeira tentativa falhou, porque a migração herdava o \texttt{statement\_timeout} de 30~s das ligações; passou
+a correr sem ele, limitada pelo prazo do \texttt{cmd/migrate}, que ficou configurável. Acima de 10\,000 erros,
+a página deixa de dar o total exato. A pesquisa por texto continua a ler a tabela quando o texto é raro;
+fica limitada pelo prazo de 10~s, sem afetar mais nada, com o gatilho de um índice \texttt{pg\_trgm}. Os
+recibos de deduplicação, que nunca são apagados (ADR-0020), ocupam 40~GB em 30 dias.
+
+\paragraph{Verificação.}
+O resultado está na secção~\ref{sec:sc4}. Pelo critério, não se particiona: a ingestão não ficou mais lenta
+com a retenção, a execução mais longa da retenção levou 0,48~s, e os expirados desciam 734 mil por hora. A
+retenção por \texttt{DELETE} em lotes fica, e passa a estar ligada por omissão: telemetria 30 dias,
+incidentes resolvidos 180, emails enviados 30, auditoria 365; a cada minuto, até 10\,000 linhas por
+categoria. Os testes de integração verificam que os contadores coincidem com uma contagem completa depois de
+inserir, deduplicar, atualizar e apagar, e que o resumo dá o mesmo resultado que as consultas antigas.
+
+\subsubsection{Testes de carga reprodutíveis (\dec{10})}
+\label{sec:d10}
+Os cenários de escalabilidade só se verificam com medições repetíveis. \dec{10} é o ambiente que as faz: k6
+com o cliente gRPC, num Compose próprio com os limites da medição escritos em código, e um gerador que
+recria o ambiente do zero em cada medição e junta a visão do agente, a do servidor e a da base de dados. O
+método e os seus limites estão na secção~\ref{sec:metodo}. Foi este ambiente que encontrou os dois problemas
+mais importantes do trabalho, ambos invisíveis sem carga: o \emph{dashboard} inutilizável durante a
+recuperação (\dec{5}, \dec{6}) e as consultas que paravam a ingestão com 30 dias de dados (\dec{9}).
 
 \subsection{Manutenção e testabilidade}
 
@@ -1065,4 +1137,42 @@ Os testes de carga chamam a API diretamente e não o viam. Ficou corrigido, com 
 \cen{SE2} e \cen{SE3} estão na secção~\ref{sec:aval-se}.
 
 \subsection{Processo e qualidade}
-\porescrever{\dec{1}--\dec{3}.}
+\label{sec:processo}
+
+As três primeiras decisões não mudam o comportamento do sistema: criam as condições para que as outras se
+possam tomar, verificar e defender. Por isso foram as primeiras a ser feitas, antes de qualquer alteração ao
+código, e a \emph{baseline} (secção~\ref{sec:baseline}) foi medida logo a seguir.
+
+\paragraph{Documentação da arquitetura (\dec{1}, ADR-0001 e ADR-0002).}
+O sistema não tinha documentação de arquitetura; sem ela, diz o slide~02, é impossível avaliá-la. A decisão foi
+documentar só o que dá retorno: uma vista de cada categoria de estruturas (capítulo~\ref{sec:sistema}), os
+cenários de qualidade (capítulo~\ref{sec:requisitos}) e um ADR por decisão, com a teoria, as alternativas e a
+verificação (anexo~\ref{anx:adrs}). Os ADR vivem no repositório \texttt{monitor-platform}, ao lado do CI
+partilhado, dos testes de carga e ponta a ponta e deste relatório, porque dizem respeito ao sistema inteiro e não
+a um repositório (ADR-0002). As decisões que já estavam no código foram registadas como ADR retroativos (0018 a
+0023), para que o porquê de cada uma também fique escrito. A alternativa rejeitada foi o UML completo: mais
+custo do que retorno para uma equipa de duas pessoas (secção~\ref{sec:documentacao}).
+
+\paragraph{Métricas e ferramentas de qualidade (\dec{2}).}
+As métricas, os limites e as ferramentas são os do capítulo~\ref{sec:metricas}, escolhidos por GQM: o
+\texttt{golangci-lint} com uma configuração única para todos os repositórios, incluindo as regras de camadas do
+\texttt{depguard}; o SonarQube Cloud, com um \emph{quality gate} no código novo; o \texttt{govulncheck} e o
+Dependabot; e a cobertura dos testes unitários e de integração. A regra foi medir antes de mudar: a
+\emph{baseline} foi gravada em \texttt{docs/metrics/baseline/} antes da primeira alteração, e cada iteração foi
+medida da mesma forma, com o mesmo \emph{script} (\texttt{scripts/medir.py}). Táticas: \emph{Restrict
+Dependencies}, que passou de convenção a regra verificada, e a testabilidade.
+
+\paragraph{Integração contínua (\dec{3}).}
+Os testes de integração do central estiveram partidos sem que ninguém desse por isso (lacuna M1). Os cinco
+repositórios de código passaram a correr o mesmo \emph{pipeline}, definido uma só vez como \emph{workflow} reutilizável
+no \texttt{monitor-platform} (secção~\ref{sec:pipeline}): formatação, lint, testes com \texttt{-race},
+integração com PostgreSQL, vulnerabilidades e SonarQube Cloud. O \texttt{main} só recebe alterações por
+\emph{pull request} com o CI verde, também para os administradores. Os testes de carga e o E2E são lentos e
+correm à parte: o E2E todas as noites, e a carga localmente, com os limites de recursos
+(secção~\ref{sec:metodo}). A teoria é a do slide~03: uma falta presente deve fazer falhar os testes o mais
+cedo possível. A verificação é \cen{TE1} (secção~\ref{sec:mo1}).
+
+\paragraph{\emph{Trade-offs}.}
+O CI acrescenta cerca de dois minutos a cada \emph{pull request} e liga o processo ao GitHub e ao SonarQube Cloud
+(secção~\ref{sec:pipeline}). Com duas pessoas, o \texttt{main} protegido não exige uma aprovação: uma revisão
+obrigatória bloquearia o trabalho sempre que uma das duas estivesse ausente.

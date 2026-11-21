@@ -1,0 +1,20 @@
+linter,ficheiro,linha,mensagem
+errcheck,internal/repository/cleanup.go,22,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repository/delivery_batch.go,30,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repository/queue.go,41,Error return value of `tx.Rollback` is not checked
+errcheck,internal/repository/queue.go,120,Error return value of `tx.Rollback` is not checked
+gocognit,internal/database/sqlite.go,78,cognitive complexity 17 of func `checkExistingSchema` is high (> 15)
+gocognit,internal/repository/cleanup.go,11,cognitive complexity 16 of func `(*QueueRepository).CleanupDelivered` is high (> 15)
+gocognit,internal/sender/sender.go,81,cognitive complexity 24 of func `(*Sender).sendPendingMachineStats` is high (> 15)
+gocognit,internal/sender/sender.go,124,cognitive complexity 24 of func `(*Sender).SendPendingErrorLogs` is high (> 15)
+gocyclo,internal/repository/cleanup.go,11,cyclomatic complexity 16 of func `(*QueueRepository).CleanupDelivered` is high (> 15)
+gosec,internal/database/sqlite.go,33,G304: Potential file inclusion via variable
+gosec,internal/database/sqlite.go,38,G104: Errors unhandled
+gosec,internal/database/sqlite.go,61,G104: Errors unhandled
+gosec,internal/database/sqlite.go,66,G104: Errors unhandled
+gosec,internal/database/sqlite.go,70,G104: Errors unhandled
+gosec,internal/repository/cleanup.go,37,G104: Errors unhandled
+gosec,internal/repository/cleanup.go,43,G104: Errors unhandled
+gosec,internal/repository/cleanup.go,58,G202: SQL string concatenation
+gosec,internal/sender/retry.go,59,G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)
+revive,internal/database/sqlite.go,13,"blank-imports: a blank import should be only in a main or test package, or have a comment justifying it"

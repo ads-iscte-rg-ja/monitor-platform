@@ -1,0 +1,21 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Complexidade das funções de produção (iter-7)}
+  \label{tab:iter-7-complexidade}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Métrica & central & remote & SDK & hello-world \\
+    \midrule
+    Funções & 375 & 108 & 4 & 4 \\
+    Ciclomática média & 3.64 & 4.46 & 8.5 & 4.25 \\
+    Ciclomática máxima & 31 & 16 & 15 & 11 \\
+    Ciclomática $>15$ & 3 & 1 & 0 & 0 \\
+    Cognitiva média & 3.08 & 4.23 & 8 & 5.5 \\
+    Cognitiva máxima & 47 & 24 & 13 & 18 \\
+    Cognitiva $>15$ & 6 & 4 & 0 & 1 \\
+    Linhas/função (média) & 17.7 & 18.8 & 28.2 & 15 \\
+    Linhas/função (máx.) & 187 & 116 & 47 & 33 \\
+    \bottomrule
+  \end{tabular}
+  \par\smallskip\footnotesize Ciclomática: McCabe (\texttt{tools/codemetrics}, igual ao gocyclo). Cognitiva: gocognit. Excluem-se testes.
+\end{table}

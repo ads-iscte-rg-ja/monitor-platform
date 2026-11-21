@@ -6,15 +6,15 @@
     \toprule
     Medida & 1 inst. & 2 inst. & 3 inst. \\
     \midrule
-    Registos confirmados no teste & 4\,526\,800 & 4\,562\,500 & 4\,648\,800 \\
-    Débito face a 1 instância (alvo) & 1× & 1,01× ($\ge$ 1,8×) & 1,03× ($\ge$ 2,5×) \\
-    Débito no minuto de pico (registos/s) & 21\,007 & 20\,276 & 19\,844 \\
-    p95 da ingestão (servidor) & 184 ms & 375 ms & 536 ms \\
-    Rejeições por sobrecarga & 19,4\,\% & 25,1\,\% & 27,1\,\% \\
-    Ligações à BD em uso, máx. (soma) & 19 de 25 & 38 de 50 & 56 de 75 \\
-    CPU de cada instância, média & 8\,\% & 5\,\% & 4\,\% \\
-    CPU do PostgreSQL, média / máx. & 49 / 110\,\% & 49 / 108\,\% & 49 / 109\,\% \\
-    p95 do \emph{dashboard} & 4,87 s & 8,75 s & 9,36 s \\
+    Registos confirmados no teste & 6\,564\,400 & 6\,621\,900 & 6\,806\,100 \\
+    Débito face a 1 instância (alvo) & 1× & 1,01× ($\ge$ 1,8×) & 1,04× ($\ge$ 2,5×) \\
+    Débito no minuto de pico (registos/s) & 22\,073 & 22\,489 & 23\,136 \\
+    p95 da ingestão (servidor) & 100 ms & 199 ms & 312 ms \\
+    Rejeições por sobrecarga & 15,6\,\% & 19,9\,\% & 22,0\,\% \\
+    Ligações à BD em uso, máx. (soma) & 17 de 25 & 35 de 50 & 51 de 75 \\
+    CPU de cada instância, média & 11\,\% & 7\,\% & 5\,\% \\
+    CPU do PostgreSQL, média / máx. & 49 / 110\,\% & 51 / 109\,\% & 50 / 110\,\% \\
+    p95 do \emph{dashboard} & 84 ms & 172 ms & 174 ms \\
     Cada \emph{job} numa só instância & \Sim & \Sim & \Sim \\
     Duplicados na base de dados & 0 & 0 & 0 \\
     \bottomrule

@@ -182,7 +182,14 @@ Por ordem de valor (detalhe em D20 e na revisão de D1, no plano):
    alertas por *polling* de 15 s em vez de *streaming* (ADR-0008, E5) e sessões no servidor em vez de JWT
    (ADR-0016). Todos entram no anexo B do relatório.
 
-### Passo 11: medição final e fecho do relatório (7/12)
+### Passo 11: medição final e fecho do relatório (7/12) — feito (21/11, por commitar)
+* **Feito:** `medir.py iter-7` e `correr.sh` com os 10 cenários (21/11, 18:45–21:42 UTC, rc=0) em
+  `docs/metrics/iter-7/`; tabelas com `--antes iter-3`, e SC4 com `--antes iter-6/sc4-antes` (antes do ADR-0017 →
+  final). Cap. 7 atualizado para iter-7, tabela-resumo dos 21 cenários (20 cumprem; SC3 em parte), resumo e
+  conclusões escritos; dados de carga apagados da máquina (volume do PG, 174 GB).
+* **Notas:** com a retenção ligada por omissão, as duas fases do SC4 final correm ambas com retenção
+  (`tabelas.py` passou a rotular pelo que correu de facto). `medir.py` passou a escrever decimais com vírgula e
+  `---` onde a métrica não se aplica. Falta, para o utilizador: o E2E de 1 h a partir do `main` (`e2e.yml`).
 * **Medições finais:** `scripts/medir.py <iter-final>` (código) e `loadtest/correr.sh <iter-final>` com todos os
   cenários (incluindo `capacidade-1..3`); tabelas com `--antes iter-3` (*baseline* → final).
 * **Relatório:**

@@ -1,4 +1,42 @@
 \section{Configuração das ferramentas}
 \label{anx:configuracao}
 
-\porescrever{\texttt{.golangci.yml}, quality gate do SonarQube Cloud, perfis k6.}
+\paragraph{Lint.}
+Uma só configuração, \texttt{lint/.golangci.yml} no \texttt{monitor-platform}, usada pelos cinco repositórios
+de código e pelo \texttt{scripts/medir.py} (\texttt{golangci-lint} v2.15.0). Os \emph{linters} estão agrupados pelo
+atributo que medem:
+\begin{itemize}
+\item \textbf{conformidade com a arquitetura}: \texttt{depguard}, com as regras de camadas de cada repositório
+(Tabela~\ref{tab:modulos-final});
+\item \textbf{legibilidade e duplicação}: \texttt{gocognit} (limite 15) e \texttt{dupl} (100 \emph{tokens});
+\item \textbf{testabilidade}: \texttt{gocyclo} (limite 15);
+\item \textbf{fiabilidade}: \texttt{govet}, \texttt{staticcheck}, \texttt{errcheck}, \texttt{ineffassign},
+\texttt{unused};
+\item \textbf{segurança}: \texttt{gosec};
+\item \textbf{convenções}: \texttt{revive}.
+\end{itemize}
+A configuração não limita nem deduplica as \emph{issues}, porque as contagens são métricas do relatório. Nos
+testes, os \emph{linters} de complexidade, duplicação, segurança e erros ignorados estão desligados. Uma exceção pontual fica
+no código com a justificação (\texttt{//nolint:<linter> // razão}). Nos passos do roteiro, o número de
+\emph{issues} de cada repositório não pode subir.
+
+\paragraph{SonarQube Cloud.}
+O \emph{quality gate} aplica-se ao código novo de cada \emph{pull request}: cobertura $\ge$ 80\,\%, duplicação
+$\le$ 3\,\% e classificação A em fiabilidade e em segurança (um só \emph{issue} novo de severidade alta
+chega para a baixar). O Sonar importa o relatório do
+\texttt{golangci-lint} e os perfis de cobertura dos testes unitários e de integração, para que a análise local e
+a remota concordem (secção~\ref{sec:pipeline}).
+
+\paragraph{Integração contínua.}
+O \emph{workflow} reutilizável \texttt{.github/workflows/go-ci.yml} (chamado por cada repositório com
+\texttt{@v1}) corre a higiene (\texttt{gofmt}, \texttt{go mod tidy}), o lint, os testes com \texttt{-race}, a
+integração com PostgreSQL~16 quando o repositório a tem, o \texttt{govulncheck} e o SonarQube Cloud. O
+\texttt{monitor-api} acrescenta \texttt{buf lint} e \texttt{buf breaking} contra o \texttt{main}.
+
+\paragraph{Perfis de carga.}
+\texttt{loadtest/k6/ingestao.js} (k6 2.4.0). Cada utilizador virtual é um \emph{host}: estatísticas a cada
+30~s, erros a cada 10~s, lotes de até 100. Perfil de logs por \emph{host}, atribuído pelo índice: em cada 100,
+1 em rajada, 4 ruidosos (1 erro/s), 25 normais (10 por minuto) e 70 silenciosos (0,5 por minuto)
+(Tabela~\ref{tab:perfil-logs}). As novas tentativas seguem as do remote: 5~s a duplicar, até 5~min, com
+\emph{jitter} de $\pm$20\,\%, e o maior entre esse atraso e o \texttt{RetryInfo} do central. O central e o
+PostgreSQL correm com 2~vCPU e 4~GB cada, e um \emph{pool} de 25 ligações.

@@ -248,9 +248,15 @@ def main() -> None:
         (destino / "carga-sc3.tex").write_text(tabela_sc3(escala, ambiente))
     # Com --antes, as colunas dizem "antes"/"depois"; as iterações vão na legenda.
     rotulo_it = {a.antes: "antes, ", a.iteracao: "depois, "} if a.antes else {a.iteracao: ""}
-    fases = [(f"{rotulo_it[it]}{fase}", carregar(it, medicao)) for it in ([a.antes] if a.antes else []) + [a.iteracao]
-             for fase, medicao in (("sem ret.", "dashboard-30d"), ("com ret.", "dashboard-30d-retencao"))]
-    fases = [(nome, m) for nome, m in fases if m is not None]
+    # O rótulo vem do que correu de facto: desde que a retenção está ligada por omissão (ADR-0017), a primeira
+    # fase também a tem, e as duas fases passam a ser duas corridas com retenção.
+    fases = []
+    for it in ([a.antes] if a.antes else []) + [a.iteracao]:
+        medidas = [m for m in (carregar(it, "dashboard-30d"), carregar(it, "dashboard-30d-retencao")) if m is not None]
+        com = [bool((valor(m, "servidor", "retencao") or {}).get("execucoes")) for m in medidas]
+        for i, m in enumerate(medidas):
+            fase = ("com ret." if com[i] else "sem ret.") + (f" ({i + 1}.ª)" if com.count(com[i]) > 1 else "")
+            fases.append((f"{rotulo_it[it]}{fase}", m))
     if fases:
         iteracoes = f"{a.antes} $\\rightarrow$ {a.iteracao}" if a.antes else a.iteracao
         (destino / "carga-sc4.tex").write_text(tabela_sc4(fases, ambiente, iteracoes))

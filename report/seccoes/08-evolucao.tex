@@ -1,8 +1,74 @@
 \section{Plano de evolução}
 \label{sec:evolucao}
 
+O trabalho fixou a escala em 1\,000 \emph{hosts} e mediu-a. Este capítulo diz o que mudaria para ir além, e
+quando: cada evolução tem um \textbf{gatilho medível} com as métricas de \dec{4}, que funcionam como
+\emph{fitness functions}. A decisão de escalar fica assim guiada por números e não por antecipação (YAGNI,
+slide~06), como as decisões deste trabalho foram.
+
 \subsection{Escalar para 10\,000+ hosts}
-\porescrever{backlog E1--E9 com gatilhos medíveis (plano §8).}
+
+\paragraph{O que se sabe da escala atual.}
+As medições dão um ponto de partida melhor do que as estimativas do capítulo~\ref{sec:requisitos}. Com 1\,000
+\emph{hosts} e o perfil de logs, entram cerca de 122 registos por segundo; os 31 dias de \cen{SC4} ocuparam
+143~GB, cerca de 4,6~GB por dia, dos quais os recibos de deduplicação são 28\,\%. Uma instância do central
+confirmou cerca de 22\,000 registos por segundo no pico de \cen{SC3}, com o PostgreSQL como limite. A 10\,000
+\emph{hosts}, por extrapolação linear, seriam 1\,200 registos por segundo (dentro da capacidade medida, com
+lotes pequenos a reduzir a folga), cerca de 46~GB por dia, e 1,4~TB para 30 dias. É o armazenamento, e não o
+débito, que chega primeiro a um limite.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Evoluções para lá de 1\,000 \emph{hosts}, com o gatilho que as tornaria necessárias}
+  \label{tab:evolucao}
+  \begin{tabularx}{\linewidth}{lYL{0.27\linewidth}L{0.17\linewidth}}
+    \toprule
+    & Evolução & Gatilho (medido) & Tática ou estilo \\
+    \midrule
+    E1 & Fila de ingestão (NATS JetStream, Kafka): a API só valida e publica; \emph{consumers} escrevem em lote & p95 de escrita na BD $>$ 200~ms, ou rejeições por sobrecarga $>$ 5\,\% em regime normal & \emph{Use an Intermediary}; \emph{event-driven} com \emph{broker} \\
+    E2 & TimescaleDB: \emph{hypertables}, agregados contínuos, compressão & \emph{dashboard} p95 $>$ 1~s com 30 dias, ou armazenamento $>$ 500~GB & \emph{Maintain Multiple Copies of Data} \\
+    E3 & \texttt{ingest}, \texttt{web} e \texttt{worker} em \emph{deploys} separados (o \texttt{APP\_ROLE} já o prepara) & ingestão e \emph{dashboard} a competir pelo CPU do central & \emph{Split Module}; \emph{service-based} \\
+    E4 & Réplicas de leitura para o \emph{dashboard}; alta disponibilidade do PostgreSQL & CPU da BD $>$ 70\,\% com leituras dominantes; um requisito de RTO & \emph{Maintain Multiple Copies}, \emph{Active/Passive Redundancy} \\
+    E5 & Alertas avaliados à entrada dos dados, em vez de a cada 15~s & ciclo de avaliação $>$ 5~s & \emph{Limit Event Response}; Observer \\
+    E6 & OpenTelemetry: um \emph{trace} do remote ao central e à BD & diagnóstico de latência entre serviços, depois de E1 ou E3 & \emph{Monitor} \\
+    E7 & \emph{Probes} repartidas entre instâncias (\emph{hash} por \emph{host}) & intervalo entre \emph{probes} $>$ 45~s (\cen{AV2}) & \emph{Introduce Concurrency} \\
+    E8 & Agregação e amostragem na origem (``a mesma mensagem $\times$1\,000'') & o custo de rede ou de disco domina, ou descartes de \dec{19} frequentes & \emph{Manage Sampling Rate} \\
+    E9 & Escalar as escritas: \emph{group commit} do WAL, depois particionar por \emph{host} em vários nós (Citus) & débito sustentado acima de metade do medido em \cen{SC3}, ou ingestão p95 $>$ 200~ms em regime normal & \emph{Increase Resources}, partições \\
+    E10 & Particionamento diário com \texttt{DROP PARTITION} (\dec{9}, parte 2) & retenção com p95 $>$ 15~s, ingestão +20\,\% durante a retenção, ou expirados a crescer & \emph{Reduce Overhead} \\
+    E11 & Recibos de deduplicação com um horizonte (a idade máxima de um registo no \emph{buffer}) & \texttt{telemetry\_receipts} maior do que as tabelas de dados & \emph{Bound Queue Sizes}, aplicado a dados \\
+    E12 & Índice \texttt{pg\_trgm}, ou janela temporal por omissão, na pesquisa de erros por texto & a pesquisa usada a sério, com o prazo de 10~s atingido & \emph{Increase Resource Efficiency} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Ordem esperada.}
+Com os números acima, o primeiro gatilho a disparar é o do armazenamento (E2, E10, E11), seguido da competição
+pelo CPU (E3). A fila de ingestão (E1) e a escala das escritas (E9) só são necessárias bem depois dos 10\,000
+\emph{hosts}, se os lotes forem cheios. A ordem real é a que os gatilhos ditarem.
 
 \subsection{Decisões rejeitadas e adiadas}
-\porescrever{plano §9.}
+
+A Tabela~\ref{tab:rejeitadas} junta as propostas que o trabalho considerou e não seguiu, com a razão. As
+alternativas de cada decisão tomada estão no seu ADR.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Decisões rejeitadas e adiadas}
+  \label{tab:rejeitadas}
+  \begin{tabularx}{\linewidth}{L{0.23\linewidth}lY}
+    \toprule
+    Proposta & Decisão & Razão \\
+    \midrule
+    Reescrever em microserviços & rejeitada & O registo, o recibo e a avaliação de alertas partilham uma transação, sinal de que pertencem ao mesmo serviço (slide~08); duas pessoas não sustentam a operação; cada fronteira de rede traz as oito falácias. Os limites a 1\,000 \emph{hosts} resolveram-se com táticas locais (ADR-0019) \\
+    \emph{Broker} (Kafka, RabbitMQ) já & adiada (E1) & O \emph{store-and-forward} com recibos já dá \emph{at-least-once} sem duplicados; o \emph{broker} acrescenta latência, indireção e um ponto de falha (slide~04) \\
+    Particionar a telemetria (\dec{9}) & adiada (E10) & Medido: não era o que faltava; a retenção por \texttt{DELETE} em lotes custa 0,33~s por execução (ADR-0017) \\
+    Escalar a base de dados para \cen{SC3} & adiada (E9) & A folga medida (cerca de 180 vezes o regime normal) cobre o \emph{backlog} de 10\,000 \emph{hosts}; desligar a sincronização do WAL poria \cen{AV1} em risco \\
+    Justiça por \emph{host} na ingestão & não implementada & Medido em \cen{SC5}: um vizinho ruidoso não atrasou os outros (ADR-0006) \\
+    SPA no lugar dos \emph{templates} & rejeitada & Um passo de \emph{build} e uma API JSON completa para páginas de leitura; \cen{MO3} cumpre-se com os \emph{templates} (ADR-0019) \\
+    Alertas em tempo real (\emph{push}) & adiada (E5) & O \emph{polling} de 15~s cumpre \cen{AV2} e mantém as métricas sem estado (ADR-0008) \\
+    Migrações no SQLite do remote & adiada & Recusar um \emph{buffer} incompatível é seguro enquanto não houver \emph{hosts} com dados por entregar durante uma atualização (ADR-0020) \\
+    mTLS entre remote e central & adiada & Exige uma CA e o ciclo de vida dos certificados em cada \emph{host}; a chave por \emph{host} com HMAC chega ao modelo de ameaças atual (ADR-0023) \\
+    Kubernetes & rejeitada & O Compose com \texttt{--scale} demonstra \cen{SC3}; é infraestrutura e não muda nenhuma decisão de arquitetura \\
+    \bottomrule
+  \end{tabularx}
+\end{table}

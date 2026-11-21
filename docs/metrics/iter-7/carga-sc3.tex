@@ -1,0 +1,23 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Cenário SC3: a mesma carga com 1, 2 e 3 instâncias do central}
+  \label{tab:carga-sc3}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}Xrrr}
+    \toprule
+    Medida & 1 inst. & 2 inst. & 3 inst. \\
+    \midrule
+    Registos confirmados no teste & 6\,564\,400 & 6\,621\,900 & 6\,806\,100 \\
+    Débito face a 1 instância (alvo) & 1× & 1,01× ($\ge$ 1,8×) & 1,04× ($\ge$ 2,5×) \\
+    Débito no minuto de pico (registos/s) & 22\,073 & 22\,489 & 23\,136 \\
+    p95 da ingestão (servidor) & 100 ms & 199 ms & 312 ms \\
+    Rejeições por sobrecarga & 15,6\,\% & 19,9\,\% & 22,0\,\% \\
+    Ligações à BD em uso, máx. (soma) & 17 de 25 & 35 de 50 & 51 de 75 \\
+    CPU de cada instância, média & 11\,\% & 7\,\% & 5\,\% \\
+    CPU do PostgreSQL, média / máx. & 49 / 110\,\% & 51 / 109\,\% & 50 / 110\,\% \\
+    p95 do \emph{dashboard} & 84 ms & 172 ms & 174 ms \\
+    Cada \emph{job} numa só instância & \Sim & \Sim & \Sim \\
+    Duplicados na base de dados & 0 & 0 & 0 \\
+    \bottomrule
+  \end{tabularx}
+  \par\smallskip\footnotesize Carga: 1\,000 \emph{hosts} a enviar lotes de 100 erros sem pausa, através do nginx, durante 5 min. CPU em \% do limite de 2 vCPU de cada contentor. Ambiente: cpu: AMD Ryzen 7 3700X 8-Core Processor (16 threads), memória: 31 GB
+\end{table}
