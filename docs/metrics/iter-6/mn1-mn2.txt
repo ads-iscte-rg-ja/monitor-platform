@@ -1,0 +1,28 @@
+# MN1 e MN2 (D17, ADR-0010)
+# 2026-11-20T19:09Z; central main=d8fdaa4, remote main=d796037, + alterações do D17 (por commitar); monitor-api local (v1.1.0 por publicar); go version go1.27.4 linux/amd64; PostgreSQL 16
+
+## MN1, remote: a fotografia do buffer (com a quarentena) segue em todos os lotes do ciclo
+# cd monitor-remote && go test -race -count=1 -run 'TestStatisticsCarryTheBufferSnapshot|TestStatisticsAreSentWithoutSnapshotWhenItFails|TestBufferStatusSnapshot' -v ./internal/sender/ ./internal/repository/ ./internal/requests/
+--- PASS: TestStatisticsCarryTheBufferSnapshot (1.08s)
+--- PASS: TestStatisticsAreSentWithoutSnapshotWhenItFails (0.10s)
+ok  	monitor-remote/internal/sender	2.207s
+--- PASS: TestBufferStatusSnapshot (0.26s)
+ok  	monitor-remote/internal/repository	1.278s
+--- PASS: TestStatisticsCarryTheBufferSnapshot (0.01s)
+ok  	monitor-remote/internal/requests	1.026s
+
+## MN1, central: o lote seguinte mostra a quarentena na API do dashboard (PostgreSQL)
+# cd monitor-central && MONITOR_TEST_DSN=... go test -race -count=1 -tags integration -run 'TestBufferStatusReachesTheDashboard|TestEveryAlertMetricIsEvaluatedFromTheDatabase|TestRegisteredMetricsMatchTheDatabaseConstraint' -v ./internal/integration
+--- PASS: TestEveryAlertMetricIsEvaluatedFromTheDatabase (0.39s)
+--- PASS: TestRegisteredMetricsMatchTheDatabaseConstraint (0.36s)
+--- PASS: TestBufferStatusReachesTheDashboard (0.38s)
+ok  	monitor-central/internal/integration	2.149s
+
+## MN2: job liderado bloqueado -> /health/ready 503 depois de 2 intervalos (relógio controlado, sem sleep)
+# cd monitor-central && go test -race -count=1 -run 'TestBlockedJobMakesTheInstanceNotReady|TestJobHeartbeats|TestHealthEndpoints' -v ./internal/server/ ./internal/services/ ./internal/handlers/
+--- PASS: TestBlockedJobMakesTheInstanceNotReady (0.01s)
+ok  	monitor-central/internal/server	1.031s
+--- PASS: TestJobHeartbeats (0.00s)
+ok  	monitor-central/internal/services	1.018s
+--- PASS: TestHealthEndpoints (0.00s)
+ok  	monitor-central/internal/handlers	1.017s

@@ -13,6 +13,8 @@ Processo em [ADR-0001](0001-registar-decisoes-com-adrs.md); modelo em [0000-mode
 | [0007](0007-central-escalavel-horizontalmente.md) | Central com várias instâncias: liderança por *job*, limites partilhados e balanceador | Aceite | Scalability, Availability, Security |
 | [0008](0008-metricas-de-alerta-como-strategy.md) | Métricas de alerta como Strategy, com um registo como Simple Factory | Aceite | Modifiability |
 | [0009](0009-buffer-do-remote-com-limite.md) | *Buffer* do remote com limite e descarte por severidade | Aceite | Availability, Performance |
+| [0010](0010-estado-do-buffer-e-health-ready.md) | Estado do *buffer* reportado ao central; `/health/live` e `/health/ready` | Aceite | Monitorability, Availability |
+| [0011](0011-remote-retoma-sem-reinicio.md) | O remote retoma a entrega sem reinício | Aceite | Availability |
 
 ## Por escrever
 

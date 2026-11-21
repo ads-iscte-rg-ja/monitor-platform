@@ -633,7 +633,8 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Estado (20/11):** implementado ([ADR-0008](adr/0008-metricas-de-alerta-como-strategy.md)). Linha de base de MO1:
   7 sítios em 5 ficheiros e 3 camadas por métrica nova; agora, 1 ficheiro + 1 migração. Uma consulta constante
   por métrica (6 por ciclo, *set-based*) em vez de SQL montado. `for_seconds` (US1) **não** implementado, com
-  gatilho (alertas falsos por picos isolados). A medição de MO1 faz-se em D17 (`buffer_quarantined`).
+  gatilho (alertas falsos por picos isolados). MO1 medido em D17 (20/11, `buffer_quarantined`): 3 ficheiros Go
+  (1 novo + 2 de registo da migração) + 1 migração, 0 alterações no avaliador. Cumpre.
 
 #### D14. Testabilidade: interfaces nos handlers, relógio injetável, timezone configurável
 * **Problema:** M5, M6, TE2, TE3; **MO3** (EUVI muda a UI → os handlers têm de ser testáveis em isolamento).
@@ -666,6 +667,10 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Teoria:** *Retry*, *Escalating Restart*; *Defer Binding* (configuração em runtime).
 * **Alternativas rejeitadas:** retry normal para 401/403 (gera tráfego inútil e consome tentativas).
 * **Verificação:** teste com relógio injetado (403 → 201) que confirma a retoma em ≤5 min.
+* **Estado (20/11):** implementado ([ADR-0011](adr/0011-remote-retoma-sem-reinicio.md)). A pausa já não
+  termina os *workers*: 1 *probe* de 1 registo a cada 5 min, partilhada pelas duas categorias; retoma quando o
+  central aceita o registo ou o valida e rejeita. `SIGHUP` relê só a chave (o ambiente do processo tem
+  precedência) e antecipa a *probe*. AV3 provado com relógio injetado (`docs/metrics/iter-6/av3.txt`).
 
 #### D17. Estado do buffer reportado ao central; `/health` live e ready
 * **Problema:** A2, A3, MN1, MN2.
@@ -675,6 +680,15 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
   alertas `buffer_quarantined` (D13). `/health/live` e `/health/ready` (BD + heartbeat de cada job de que esta instância é líder).
 * **Teoria:** *Monitor*, *Heartbeat*, *Self-Test*; *Inform Actors*; *Maintain System Model*.
 * **Verificação:** MN1 com o E2E; MN2 com um teste que bloqueia um job e espera 503.
+* **Estado (20/11):** implementado ([ADR-0010](adr/0010-estado-do-buffer-e-health-ready.md)). Contrato
+  `monitor-api` v1.1.0 (`IngestStatsRequest.buffer`, aditivo, `buf breaking` verde); o remote envia uma
+  fotografia por ciclo de estatísticas; o central guarda a mais recente por host (`host_buffer_status`,
+  migração 5), mostra-a em `/api/v1/dashboard/metrics` e ignora (com aviso) um estado inválido.
+  `/health/live` e `/health/ready` (BD + *heartbeat* dos *jobs* liderados, 503 após 2 intervalos). MN1 provado
+  nos dois lados (o E2E de D15 repete-o ponta a ponta); MN2 provado com relógio controlado
+  (`docs/metrics/iter-6/mn1-mn2.txt`). **Desvio:** o nginx de código aberto não faz verificações ativas, por
+  isso não consulta o *ready*; usa-o o Compose, e qualquer orquestrador. MO1 medido com `buffer_quarantined`
+  (`docs/metrics/iter-6/mo1.md`): 3 ficheiros Go + 1 migração, avaliador intocado.
 
 ### 7.5 Segurança
 

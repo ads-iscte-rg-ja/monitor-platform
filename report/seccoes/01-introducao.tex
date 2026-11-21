@@ -18,7 +18,26 @@ repositório:
 \end{itemize}
 Durante o trabalho surgiram mais dois repositórios: \texttt{monitor-api}, com o contrato de ingestão
 entre o remote e o central (secção~\ref{sec:d11}), e \texttt{monitor-platform}, com o pipeline de CI
-partilhado, as medições, as decisões e este relatório (secção~\ref{sec:pipeline}).
+partilhado, as medições, as decisões e este relatório (secção~\ref{sec:pipeline}). Os seis repositórios são
+públicos, na organização \url{\Organizacao} (Tabela~\ref{tab:repositorios}).
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Repositórios do projeto, cada um em \url{\Organizacao/}\emph{nome}}
+  \label{tab:repositorios}
+  \begin{tabularx}{\textwidth}{lX}
+    \toprule
+    Repositório & Conteúdo \\
+    \midrule
+    \repo{monitor-central} & servidor central (ingestão, alertas, \emph{probes}) e \emph{dashboard} \\
+    \repo{monitor-remote} & agente de cada \emph{host} e \emph{buffer} SQLite \\
+    \repo{monitor-go-sdk} & biblioteca para as aplicações \\
+    \repo{monitor-hello-world} & aplicação de exemplo \\
+    \repo{monitor-api} & contrato de ingestão gRPC, versionado \\
+    \repo{monitor-platform} & CI partilhado, testes de carga, medições, ADR e relatório \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 
 O projeto foi proposto pela própria equipa, de duas pessoas, e não tem enunciado. Os números dos cenários
 de qualidade são, por isso, propostas da equipa; cada um é acompanhado da sua origem, quase sempre
@@ -88,5 +107,5 @@ arquitetura atual e as lacunas encontradas. O capítulo~\ref{sec:requisitos} def
 arquiteturais. O capítulo~\ref{sec:metricas} apresenta as métricas, as ferramentas, o pipeline e a
 baseline. O capítulo~\ref{sec:decisoes} descreve as decisões e o capítulo~\ref{sec:avaliacao} avalia-as.
 Os capítulos seguintes tratam da evolução, da discussão e das conclusões. Os anexos contêm os comandos de
-reprodução, os ADR e a configuração das ferramentas. Todo o material está no repositório
-\url{\Repositorio}.
+reprodução, os ADR e a configuração das ferramentas. O código de cada componente está no seu repositório
+(Tabela~\ref{tab:repositorios}); as medições, os ADR e este relatório estão em \url{\Repositorio}.

@@ -23,6 +23,8 @@ ADR; o texto completo de cada um está em \url{\Repositorio/tree/main/docs/adr}.
     0007 & Central com várias instâncias: liderança por \emph{job}, limites partilhados e balanceador & Aceite & Scalability, Availability, Security \\
     0008 & Métricas de alerta como Strategy, com um registo como Simple Factory & Aceite & Modifiability \\
     0009 & \emph{Buffer} do remote com limite e descarte por severidade & Aceite & Availability, Performance \\
+    0010 & Estado do \emph{buffer} reportado ao central; \texttt{/health/live} e \texttt{/health/ready} & Aceite & Monitorability, Availability \\
+    0011 & O remote retoma a entrega sem reinício & Aceite & Availability \\
     \bottomrule
   \end{tabularx}
 \end{table}

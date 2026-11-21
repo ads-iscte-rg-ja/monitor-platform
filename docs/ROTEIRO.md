@@ -13,9 +13,9 @@ SC3 (coordenação cumprida; débito não, com diagnóstico), TE1.
 |---|---|---|---|---|---|---|
 | 0 | 20/11 | *Merge* do D8 | SC3 | 0007 | central, platform | feito |
 | 1 | 20–22/11 | D13 Strategy nos alertas | MO1 (preparação), US1 | 0008 | central, platform (lint) | feito |
-| 2 | 23–24/11 | D19 limite do *buffer* | AV4 | 0009 | remote | feito, por commitar |
-| 3 | 25–27/11 | D17 estado do *buffer* + `/health` live/ready + **medição de MO1** | MO1, MN1, MN2 | 0010 | api, remote, central | |
-| 4 | 28/11 | D16 retoma sem reinício | AV3 | 0011 | remote | |
+| 2 | 23–24/11 | D19 limite do *buffer* | AV4 | 0009 | remote | feito |
+| 3 | 25–27/11 | D17 estado do *buffer* + `/health` live/ready + **medição de MO1** | MO1, MN1, MN2 | 0010 | api, remote, central | feito, por commitar |
+| 4 | 28/11 | D16 retoma sem reinício | AV3 | 0011 | remote | feito, por commitar |
 | 5 | 29/11–1/12 | D15 higiene + E2E | **AV1**, SE1, MN1 (ponta a ponta) | 0012 | todos + `e2e/` | |
 | 6 | 2/12 | D7 *probes* escaláveis (medir primeiro) | AV2 | 0013 | central | |
 | 7 | 3/12 | D14 testabilidade + D12 fonte única | TE2, TE3, MO2 | 0014, 0015 | central, remote, sdk | |
