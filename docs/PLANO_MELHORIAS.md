@@ -778,7 +778,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
   segue nem **porquê**, que é a primeira decisão que o slide 08 pede (*"monolith vs distributed, where should
   data live, synchronous vs asynchronous"*). Os riscos próprios dos sistemas distribuídos (as 8 falácias) e o
   acoplamento entre repositórios estão tratados, mas dispersos por várias decisões e sem nome.
-* **Decisão:** ADR-0018, **retroativo** (resultado da reconstrução, D1), com:
+* **Decisão:** ADR-0019, **retroativo** (resultado da reconstrução, D1), com:
   1. **Classificação:** distribuído, com agente e central; central em camadas, replicado sobre uma BD
      partilhada; remote em *pipeline*; alertas em microkernel interno (registo de *plug-ins* com ligação em tempo
      de compilação, como o exemplo do slide). Comunicação síncrona por pedido (gRPC), mas assíncrona do ponto

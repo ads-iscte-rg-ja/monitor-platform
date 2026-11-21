@@ -10,7 +10,7 @@ Ainda sem prova: SC4 (Passo 9), MO3 e IO1 (Passo 10).
 
 **21/11:** chegaram os slides 07 (documentação, conformidade, testes, variabilidade) e 08 (estilos, falácias da
 computação distribuída, conascência). Não invalidam nenhuma decisão; acrescentam o Passo 10 (D20 no
-[plano](PLANO_MELHORIAS.md), ADR-0018) e a revisão de D1, E3 e §9 do plano.
+[plano](PLANO_MELHORIAS.md), ADR-0019) e a revisão de D1, E3 e §9 do plano.
 
 ## Quadro
 
@@ -26,7 +26,7 @@ computação distribuída, conascência). Não invalidam nenhuma decisão; acres
 | 7 | 3/12 | D14 testabilidade + D12 fonte única | TE2, TE3, MO2 | 0014, 0015 | central, remote, sdk | feito |
 | 8 | 4/12 | D18 endurecimento (ASVS N1) | SE2, SE3 | 0016 | central | feito |
 | 9 | 5/12 | D9 particionamento: medir SC4 e decidir | SC4 | 0017 | central | feito, por commitar (não se particiona) |
-| 10 | 6/12 | D20 estilo, falácias e conascência; vistas finais e de qualidade; conformidade (slides 07–08) | MO3, IO1 | 0018 | platform, central (comentários `// Package`) | |
+| 10 | 6/12 | D20 estilo, falácias e conascência; vistas finais e de qualidade; conformidade (slides 07–08) | MO3, IO1 | 0019 | platform, central (comentários `// Package`) | |
 | 11 | 7/12 | Medição final + fecho do relatório | todos | — | platform | |
 | 12 | 8/12 | Revisão final | — | — | platform | |
 | — | 9/12 | **Entrega** | | | | |
@@ -160,7 +160,7 @@ D17 reporta; D17 traz o dado (quarentena) que dá a métrica nova de MO1; o E2E 
 
 ### Passo 10: D20, estilo e documentação segundo os slides 07–08 (6/12)
 Por ordem de valor (detalhe em D20 e na revisão de D1, no plano):
-1. **ADR-0018 (retroativo):** estilo do sistema (distribuído; central em camadas, replicado sobre uma BD
+1. **ADR-0019 (retroativo):** estilo do sistema (distribuído; central em camadas, replicado sobre uma BD
    partilhada; remote em *pipeline*; alertas em microkernel interno), justificado pelos critérios de decisão do
    slide 08; **tabela das 8 falácias** → resposta → ADR; transações distribuídas evitadas com recibos;
    versionamento de contratos; logs distribuídos sem correlação (lacuna, E6).
@@ -176,6 +176,11 @@ Por ordem de valor (detalhe em D20 e na revisão de D1, no plano):
 6. **Variabilidade:** um parágrafo (*extension point*, configurador, substituição de componentes, SDK como
    *core asset*), sem dizer que é uma linha de produtos.
 7. **Cap. 2:** secção curta com estilos, falácias e conascência (08) e notações e conformidade (07).
+8. **ADRs retroativos já escritos (21/11):** 0018 (PostgreSQL), 0020 (*store-and-forward*), 0021 (SDK → *buffer*),
+   0022 (*outbox*), 0023 (chaves HMAC). O ADR-0019 junta também o monólito em camadas, os *jobs* no processo, Go
+   e a interface no servidor. Acrescentar como alternativas, no Histórico dos ADRs existentes: avaliação de
+   alertas por *polling* de 15 s em vez de *streaming* (ADR-0008, E5) e sessões no servidor em vez de JWT
+   (ADR-0016). Todos entram no anexo B do relatório.
 
 ### Passo 11: medição final e fecho do relatório (7/12)
 * **Medições finais:** `scripts/medir.py <iter-final>` (código) e `loadtest/correr.sh <iter-final>` com todos os
