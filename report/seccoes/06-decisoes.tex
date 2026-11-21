@@ -767,7 +767,58 @@ que entrega um lote foi partida em quatro; o lint do remote desceu de 24 para 21
 \cen{AV3} é provado por um teste com o relógio injetado, descrito na secção~\ref{sec:av1-av4}.
 
 \subsection{Segurança}
-\porescrever{\dec{18}.}
+
+\subsubsection{Endurecimento por \emph{checklist} (\dec{18}, ADR-0016)}
+\label{sec:d18}
+
+\paragraph{Problema.}
+Com os repositórios públicos, duas lacunas estavam identificadas desde a linha de base. A interface carregava o
+Tailwind de uma CDN em cada visita e nenhuma resposta tinha cabeçalhos de segurança: um XSS executaria sem
+obstáculo e qualquer página podia ser enquadrada noutro sítio (\cen{SE2}). E o \emph{endpoint} de saúde de um
+host, que o central visita a cada 30~s, aceitava \emph{loopback} e o endereço de metadados das \emph{clouds}, ou
+um nome que resolvesse para lá: um SSRF a partir do central (\cen{SE3}).
+
+\paragraph{Decisão.}
+Para não endurecer às cegas, usámos uma \emph{checklist} externa e completa como método: os 70 requisitos de
+nível 1 do OWASP ASVS 5.0.0, avaliados um a um, com evidência. A avaliação inicial deu 36 cumpridos, 25 que não se
+aplicam e 9 falhas. As decisões seguem dela: um \emph{middleware} põe em todas as respostas uma CSP que só aceita
+\emph{scripts} da própria origem e nenhum \emph{inline}, \texttt{X-Frame-Options}, \texttt{nosniff},
+\texttt{Referrer-Policy} e, com HTTPS, HSTS; a CSP fica em \emph{enforce} por omissão, com um modo que só reporta,
+e um \emph{endpoint} regista as violações enviadas pelo navegador. O Tailwind passa a ser servido pelo central, na
+mesma versão, verificado contra a integridade publicada no registo npm. As \emph{probes} ganham uma guarda no
+momento da ligação, sobre o endereço já resolvido, que recusa \emph{loopback}, \emph{link-local}, metadados e
+\emph{multicast}, e permite as redes privadas, onde os \emph{hosts} monitorizados normalmente estão. A
+\emph{checklist} levou ainda ao \emph{cookie} com o prefixo \texttt{\_\_Host-}, ao \texttt{Clear-Site-Data} no
+\emph{logout}, e à documentação das regras de autorização e dos prazos de correção de dependências.
+
+\paragraph{Teoria.}
+Nas táticas de segurança, \emph{Limit Exposure} (código de terceiros servido localmente; o que o central pode
+alcançar), \emph{Limit Access} (quem executa \emph{scripts} e quem enquadra as páginas) e \emph{Change Default
+Settings} (os navegadores permitem tudo isto por omissão). A \emph{checklist} é o método de análise: um padrão
+reconhecido em vez de uma lista feita por nós.
+
+\paragraph{Alternativas.}
+Deixar a CSP só a reportar não bloquearia um XSS. Compilar o CSS do Tailwind permitiria tirar
+\texttt{'unsafe-inline'} dos estilos, mas introduziria um passo de \emph{build} numa interface que não tem
+nenhum. Manter a CDN com verificação de integridade não resolveria a dependência de terceiros em cada visita.
+Validar o URL só no formulário deixaria passar um nome que resolve para \emph{loopback}; bloquear todos os IPs
+privados tornaria o produto inútil em redes internas.
+
+\paragraph{Trade-offs.}
+A CSP aceita estilos \emph{inline}, porque o Tailwind gera o CSS no navegador: um atacante que injete HTML pode
+mudar estilos, não executar código; o gatilho é a interface ganhar um passo de \emph{build}. Três requisitos
+continuam a falhar, com o risco aceite: o bloqueio temporário do \emph{login} por quem insistir, a mudança de
+palavra-passe só pela implantação, e a falta de comparação com palavras-passe comuns. Há uma única conta, de
+operador; o gatilho é haver mais.
+
+\paragraph{O que a verificação encontrou.}
+Ao percorrer a interface num navegador real para confirmar que a CSP não partia nada, o painel de métricas do
+\emph{dashboard} não carregava. A causa era antiga e não tinha a ver com a CSP: a opção provisória do seletor de
+hosts não tinha valor, o \emph{script} enviava o texto dela como identificador, e o primeiro pedido falhava sempre.
+Os testes de carga chamam a API diretamente e não o viam. Ficou corrigido, com teste.
+
+\paragraph{Verificação.}
+\cen{SE2} e \cen{SE3} estão na secção~\ref{sec:aval-se}.
 
 \subsection{Processo e qualidade}
 \porescrever{\dec{1}--\dec{3}.}

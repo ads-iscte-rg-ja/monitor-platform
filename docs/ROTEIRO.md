@@ -18,8 +18,8 @@ SC3 (coordenação cumprida; débito não, com diagnóstico), TE1.
 | 4 | 28/11 | D16 retoma sem reinício | AV3 | 0011 | remote | feito |
 | 5 | 29/11–1/12 | D15 higiene + E2E | **AV1**, SE1, MN1 (ponta a ponta) | 0012 | todos + `e2e/` | feito |
 | 6 | 2/12 | D7 *probes* escaláveis (medir primeiro) | AV2 | 0013 | central | feito |
-| 7 | 3/12 | D14 testabilidade + D12 fonte única | TE2, TE3, MO2 | 0014, 0015 | central, remote, sdk | feito, por commitar |
-| 8 | 4/12 | D18 endurecimento (ASVS N1) | SE2, SE3 | 0016 | central | |
+| 7 | 3/12 | D14 testabilidade + D12 fonte única | TE2, TE3, MO2 | 0014, 0015 | central, remote, sdk | feito |
+| 8 | 4/12 | D18 endurecimento (ASVS N1) | SE2, SE3 | 0016 | central | feito, por commitar |
 | 9 | 5/12 | D9 particionamento: medir SC4 e decidir | SC4 | 0017 | central | |
 | 10 | 6–7/12 | Medição final + fecho do relatório | todos | — | platform | |
 | 11 | 8/12 | Revisão final | — | — | platform | |
@@ -127,6 +127,10 @@ D17 reporta; D17 traz o dado (quarentena) que dá a métrica nova de MO1; o E2E 
   `Referrer-Policy`, HSTS com `COOKIE_SECURE`); Tailwind servido localmente; guarda SSRF no `Dialer.Control`
   das *probes* (depois da resolução DNS).
 * **Provas:** SE2 e SE3 com testes.
+* **Estado (21/11):** feito ([ADR-0016](adr/0016-endurecimento-por-checklist-asvs.md),
+  `docs/seguranca/asvs-n1.md`, `docs/metrics/iter-6/se2-se3.md`). ASVS 5.0.0 N1 (70 requisitos): 9 → 3 falhas,
+  com risco aceite. CSP em *enforce* por omissão (decisão do utilizador; `CSP_MODE=report-only` disponível),
+  verificada num navegador real. Encontrado e corrigido um defeito antigo no seletor de hosts do *dashboard*.
 
 ### Passo 9: D9, medir SC4 e decidir (5/12)
 * Gerar 30 dias sintéticos de 1.000 hosts (`seed-demo` estendido); medir o p95 do *dashboard* e a duração da
