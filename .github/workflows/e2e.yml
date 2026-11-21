@@ -1,5 +1,5 @@
-# Testes ponta a ponta (ADR-0012): o sistema inteiro, construído a partir do main dos seis
-# repositórios, num Compose descartável. Corre todas as noites e à mão; não é obrigatório nos
+# Testes ponta a ponta (ADR-0012): o sistema inteiro, construído a partir do main dos
+# repositórios (o SDK entra pela versão que o hello-world fixa), num Compose descartável. Corre todas as noites e à mão; não é obrigatório nos
 # PRs (demora minutos e depende do main de todos os repositórios).
 name: e2e
 
@@ -34,8 +34,6 @@ jobs:
         with: {repository: ads-iscte-rg-ja/monitor-central, path: monitor-central}
       - uses: actions/checkout@v7
         with: {repository: ads-iscte-rg-ja/monitor-remote, path: monitor-remote}
-      - uses: actions/checkout@v7
-        with: {repository: ads-iscte-rg-ja/monitor-go-sdk, path: monitor-go-sdk}
       - uses: actions/checkout@v7
         with: {repository: ads-iscte-rg-ja/monitor-hello-world, path: monitor-hello-world}
 

@@ -128,3 +128,7 @@ Higiene: `ErrorLogCollector` removido (−408 linhas; lint do remote 21 → 20);
 módulo do SDK renomeado; `scripts/go-work.sh`; READMEs sem referências partidas. Lint do central: 54, igual.
 
 ## Histórico
+* **2026-11-21 —** o SDK foi publicado como `v0.1.0` e o hello-world passou a depender dessa versão, sem
+  `replace` (ponto 3 da decisão). Motivo: o CI do hello-world clonava o `main` do SDK para o `replace`, e uma
+  mudança nos dois repositórios ao mesmo tempo (o nome do módulo) falhou o `go mod tidy -diff` até o PR do SDK
+  entrar. O SDK deixa de ser repositório irmão no CI e no E2E; o `monitor-remote` continua (esquema do *buffer*).

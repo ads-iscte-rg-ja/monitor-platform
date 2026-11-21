@@ -3,7 +3,8 @@
 Decisão: [ADR-0012](../docs/adr/0012-higiene-e-testes-ponta-a-ponta.md) (plano §7, D15).
 
 O sistema inteiro num Compose descartável, construído a partir dos repositórios irmãos (a pasta-mãe tem de ter
-`monitor-central`, `monitor-remote`, `monitor-go-sdk` e `monitor-hello-world` ao lado de `monitor-platform`):
+`monitor-central`, `monitor-remote` e `monitor-hello-world` ao lado de `monitor-platform`). O SDK entra pela
+versão publicada que o `go.mod` do hello-world fixa, como numa aplicação real:
 
 ```
 hello-world (SDK) ──escreve──▶ buffer SQLite ◀── remote ──gRPC/TLS──▶ nginx ──▶ central ──▶ PostgreSQL

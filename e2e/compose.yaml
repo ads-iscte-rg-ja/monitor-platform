@@ -41,8 +41,6 @@ x-hello-world: &hello-world
   build:
     context: ../../monitor-hello-world
     dockerfile: ../monitor-platform/e2e/hello-world.Dockerfile
-    additional_contexts:
-      sdk: ../../monitor-go-sdk
   profiles: [aplicacao]
   restart: "no"
 
