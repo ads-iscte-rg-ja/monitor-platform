@@ -4,8 +4,13 @@ Ordem de execução do que falta no [plano](PLANO_MELHORIAS.md), passo a passo. 
 fecha, que ADR escreve, o que se implementa, como se prova e o que entra no relatório. Atualizar a coluna
 **Estado** do quadro à medida que se avança.
 
-**Já feito:** D1–D6, D8, D10, D11 (ADR-0001 a 0007; iterações 1–5 medidas). Cenários com prova: SC1, SC2, SC5,
-SC3 (coordenação cumprida; débito não, com diagnóstico), TE1.
+**Já feito:** D1–D8, D10–D19 (ADR-0001 a 0016; iterações 1–6 medidas). Cenários com prova: SC1, SC2, SC5,
+SC3 (coordenação cumprida; débito não, com diagnóstico), TE1–TE3, AV1–AV4, MO1, MO2, MN1, MN2, SE1–SE3.
+Ainda sem prova: SC4 (Passo 9), MO3 e IO1 (Passo 10).
+
+**21/11:** chegaram os slides 07 (documentação, conformidade, testes, variabilidade) e 08 (estilos, falácias da
+computação distribuída, conascência). Não invalidam nenhuma decisão; acrescentam o Passo 10 (D20 no
+[plano](PLANO_MELHORIAS.md), ADR-0018) e a revisão de D1, E3 e §9 do plano.
 
 ## Quadro
 
@@ -19,10 +24,11 @@ SC3 (coordenação cumprida; débito não, com diagnóstico), TE1.
 | 5 | 29/11–1/12 | D15 higiene + E2E | **AV1**, SE1, MN1 (ponta a ponta) | 0012 | todos + `e2e/` | feito |
 | 6 | 2/12 | D7 *probes* escaláveis (medir primeiro) | AV2 | 0013 | central | feito |
 | 7 | 3/12 | D14 testabilidade + D12 fonte única | TE2, TE3, MO2 | 0014, 0015 | central, remote, sdk | feito |
-| 8 | 4/12 | D18 endurecimento (ASVS N1) | SE2, SE3 | 0016 | central | feito, por commitar |
-| 9 | 5/12 | D9 particionamento: medir SC4 e decidir | SC4 | 0017 | central | |
-| 10 | 6–7/12 | Medição final + fecho do relatório | todos | — | platform | |
-| 11 | 8/12 | Revisão final | — | — | platform | |
+| 8 | 4/12 | D18 endurecimento (ASVS N1) | SE2, SE3 | 0016 | central | feito |
+| 9 | 5/12 | D9 particionamento: medir SC4 e decidir | SC4 | 0017 | central | feito, por commitar (não se particiona) |
+| 10 | 6/12 | D20 estilo, falácias e conascência; vistas finais e de qualidade; conformidade (slides 07–08) | MO3, IO1 | 0018 | platform, central (comentários `// Package`) | |
+| 11 | 7/12 | Medição final + fecho do relatório | todos | — | platform | |
+| 12 | 8/12 | Revisão final | — | — | platform | |
 | — | 9/12 | **Entrega** | | | | |
 
 A ordem segue as dependências: D13 cria o mecanismo que MO1 mede; D19 produz os contadores de descarte que
@@ -133,13 +139,45 @@ D17 reporta; D17 traz o dado (quarentena) que dá a métrica nova de MO1; o E2E 
   verificada num navegador real. Encontrado e corrigido um defeito antigo no seletor de hosts do *dashboard*.
 
 ### Passo 9: D9, medir SC4 e decidir (5/12)
-* Gerar 30 dias sintéticos de 1.000 hosts (`seed-demo` estendido); medir o p95 do *dashboard* e a duração da
-  retenção com a ingestão a correr.
+* Gerar 30 dias sintéticos de 1.000 hosts; medir o p95 do *dashboard* e a duração da retenção com a ingestão a
+  correr. **Feito assim (21/11):** em vez de estender o `seed-demo` (código de produção), a geração ficou no
+  `loadtest/` (`historico.py`, medição `dashboard-30d`): 31 dias com o ritmo e o perfil do k6 (~89 M estatísticas,
+  ~239 M erros, com os recibos), duas fases sobre os mesmos dados (sem e com retenção, para isolar o efeito
+  desta na ingestão) e o p95 de cada página e API do *dashboard*. Medição "antes" em `docs/metrics/iter-6/sc4-antes/`.
+* Separar as causas: se o *dashboard* falhar por consultas sem limite temporal (`COUNT(*)`, `DISTINCT` sobre a
+  tabela inteira), a correção é a forma da consulta, não o particionamento. Registar no ADR-0017 o crescimento
+  sem limite de `telemetry_receipts`.
+* **Resultado (21/11):** antes, p95 29–74 s e a ingestão parada; a causa eram quatro consultas sem limite
+  temporal. Com o ADR-0017: p95 16–287 ms, ingestão 7,4 ms, retenção 0,33 s por execução. Não se particiona (o
+  critério foi fixado no ADR antes da medição). A migração 8 demora 4 min 12 s nos 143 GB e falhava com o
+  `statement_timeout` de 30 s (corrigido; `MIGRATE_TIMEOUT`). Falta o relatório (§D9, cap. 7 com
+  `carga-sc4.tex`), que entra no Passo 11.
+* **Para o Passo 11:** a retenção passou a estar ativa por omissão (a cada minuto). A medição final corre com ela
+  ligada, ao contrário das iterações 3–5; dizê-lo no método do cap. 7.
 * Se SC4 falhar: particionamento diário com `DROP PARTITION` (migração testada nos testes de integração). Se
   cumprir: ADR com a medição e o gatilho. Em ambos os casos, ligar ao diagnóstico do SC3 (o particionamento
   ajuda a retenção, não as escritas).
 
-### Passo 10: medição final e fecho do relatório (6–7/12)
+### Passo 10: D20, estilo e documentação segundo os slides 07–08 (6/12)
+Por ordem de valor (detalhe em D20 e na revisão de D1, no plano):
+1. **ADR-0018 (retroativo):** estilo do sistema (distribuído; central em camadas, replicado sobre uma BD
+   partilhada; remote em *pipeline*; alertas em microkernel interno), justificado pelos critérios de decisão do
+   slide 08; **tabela das 8 falácias** → resposta → ADR; transações distribuídas evitadas com recibos;
+   versionamento de contratos; logs distribuídos sem correlação (lacuna, E6).
+2. **Relatório, vistas:** vistas da arquitetura **final** (módulos, C&C em diagrama, alocação); **vistas de
+   qualidade** de disponibilidade e de segurança; notação declarada (informal com legenda; `.proto` e `depguard`
+   como as partes verificáveis por máquina); legenda em todas as figuras; cap. 3 descrito como reconstrução.
+3. **Conascência** no §MO2 / D11 / D12 e no cap. 9 (de significado → de nome e tipo; de valores → fonte única).
+4. **Conformidade:** parágrafo sobre o `depguard` como *conformance by analysis* e o seu limite (estruturas de
+   execução verificadas por SC3 e pelo E2E); comentários `// Package` em `handlers`, `services` e `repositories`
+   (camada, dependências permitidas, regra do `depguard`); tabela cenário → nível de teste.
+5. **Medir MO3** (alteração de apresentação real a uma página: 0 ficheiros em `services`/`repositories`) e
+   **IO1** (o k6 em JavaScript como agente feito só a partir do `.proto`).
+6. **Variabilidade:** um parágrafo (*extension point*, configurador, substituição de componentes, SDK como
+   *core asset*), sem dizer que é uma linha de produtos.
+7. **Cap. 2:** secção curta com estilos, falácias e conascência (08) e notações e conformidade (07).
+
+### Passo 11: medição final e fecho do relatório (7/12)
 * **Medições finais:** `scripts/medir.py <iter-final>` (código) e `loadtest/correr.sh <iter-final>` com todos os
   cenários (incluindo `capacidade-1..3`); tabelas com `--antes iter-3` (*baseline* → final).
 * **Relatório:**
@@ -148,9 +186,11 @@ D17 reporta; D17 traz o dado (quarentena) que dá a métrica nova de MO1; o E2E 
   * cap. 8: evolução E1–E9 com gatilhos;
   * resumo (rever com os resultados finais).
 
-### Passo 11: revisão final (8/12)
+### Passo 12: revisão final (8/12)
 * PT-PT, afirmações (cada número tem fonte: medição, ADR ou estimativa identificada), coerência entre plano,
   ADRs e relatório.
+* **Cobertura da teoria:** cada slide (01–08) tem pelo menos uma decisão ou secção que o aplica, com a citação;
+  nenhuma referência a padrões ou estilos com o nome errado (por exemplo, E3 é Service-Based, não SOA).
 * **O relatório não menciona EUVI** (o plano menciona-o em MO3, US1, D14, D17 e D18: reformular ao passar para
   o relatório).
 * Compilação limpa; `make dados` com a iteração final; anexos completos.

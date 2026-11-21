@@ -1,0 +1,8 @@
+data: 2026-11-21T16:02:52+00:00
+monitor-central: main@ecf7e8e
+monitor-api: main@7f42c4e
+monitor-platform: main@0bfc70a (com alterações por commitar)
+hosts simulados: 1000; duração dos cenários contínuos: 10m
+limites: central 2 vCPU / 4 GB por instância; PostgreSQL 2 vCPU / 4 GB; nginx e k6 sem limites (loadtest/compose.yaml)
+k6: grafana/k6:2.4.0
+cpu: AMD Ryzen 7 3700X 8-Core Processor (16 threads), memória: 31 GB

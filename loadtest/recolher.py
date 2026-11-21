@@ -71,6 +71,13 @@ def servidor(prometheus: str, inicio: int, fim: int) -> dict:
         "esperas_por_ligacao": q(f"sum(increase(go_sql_wait_count_total[{d}]))"),
         "espera_por_ligacao_s": q(f"sum(increase(go_sql_wait_duration_seconds_total[{d}]))"),
         "jobs": jobs(prometheus, d, fim),
+        "retencao": retencao(prometheus, d, fim),
+        # p95 do servidor por rota do dashboard (SC4); o do agente, por consulta, vem do k6.
+        "dashboard_p95_ms_por_rota": {
+            r["metric"].get("route", "?"): ms(float(r["value"][1])) for r in consultar(
+                prometheus, f'histogram_quantile(0.95, sum by (le, route) (increase(monitor_http_request_duration_seconds_bucket'
+                f'{{route=~"/dashboard|/errors|/hosts|/api/v1/dashboard/.*"}}[{d}])))', fim)
+            if r["value"][1] not in ("NaN", "+Inf")},
     }
 
 
@@ -82,6 +89,40 @@ def jobs(prometheus: str, d: str, fim: int) -> dict:
     executores = {r["metric"]["exported_job"]: float(r["value"][1]) for r in consultar(
         prometheus, f"count by (exported_job) (increase(monitor_job_duration_seconds_count[{d}]) > 0)", fim)}
     return {"lideres_max": lideres, "instancias_que_executaram": executores}
+
+
+def retencao(prometheus: str, d: str, fim: int) -> dict:
+    """SC4: execuções da retenção na janela, a sua duração e falhas (monitor_job_duration_seconds, ADR-0004)."""
+    q = lambda e: escalar(prometheus, e, fim)  # noqa: E731
+    filtro = '{exported_job="retention"}'
+    execucoes = q(f"sum(increase(monitor_job_duration_seconds_count{filtro}[{d}]))")
+    soma = q(f"sum(increase(monitor_job_duration_seconds_sum{filtro}[{d}]))")
+    return {
+        "execucoes": execucoes,
+        "duracao_media_s": None if not execucoes else round(soma / execucoes, 2),
+        "duracao_p95_s": q(f"histogram_quantile(0.95, sum by (le) (increase(monitor_job_duration_seconds_bucket{filtro}[{d}])))"),
+        "falhas": q(f"sum(increase(monitor_job_failures_total{filtro}[{d}]))"),
+    }
+
+
+def estado_bd(caminho: Path | None) -> dict:
+    """SC4: registos fora da janela de retenção e tamanho das tabelas, antes e depois (correr.sh)."""
+    if caminho is None or not caminho.exists():
+        return {}
+    campos = ("stats_expirados", "erros_expirados", "machine_stats_bytes", "error_logs_bytes",
+              "telemetry_receipts_bytes", "base_de_dados_bytes", "instante")
+    estado = {}
+    for linha in caminho.read_text().splitlines():
+        partes = linha.split("|")
+        if len(partes) == len(campos) + 1:
+            estado[partes[0]] = dict(zip(campos, map(int, partes[1:])))
+    if {"antes", "depois"} <= estado.keys():
+        a, b = estado["antes"], estado["depois"]
+        horas = max(b["instante"] - a["instante"], 1) / 3600
+        # O que a retenção removeu por hora, contra o que entra: se for menor, os dados antigos acumulam.
+        estado["removidos_por_hora"] = round((a["stats_expirados"] + a["erros_expirados"]
+                                              - b["stats_expirados"] - b["erros_expirados"]) / horas)
+    return estado
 
 
 def cpu_contentores(caminho: Path | None) -> dict:
@@ -151,6 +192,7 @@ def main() -> None:
     ap.add_argument("--hosts", type=int, required=True)
     ap.add_argument("--instancias", type=int, default=1)
     ap.add_argument("--cpu-contentores", type=Path)
+    ap.add_argument("--estado-bd", type=Path)
     ap.add_argument("--saida", type=Path, required=True)
     a = ap.parse_args()
     medicao = {
@@ -164,6 +206,7 @@ def main() -> None:
         "servidor": servidor(a.prometheus, a.inicio, a.fim),
         "dashboard_p95_ms_durante_recuperacao": None,
         "base_de_dados": {"stats": a.gravados_stats, "erros": a.gravados_erros, "duplicados": a.duplicados},
+        "estado_bd": estado_bd(a.estado_bd),
     }
     recuperacao = valor_recuperacao(medicao["agente"])
     medicao["dashboard_p95_ms_durante_recuperacao"] = dashboard_durante(a.prometheus, a.inicio, recuperacao)

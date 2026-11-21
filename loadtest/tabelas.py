@@ -4,7 +4,7 @@
 Uso:  loadtest/tabelas.py <iteração> [--antes <iteração>]
 
 Escreve em docs/metrics/<iteração>/: carga-sc1.tex, carga-sc2.tex, carga-sc5.tex,
-carga-sensibilidade.tex e carga-sc3.tex (o relatório inclui-as com \\gerado, depois de "make dados ITER=...").
+carga-sensibilidade.tex, carga-sc3.tex e carga-sc4.tex (o relatório inclui-as com \\gerado, depois de "make dados ITER=...").
 Com --antes, cada tabela acrescenta a coluna da iteração anterior (antes/depois).
 """
 
@@ -246,7 +246,56 @@ def main() -> None:
     escala = [(n, m) for n, m in escala if m is not None]
     if escala:
         (destino / "carga-sc3.tex").write_text(tabela_sc3(escala, ambiente))
+    # Com --antes, as colunas dizem "antes"/"depois"; as iterações vão na legenda.
+    rotulo_it = {a.antes: "antes, ", a.iteracao: "depois, "} if a.antes else {a.iteracao: ""}
+    fases = [(f"{rotulo_it[it]}{fase}", carregar(it, medicao)) for it in ([a.antes] if a.antes else []) + [a.iteracao]
+             for fase, medicao in (("sem ret.", "dashboard-30d"), ("com ret.", "dashboard-30d-retencao"))]
+    fases = [(nome, m) for nome, m in fases if m is not None]
+    if fases:
+        iteracoes = f"{a.antes} $\\rightarrow$ {a.iteracao}" if a.antes else a.iteracao
+        (destino / "carga-sc4.tex").write_text(tabela_sc4(fases, ambiente, iteracoes))
     print(f"tabelas de carga escritas em {destino}")
+
+
+# SC4: as consultas do dashboard do cenário dashboard-30d (k6/ingestao.js, CONSULTAS_30D).
+CONSULTAS_SC4 = [("summary", "Resumo (\\texttt{/summary})"), ("pagina_dashboard", "Página do \\emph{dashboard}"),
+                 ("metricas_24h", "Métricas de 24 h"), ("metricas_1m", "Métricas de 1 mês"),
+                 ("erros", "Erros (\\texttt{/errors})"), ("erros_host", "Erros de um \\emph{host}"),
+                 ("hosts", "\\emph{Hosts} (\\texttt{/hosts})")]
+
+
+def tabela_sc4(fases: list[tuple[str, dict]], ambiente: str, iteracoes: str) -> str:
+    """SC4: 31 dias de histórico, sem e com a retenção, antes e depois (ADR-0017)."""
+    def col(f):
+        return [f(m) for _, m in fases]
+
+    def p95_consulta(m, nome):
+        return duracao(valor(m, "agente", f"http_req_duration{{consulta:{nome}}}", "p(95)"))
+
+    def rejeicoes(m):
+        return num(pct_codigo(m, 8), 0, "\\,\\%")
+
+    def retencao(m):
+        r = valor(m, "servidor", "retencao") or {}
+        if not r.get("execucoes"):
+            return "---"
+        return f"{num(r['duracao_media_s'], 1, ' s')} / {num(r.get('duracao_p95_s'), 1, ' s')}"
+
+    linhas = [[f"p95: {rotulo}", "$<$ 1 s"] + col(lambda m, n=nome: p95_consulta(m, n)) for nome, rotulo in CONSULTAS_SC4]
+    linhas += [
+        ["p95 da ingestão (agente)", "$<$ 300 ms"] + col(lambda m: duracao(valor(m, "agente", "grpc_req_duration{ingestao:sim}", "p(95)"))),
+        ["Rejeições por sobrecarga", "---"] + col(rejeicoes),
+        ["Registos confirmados em 10 min", "---"] + col(lambda m: num(valor(m, "agente", "registos_confirmados", "count"))),
+        ["Retenção: duração média / p95", "---"] + col(retencao),
+        ["Expirados: variação por hora", "$\\le$ 0"] + col(lambda m: num(-(valor(m, "estado_bd", "removidos_por_hora") or 0)).replace("-", "$-$")),
+        ["Lotes perdidos / duplicados", "0 / 0"] + col(lambda m: f"{num(valor(m, 'agente', 'lotes_perdidos', 'passes'))} / {num(valor(m, 'base_de_dados', 'duplicados'))}"),
+    ]
+    cab = ["Medida", "Alvo"] + [nome for nome, _ in fases]
+    nota = ("31 dias de histórico de 1\\,000 \\emph{hosts} (89 M estatísticas, 239 M erros) e a carga nominal durante 10 min, "
+            "com uma consulta do \\emph{dashboard} por segundo, à vez pelas sete. Com retenção: 30 dias, a cada minuto, lotes de 10\\,000. "
+            + ambiente)
+    return tabela("tab:carga-sc4", f"Cenário SC4: \\emph{{dashboard}} e retenção com 30 dias de dados ({iteracoes})", cab, linhas,
+                  "ll" + "r" * len(fases), nota)
 
 
 def tabela_sc3(escala: list[tuple[int, dict]], ambiente: str) -> str:

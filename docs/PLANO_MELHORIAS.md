@@ -1,7 +1,9 @@
 # Plano de melhoria arquitetural — Monitor (perspetiva ADS)
 
 > **Âmbito:** `monitor-central`, `monitor-remote`, `monitor-go-sdk`, `monitor-hello-world`.
-> **Base teórica:** slides de ADS (ISCTE, 01 a 06): QA, tácticas, padrões, GoF, utility tree, ADD.
+> **Base teórica:** slides de ADS (ISCTE, 01 a 08): QA, tácticas, padrões, GoF, utility tree, ADD,
+> documentação e conformidade (07), estilos arquiteturais, falácias da computação distribuída e conascência (08).
+> Os slides 07 e 08 chegaram a 21/11: o que mudam no plano está em D20 e na revisão de D1, E3 e §9.
 > **Contexto:** projeto proposto pela equipa (2 pessoas). O mesmo sistema é avaliado em **EUVI**
 > (UI/UX) e em **ADS** (arquitetura). Os repos vão ficar públicos.
 > **Prioridades da equipa para ADS:** (1) métricas de qualidade, (2) escalabilidade, (3) manutenção,
@@ -345,6 +347,12 @@ flowchart TB
 (SQLite partilhado entre SDK e remote; PostgreSQL), **MVC** server-side, *Transactional Outbox*
 (email), *Store-and-Forward* (`delivery_status`).
 
+**Estilo (slide 08, acrescentado a 21/11; ver D20):** sistema **distribuído** com duas unidades de
+*deployment*, o agente (um por host) e o central. O central é um **monólito em camadas** (partição técnica);
+o remote é um **pipeline** (recolha → *buffer* → envio) cujo *pipe* é persistente (SQLite). Depois de D8, o
+central passa a monólito replicado sobre uma BD partilhada; depois de D13, os alertas são um **microkernel
+interno** (núcleo + *plug-ins* obtidos de um registo).
+
 ### 5.3 Tácticas já implementadas (slide 03)
 | QA | Tácticas | Evidência |
 |---|---|---|
@@ -418,6 +426,27 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Alternativas rejeitadas:** UML completo (YAGNI; slide 02: *"only if it brings a positive return"*);
   repo separado de documentação (afasta os docs do código, que deve ser *"visible & self-evident in the code"*).
 * **Verificação:** cada D tem ADR; um leitor externo encontra as decisões a partir de qualquer README.
+
+* **Revisão com o slide 07 (21/11):**
+  * **Notação:** as vistas são **informais com legenda** (custo/benefício do slide 07; o UML completo continua
+    rejeitado). As partes **formais e verificáveis por máquina** dizem-se como tal: o `.proto` (verificado pelo
+    `buf`) e as regras de camadas do `depguard`. Todas as figuras do relatório levam legenda.
+  * **Vistas finais:** o cap. 3 mostra só a iteração 0. Faltam as vistas da arquitetura final (módulos com
+    `monitor-api` e `alertmetric`; C&C em diagrama, não só em tabela, com gRPC, nginx, N instâncias e líder;
+    alocação com o Compose de produção).
+  * **Vistas de qualidade** (slide 07: *"quality views extract relevant pieces of structural views"*):
+    **disponibilidade** (o caminho de um registo do SDK à BD, cada ponto de falha e a tática que o cobre) e
+    **segurança** (fronteiras de confiança, chaves HMAC, TLS, CSP, guarda SSRF; é o exemplo do próprio slide).
+  * **Reconstrução:** o cap. 3 passa a chamar ao que foi feito *architecture reconstruction* (processo
+    interpretativo e iterativo, com ferramentas: leitura do código, grafo de *imports*, primeira execução do
+    `depguard`).
+  * **Conformidade por análise:** o `depguard` é *conformance by analysis*. O slide aponta o seu limite (as
+    estruturas de execução não aparecem no código estático); a nossa resposta é verificá-las em execução: SC3
+    (cada *job* numa só instância) e o E2E.
+  * ***Architecturally-evident coding style*:** comentário `// Package` em `handlers`, `services` e
+    `repositories` com a camada, o que pode usar e a regra do `depguard` que o garante (hoje não existem).
+  * **Arquitetura e testes:** tabela cenário → nível de teste (unitário com *fakes*; integração com PostgreSQL e
+    o contrato, isto é, as interfaces entre elementos; aceitação de QA com k6 e E2E).
 
 #### D2. Métricas e ferramentas de qualidade de código
 * **Problema:** prioridade da equipa; M1. Hoje não se mede nada além da cobertura feita à mão.
@@ -560,6 +589,17 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Trade-off:** migração mais delicada, porque converter uma tabela existente exige cópia. Mitigação: a
   migração é testada nos testes de integração, como as v1→v3 que já existem.
 * **Verificação:** SC4 com 30 dias sintéticos (`seed-demo` estendido); duração da retenção constante, seja qual for o volume.
+* **Estado (21/11): medido primeiro, e a decisão mudou** ([ADR-0017](adr/0017-consultas-limitadas-e-bulkhead-do-dashboard.md)).
+  Com 31 dias de 1.000 *hosts* (143 GB), o *dashboard* deu p95 de 29–74 s e parou a ingestão (58 % de rejeições),
+  já sem retenção. A causa não era o volume nem a retenção: eram quatro consultas sem limite temporal (55 s, 17 s,
+  13 s, 5 s isoladas), que o particionamento não teria ajudado, a ocupar todo o *pool*. Parte 1 (feita):
+  consultas com custo limitado (*lateral*, *loose index scan*, contagem com teto, contadores por hora, índice de
+  cobertura) e *bulkhead* do *dashboard*. Parte 2: o particionamento decide-se pela fase com retenção da nova
+  medição, com um critério fixado no ADR antes de medir.
+  **Depois (21/11, `iter-6/sc4-depois`): SC4 cumpre-se.** O p95 das 7 consultas ficou entre 16 e 287 ms, a
+  ingestão em 7,4 ms com 0 rejeições, e cada execução da retenção em 0,33 s (p95 0,48 s), sem efeito na ingestão.
+  **Não se particiona** (nenhuma condição do critério se verifica; o gatilho fica no ADR). A retenção passa a
+  estar ativa por omissão (30/30/180/30/365 dias; a cada 1 min, lotes de 10.000).
 
 #### D10. Testes de carga reprodutíveis
 * **Problema:** os cenários SC precisam de evidência repetível, não de uma demonstração única.
@@ -731,6 +771,49 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 
 ---
 
+### 7.6 Estilo arquitetural (slide 08)
+
+#### D20. Estilo arquitetural explícito, falácias da computação distribuída e conascência
+* **Problema:** o plano e o relatório falam de padrões (slide 04), mas nunca dizem **que estilo** o sistema
+  segue nem **porquê**, que é a primeira decisão que o slide 08 pede (*"monolith vs distributed, where should
+  data live, synchronous vs asynchronous"*). Os riscos próprios dos sistemas distribuídos (as 8 falácias) e o
+  acoplamento entre repositórios estão tratados, mas dispersos por várias decisões e sem nome.
+* **Decisão:** ADR-0018, **retroativo** (resultado da reconstrução, D1), com:
+  1. **Classificação:** distribuído, com agente e central; central em camadas, replicado sobre uma BD
+     partilhada; remote em *pipeline*; alertas em microkernel interno (registo de *plug-ins* com ligação em tempo
+     de compilação, como o exemplo do slide). Comunicação síncrona por pedido (gRPC), mas assíncrona do ponto
+     de vista da aplicação, que escreve no *buffer* local e não espera pela rede.
+  2. **Critérios do slide 08:** domínio (telemetria com picos e um *dashboard* de leitura); características
+     (escalabilidade, disponibilidade, manutenção: §2); arquitetura de dados (registo e recibo na mesma
+     transação ACID); fatores organizacionais (2 pessoas, prazo); maturidade operacional (Compose, sem
+     orquestrador).
+  3. **Tabela das 8 falácias**, cada uma com a resposta do sistema e o ADR (rede fiável → *store-and-forward*,
+     *retry*, recibos; latência → lotes; largura de banda → lote ≤ 1 MiB, protobuf; rede segura → HMAC, TLS,
+     SSRF; topologia → nginx e líder; um só administrador → estado do *buffer* no central, `/health/ready`;
+     custo de transporte → gRPC, só como argumento, não medido; rede homogénea → contrato `.proto`, IO1). E os
+     outros desafios do slide: **transações distribuídas** evitadas com idempotência (recibos), sem 2PC nem
+     *saga*; **versionamento de contratos** com `buf breaking` e *tags* semânticas; **logs distribuídos**
+     estruturados (D4), mas sem correlação remote→central (lacuna assumida, gatilho em E6).
+  4. **Conascência** como métrica de acoplamento (slide 08: reduzi-la reduz o custo de mudança), aplicada às
+     decisões que já existem: M2 (texto das mensagens em inglês, conascência de significado) → D11 (`enum`
+     `RejectionReason`: de nome e de tipo, verificada pelo compilador e pelo `buf`); M3 (níveis em 10 sítios,
+     de valores) → D12 (fonte única + testes de consistência); SDK → esquema SQLite do remote (de nome e de
+     tipo, entre repositórios, coberta por testes); recibos (de identidade, `host_id` + `source_id`); líder e
+     `RetryInfo` (dinâmicas, de execução e de tempo).
+  5. **Variabilidade** (slide 07; não somos uma linha de produtos e não o dizemos): *extension point* (registo
+     de métricas de alerta), *parameters/configurator* (configuração por ambiente validada), substituição de
+     componentes (`Clock`, `DialControl`), o SDK como *core asset* reutilizável.
+* **Teoria:** estilos e critérios de decisão (slide 08); falácias e desafios dos sistemas distribuídos (08);
+  conascência estática e dinâmica (08); variabilidade (07).
+* **Alternativas rejeitadas:** microserviços e *broker* já (§9, agora com os argumentos do slide 08);
+  documentar o estilo só no texto, sem ADR (perde-se o *porquê*, ADR-0001).
+* **Trade-offs:** um ADR retroativo descreve uma decisão que não foi tomada com este vocabulário; diz-se
+  isso no próprio ADR.
+* **Verificação:** os cenários que ainda não tinham prova passam a tê-la: **IO1** (o gerador de carga k6 é um
+  agente em JavaScript feito só a partir do `.proto` do `monitor-api`) e **MO3** (uma alteração de
+  apresentação real a uma página: 0 ficheiros alterados em `services` e `repositories`, com o `depguard` a
+  garantir a regra).
+
 ## 8. Plano de evolução para 10.000+ hosts (backlog com gatilhos)
 
 Não implementamos isto. Documentamos **quando** e **porquê** cada passo se tornaria necessário. Cada item
@@ -744,7 +827,7 @@ de escalar fica guiada por dados e não por antecipação (YAGNI, slide 06).
 |---|---|---|---|---|
 | E1 | **Fila de ingestão** (NATS JetStream ou Kafka) entre a API e a BD: a API só valida e publica, e *consumers* escrevem em lote | p95 de escrita na BD >200 ms **ou** taxa de rejeições por sobrecarga >5% em regime normal | **Publish-Subscribe / Broker** (slide 04); *Use an Intermediary* | Novo serviço com estado; a deduplicação passa para o *consumer* |
 | E2 | **TimescaleDB**: *hypertables* + *continuous aggregates* (1 min / 1 h) + compressão | Dashboard p95 >1 s em 30 d **ou** armazenamento >500 GB | *Maintain Multiple Copies of Data* (agregados), *Reduce Overhead* | Troca da imagem do Postgres; migração de dados |
-| E3 | **Separar serviços**: `ingest`, `web` e `worker` em deploys independentes (o `APP_ROLE` já o prepara) | Ingestão e dashboard competem por CPU (correlação nas métricas) | *Split Module*; SOA (slide 04) | Mais deploys; o contrato interno passa a ser fronteira de rede |
+| E3 | **Separar serviços**: `ingest`, `web` e `worker` em deploys independentes (o `APP_ROLE` já o prepara) | Ingestão e dashboard competem por CPU (correlação nas métricas) | *Split Module*; **Service-Based Architecture** (slide 08: serviços de grão grosso com a BD partilhada; não SOA, que o slide 08 dá como exemplo a evitar) | Mais deploys; o contrato interno passa a ser fronteira de rede |
 | E4 | **Réplicas de leitura** para o dashboard; HA do Postgres (Patroni ou serviço gerido) | CPU da BD >70% com leitura dominante; requisito de RTO | *Maintain Multiple Copies of Data*, *Active/Passive Redundancy* | Leituras ligeiramente desatualizadas (aceitável num dashboard) |
 | E5 | **Avaliação de alertas em streaming** (avaliar à entrada em vez de *polling* de 15 s) | Ciclo de avaliação >5 s | *Limit Event Response*; **Observer** (slide 05) | Mais complexidade com estado por regra |
 | E6 | **OpenTelemetry** (traces distribuídos remote→central→BD) | Diagnóstico de latência entre serviços após E1/E3 | *Monitor* | Coletor e backend de traces |
@@ -761,8 +844,8 @@ A ordem real é decidida pelos gatilhos.
 
 | Proposta | Decisão | Justificação |
 |---|---|---|
-| Reescrever em microserviços já | Rejeitado | A análise de §4.3 mostra que os limites a 1.000 hosts estão em 4 pontos concretos, que se resolvem com tácticas locais. Os microserviços trariam custo operacional sem ASR que o pague; o caminho existe em E3. |
-| Broker (Kafka/RabbitMQ) já | Adiado (E1) | O store-and-forward com recibos idempotentes já dá at-least-once com deduplicação. Constraints do Broker (slide 04): latência, indireção, *"point of attack/failure/bottleneck"*. |
+| Reescrever em microserviços já | Rejeitado | A análise de §4.3 mostra que os limites a 1.000 hosts estão em 4 pontos concretos, que se resolvem com tácticas locais. Os microserviços trariam custo operacional sem ASR que o pague; o caminho existe em E3. Slide 08: o registo, o recibo e a avaliação de alertas vivem na mesma transação ACID, e *"transaction boundaries are an indicator of service granularity"*: separá-los exigiria uma *saga*; *"MS couldn't exist without DevOps"*, o que uma equipa de 2 não sustenta; e cada fronteira de rede nova soma as 8 falácias. |
+| Broker (Kafka/RabbitMQ) já | Adiado (E1) | O store-and-forward com recibos idempotentes já dá at-least-once com deduplicação. Constraints do Broker (slide 04): latência, indireção, *"point of attack/failure/bottleneck"*. Slide 08: a topologia *broker* do estilo *event-driven* dificulta o tratamento de erros e não recupera transações, que é exatamente o que os recibos garantem hoje. |
 | SPA (React/Vue) | Rejeitado em ADS | O MVC server-side serve a UI; a decisão de UI pertence a EUVI e a restrição de "sem build" mantém-se. |
 | Push em tempo real (SSE / Observer) | Adiado (E5) | O polling de 15 s, que pausa quando o separador está oculto (`dashboard.js:56`), cumpre G2. |
 | Migrações no SQLite do remote | Adiado | Rejeitar buffers incompatíveis é deliberado e seguro até haver hosts em produção com dados por entregar durante um upgrade. |
@@ -801,7 +884,7 @@ de implementação**. Num relatório de arquitetura isso conta como trabalho de 
 
 | Prioridade | Decisões | Porquê |
 |---|---|---|
-| **Must** (implementado e medido) | D1 docs, D2 métricas e ferramentas, D3 CI, D4 `/metrics`, D10 testes de carga, D5 escritas set-based, D6 admissão + justiça por host, D7 probes, **D19 buffer com limite**, D8 escala horizontal, retenção por omissão (parte de D9), D13 Strategy de métricas | São o núcleo das 3 prioridades: medir (D2, D4, D10), escalar (D5–D8, D19) e provar a manutenção com um exemplo mensurável (D13 → MO1) |
+| **Must** (implementado e medido) | D1 docs, D2 métricas e ferramentas, D3 CI, D4 `/metrics`, D10 testes de carga, D5 escritas set-based, D6 admissão + justiça por host, D7 probes, **D19 buffer com limite**, D8 escala horizontal, retenção por omissão (parte de D9), D13 Strategy de métricas, **D20 estilo e documentação (slides 07–08, acrescentado a 21/11)** | São o núcleo das 3 prioridades: medir (D2, D4, D10), escalar (D5–D8, D19) e provar a manutenção com um exemplo mensurável (D13 → MO1); D20 não tem código, mas é o que liga o desenho aos slides 07–08 |
 | **Should** | D11 contrato com códigos, D14 interfaces + clock, D12 fontes únicas, D17 estado do buffer no central, D18 CSP e Tailwind local (até 30/11, antes de EUVI) | Melhoram manutenção e monitorabilidade, mas a defesa do relatório não depende deles |
 | **Could** | Particionamento (resto de D9), D16 recuperação do remote sem restart, *mutation testing*, E2E completo | Têm valor, mas o risco (migração) ou o custo é alto para o prazo. O particionamento fica **desenhado** no ADR, mesmo que não seja implementado |
 | **Won't** (nesta entrega) | E1–E8 (§8) | Plano de evolução para 10k+, com gatilhos |
@@ -849,11 +932,11 @@ report/
 └── seccoes/
     ├── 00-resumo.tex
     ├── 01-introducao.tex            contexto, objetivos G1–G6, relação com EUVI, contribuições
-    ├── 02-enquadramento.tex         QA e cenários, tácticas, padrões, GoF, ADD, GQM (com citações)
-    ├── 03-sistema.tex               Monitor as-is: views (TikZ), padrões e tácticas existentes
+    ├── 02-enquadramento.tex         QA e cenários, tácticas, padrões, GoF, ADD, GQM; estilos, falácias e conascência (08); notações e conformidade (07)
+    ├── 03-sistema.tex               Monitor as-is (reconstrução): views (TikZ, com legenda), estilo, padrões e tácticas existentes
     ├── 04-requisitos.tex            priorização de QA e trade-offs (§2), utility tree, cenários
     ├── 05-metricas.tex              GQM, métricas, limites, ferramentas e alternativas (§4) + baseline
-    ├── 06-decisoes.tex              ADRs por QA (§7), cada um com táctica, alternativas e trade-offs
+    ├── 06-decisoes.tex              ADRs por QA (§7), cada um com táctica, alternativas e trade-offs; D20 (estilo); vistas finais e de qualidade
     ├── 07-avaliacao.tex             método de medição, resultados antes/depois, cenários cumpridos/falhados
     ├── 08-evolucao.tex              plano 10k+ com gatilhos (§8) e decisões rejeitadas (§9)
     ├── 09-discussao.tex             trade-offs observados, ameaças à validade

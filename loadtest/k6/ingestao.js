@@ -3,10 +3,11 @@
 // primeiro, novas tentativas nas falhas transitórias e paragem nas definitivas (ADR-0003).
 //
 // Variáveis (preenchidas por correr.sh):
-//   CENARIO     nominal | recovery-storm | noisy-neighbour | capacidade
+//   CENARIO     nominal | recovery-storm | noisy-neighbour | capacidade | dashboard-30d
 //   MULT_LOGS   multiplicador da taxa de logs (análise de sensibilidade: 1, 2, 5)
 //   DURACAO     duração dos cenários contínuos (ex.: 10m)
 //   RESULTADO   ficheiro de saída em /results (sem extensão)
+//   PRIMEIRO_SOURCE_ID  primeiro source_id de cada host (dashboard-30d: acima do histórico de historico.py)
 import grpc from 'k6/net/grpc';
 import http from 'k6/http';
 import exec from 'k6/execution';
@@ -20,6 +21,7 @@ const DURACAO = __ENV.DURACAO || '10m';
 const RESULTADO = __ENV.RESULTADO || CENARIO;
 const CENTRAL_GRPC = __ENV.CENTRAL_GRPC || 'backend:3334';
 const CENTRAL_HTTP = __ENV.CENTRAL_HTTP || 'http://backend:3333';
+const PRIMEIRO_SOURCE_ID = parseInt(__ENV.PRIMEIRO_SOURCE_ID || '1', 10);
 
 const HOSTS = new SharedArray('hosts', () => JSON.parse(open('/dados/hosts.json')));
 
@@ -62,6 +64,21 @@ if (CENARIO === 'noisy-neighbour') {
   thresholds['atraso_central{fase:rajada,vizinho:sim}'] = ['p(95)<5000']; // SC5: só durante a rajada
   thresholds['atraso_central{perfil:rajada}'] = ['p(95)<999999999'];     // registado para o relatório
 }
+// SC4: as páginas e APIs que um operador abre, cada uma com o seu p95 (o alvo é < 1 s em todas).
+const CONSULTAS_30D = [
+  ['summary', () => '/api/v1/dashboard/summary'],
+  ['pagina_dashboard', () => '/dashboard'],
+  ['metricas_24h', (h) => `/api/v1/dashboard/metrics?range=24h&host_id=${h}`],
+  ['metricas_1m', (h) => `/api/v1/dashboard/metrics?range=1m&host_id=${h}`],
+  ['erros', () => '/errors'],
+  ['erros_host', (h) => `/errors?host_id=${h}`],
+  ['hosts', () => '/hosts'],
+];
+if (CENARIO === 'dashboard-30d') {
+  for (const [nome] of CONSULTAS_30D) {
+    thresholds[`http_req_duration{consulta:${nome}}`] = ['p(95)<1000'];
+  }
+}
 if (CENARIO === 'recovery-storm') {
   thresholds['tempo_recuperacao'] = ['max<900000'];        // SC2: backlog absorvido em 15 min
   thresholds['http_req_duration{dashboard:sim}'] = ['p(95)<1000'];
@@ -75,6 +92,7 @@ const continuo = {
 };
 const cenarios = {
   nominal: continuo,
+  'dashboard-30d': continuo,
   'noisy-neighbour': continuo,
   // SC3: cada host envia lotes de 100 erros sem pausa, para a carga ficar acima da capacidade.
   capacidade: { ...continuo, exec: 'hostCapacidade' },
@@ -87,10 +105,13 @@ export const options = {
   scenarios: {
     ingestao: cenarios[CENARIO],
     // O dashboard é consultado durante toda a medição (SC2 exige p95 < 1 s durante a recuperação).
-    dashboard: {
-      executor: 'constant-arrival-rate', rate: 1, timeUnit: '2s', duration: DURACAO,
-      preAllocatedVUs: 2, maxVUs: 10, exec: 'dashboard',
-    },
+    dashboard: CENARIO === 'dashboard-30d'
+      // Uma consulta por segundo, às voltas pelas de CONSULTAS_30D; com consultas lentas, os VUs
+      // extra evitam que o k6 salte iterações (o que esconderia a lentidão).
+      ? { executor: 'constant-arrival-rate', rate: 1, timeUnit: '1s', duration: DURACAO,
+        preAllocatedVUs: 5, maxVUs: 60, exec: 'dashboard30d' }
+      : { executor: 'constant-arrival-rate', rate: 1, timeUnit: '2s', duration: DURACAO,
+        preAllocatedVUs: 2, maxVUs: 10, exec: 'dashboard' },
   },
   thresholds,
   summaryTrendStats: ['avg', 'min', 'med', 'p(90)', 'p(95)', 'p(99)', 'max', 'count'],
@@ -102,8 +123,8 @@ const client = new grpc.Client();
 client.load(['/proto'], 'monitor/ingest/v1/ingest.proto');
 let ligado = false;
 let host;
-let proximoStat = 1;
-let proximoErro = 1;
+let proximoStat = PRIMEIRO_SOURCE_ID;
+let proximoErro = PRIMEIRO_SOURCE_ID;
 let acumulado = 0;
 let tick = 0;
 let avisos = 0;
@@ -275,12 +296,22 @@ export function setup() {
   if (!sessao) {
     throw new Error(`login no dashboard falhou (estado ${res.status})`);
   }
-  return { cookie: `${sessao.name}=${sessao.value}` };
+  return { cookie: `${sessao.name}=${sessao.value}`, primeiroHost: parseInt(__ENV.PRIMEIRO_HOST_ID || '1', 10) };
 }
 
 export function dashboard(dados) {
   http.get(`${CENTRAL_HTTP}/api/v1/dashboard/summary`, {
     headers: { Cookie: dados.cookie }, tags: { dashboard: 'sim', name: 'dashboard_summary' },
+  });
+}
+
+export function dashboard30d(dados) {
+  const i = exec.scenario.iterationInTest;
+  const [nome, caminho] = CONSULTAS_30D[i % CONSULTAS_30D.length];
+  // O host consultado varia (o id dos hosts de carga vai de dados.primeiroHost em diante).
+  const h = dados.primeiroHost + ((i * 7919) % HOSTS.length);
+  http.get(`${CENTRAL_HTTP}${caminho(h)}`, {
+    headers: { Cookie: dados.cookie }, tags: { dashboard: 'sim', consulta: nome, name: nome }, timeout: '120s',
   });
 }
 
