@@ -16,9 +16,9 @@ SC3 (coordenação cumprida; débito não, com diagnóstico), TE1.
 | 2 | 23–24/11 | D19 limite do *buffer* | AV4 | 0009 | remote | feito |
 | 3 | 25–27/11 | D17 estado do *buffer* + `/health` live/ready + **medição de MO1** | MO1, MN1, MN2 | 0010 | api, remote, central | feito |
 | 4 | 28/11 | D16 retoma sem reinício | AV3 | 0011 | remote | feito |
-| 5 | 29/11–1/12 | D15 higiene + E2E | **AV1**, SE1, MN1 (ponta a ponta) | 0012 | todos + `e2e/` | feito, por commitar |
-| 6 | 2/12 | D7 *probes* escaláveis (medir primeiro) | AV2 | 0013 | central | feito, por commitar |
-| 7 | 3/12 | D14 testabilidade + D12 fonte única | TE2, TE3, MO2 | 0014, 0015 | central, remote, sdk | |
+| 5 | 29/11–1/12 | D15 higiene + E2E | **AV1**, SE1, MN1 (ponta a ponta) | 0012 | todos + `e2e/` | feito |
+| 6 | 2/12 | D7 *probes* escaláveis (medir primeiro) | AV2 | 0013 | central | feito |
+| 7 | 3/12 | D14 testabilidade + D12 fonte única | TE2, TE3, MO2 | 0014, 0015 | central, remote, sdk | feito, por commitar |
 | 8 | 4/12 | D18 endurecimento (ASVS N1) | SE2, SE3 | 0016 | central | |
 | 9 | 5/12 | D9 particionamento: medir SC4 e decidir | SC4 | 0017 | central | |
 | 10 | 6–7/12 | Medição final + fecho do relatório | todos | — | platform | |
@@ -116,6 +116,10 @@ D17 reporta; D17 traz o dado (quarentena) que dá a métrica nova de MO1; o E2E 
   *handlers* ≥ 60 %), TE3 (0 `time.Sleep` em testes de lógica temporal).
 * **D12:** `models.Level` + teste que compara as constantes Go com o `CHECK` SQL; constantes no SDK; uma só
   `IsLoopbackURL`. Prova de MO2: uma definição por repositório; divergência apanhada por teste.
+* **Estado (21/11):** feito ([ADR-0014](adr/0014-handlers-testaveis-relogio-e-fuso.md),
+  [ADR-0015](adr/0015-fonte-unica-das-regras-de-dominio.md); `docs/metrics/iter-6/te2-te3-mo2.md`). TE2 9,5 % → 95,6 %;
+  TE3 1 → 0 `time.Sleep`; MO2 central 5 → 1 listas de níveis, com 6 testes de consistência. O SDK sai em v0.2.0:
+  *merge* do SDK e *tag* antes do PR do hello-world (como no ADR-0012).
 
 ### Passo 8: D18, endurecimento (4/12)
 * Checklist **OWASP ASVS nível 1** como método, com o resultado (cumpre / não se aplica / falha) no ADR.

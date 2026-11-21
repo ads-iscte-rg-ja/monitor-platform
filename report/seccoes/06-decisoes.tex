@@ -492,7 +492,82 @@ Os resultados de \cen{AV1}, \cen{SE1} e \cen{MN1} estão nas secções~\ref{sec:
 e~\ref{sec:mn}. A remoção do código morto baixou o lint do remote de 21 para 20 \emph{issues}; o do central
 ficou igual (54).
 
-\porescrever{\dec{12}, \dec{14}.}
+\subsubsection{Uma fonte única por repositório (\dec{12}, ADR-0015)}
+\label{sec:d12}
+
+\paragraph{Problema.}
+\cen{MO2} pede que mudar uma regra do protocolo toque um sítio por repositório e que uma divergência seja
+apanhada por um teste. Entre repositórios, o contrato já é o \texttt{monitor-api} (\dec{11}). Dentro de cada
+um, as mesmas regras repetiam-se. A lista dos cinco níveis de log estava escrita cinco vezes em Go no central,
+uma no remote, uma no SDK (não exportada) e outra vez no hello-world, além do SQL e das traduções do
+\emph{protobuf}; nada ligava as cópias. No remote, o endereço do central era validado duas vezes, com regras
+diferentes: a configuração aceitava um caminho no URL e só três nomes de \emph{loopback}; o cliente gRPC recusava
+caminhos e aceitava qualquer endereço de \emph{loopback}.
+
+\paragraph{Decisão.}
+Uma definição dos níveis por repositório: \texttt{models} no central, \texttt{validation} no remote, e
+constantes exportadas no SDK, publicadas numa versão nova, que o hello-world passa a usar. O que não se pode
+eliminar, porque a base de dados também valida e o contrato tem o seu próprio tipo, fica coberto por testes de
+consistência: os níveis do Go são comparados com os \texttt{CHECK} do SQL, com a tradução do \emph{protobuf} nos
+dois sentidos e com o SQL das métricas de erro. O endereço do central passa a ter uma só regra, a mais estrita,
+usada pela configuração e pelo cliente.
+
+\paragraph{Teoria.}
+\emph{Increase Semantic Coherence}: o que muda junto fica junto. \emph{Abstract Common Services}: a validação
+do endereço era um serviço usado em duas versões. A duplicação que fica, entre Go e SQL e entre Go e o
+contrato, é deliberada e passa a ser verificada.
+
+\paragraph{Alternativas.}
+Usar o tipo do \emph{protobuf} em todo o lado levaria o contrato de rede para as camadas internas e para o SQL.
+Um módulo partilhado com os níveis acrescentaria uma dependência entre repositórios que mudam a ritmos diferentes.
+Gerar o \texttt{CHECK} a partir do Go não serve, porque as migrações são SQL escrito à mão e a base é imutável;
+um teste que compara é mais simples e cobre também as migrações antigas.
+
+\paragraph{Trade-offs.}
+O SDK muda de versão e o hello-world tem de a pedir, pela mesma ordem de \emph{merges} do \dec{15}. Um endereço
+com caminho, que a configuração aceitava, passa a ser recusado no arranque; antes era recusado logo a seguir,
+pelo cliente.
+
+\paragraph{Verificação.}
+A medição de \cen{MO2} está na secção~\ref{sec:mo1}.
+
+\subsubsection{\emph{Handlers} testáveis, relógio e fuso injetados (\dec{14}, ADR-0014)}
+\label{sec:d14}
+
+\paragraph{Problema.}
+Os \emph{handlers} do central guardavam serviços concretos e o gestor de sessões: testar um obrigava a montar o
+serviço, o repositório e um PostgreSQL. A cobertura da camada era de 9,5\,\%, com dois ficheiros de teste, e é a
+camada que traduz formulários, códigos HTTP e redirecionamentos (\cen{TE2}). O tempo estava escondido: o fuso
+de Lisboa estava escrito em quatro sítios, carregado a cada pedido, e o resumo diário decidia a hora de envio
+com o relógio da máquina, sem forma de o testar sem esperar; no remote ainda havia um \texttt{time.Sleep} num
+teste (\cen{TE3}).
+
+\paragraph{Decisão.}
+Cada \emph{handler} declara a interface mínima de que precisa, só com os métodos que chama; os serviços concretos
+satisfazem-na sem mudar, e a montagem do servidor fica igual. Os testes usam \emph{fakes} escritos à mão e
+desenham as páginas reais, o que também apanha um campo que um modelo use e o \emph{handler} não passe. O fuso
+passa a ser configuração (\texttt{APP\_TIMEZONE}, por omissão Lisboa), carregada e validada uma vez no arranque;
+o relógio é injetado onde o tempo decide alguma coisa, e a hora do resumo diário passa a ser calculada por uma
+função pura. O teste do remote passa a esperar por um evento em vez de dormir.
+
+\paragraph{Teoria.}
+\emph{Abstract Data Sources} e \emph{Specialized Interfaces}, com o princípio de segregação de interfaces: cada
+cliente vê só o que usa. \emph{Limit Nondeterminism}: relógio injetado, fuso explícito, testes que esperam por
+eventos. \emph{Defer Binding}: o fuso passa a ser lido no arranque.
+
+\paragraph{Alternativas.}
+\emph{Mocks} gerados trariam mais uma ferramenta e testes acoplados à ordem das chamadas. Testar os
+\emph{handlers} só com a base de dados seria lento e não isolaria a camada. Interfaces grandes no pacote dos
+serviços obrigariam cada \emph{fake} a implementar métodos que o \emph{handler} nunca chama. Substituir as 16
+chamadas ao relógio não tornaria possível nenhum teste novo: a maioria só carimba registos ou mede durações.
+
+\paragraph{Trade-offs.}
+Sete interfaces pequenas; um método novo usado por um \emph{handler} obriga a acrescentá-lo à interface (o
+compilador avisa). Os \emph{fakes} não provam que o serviço real se comporta como eles; isso continua nos testes
+dos serviços e de integração.
+
+\paragraph{Verificação.}
+\cen{TE2} e \cen{TE3} estão na secção~\ref{sec:mo1}.
 
 \subsection{Disponibilidade e monitorabilidade}
 

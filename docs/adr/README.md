@@ -17,6 +17,8 @@ Processo em [ADR-0001](0001-registar-decisoes-com-adrs.md); modelo em [0000-mode
 | [0011](0011-remote-retoma-sem-reinicio.md) | O remote retoma a entrega sem reinício | Aceite | Availability |
 | [0012](0012-higiene-e-testes-ponta-a-ponta.md) | Higiene dos repositórios e testes ponta a ponta em Compose | Aceite | Testability, Availability |
 | [0013](0013-probes-de-saude-escalaveis.md) | *Probes* de saúde escaláveis: só os *hosts* devidos, espalhados no tempo | Aceite | Availability, Performance |
+| [0014](0014-handlers-testaveis-relogio-e-fuso.md) | *Handlers* testáveis com interfaces mínimas; relógio e fuso horário injetados | Aceite | Testability |
+| [0015](0015-fonte-unica-das-regras-de-dominio.md) | Uma fonte única por repositório para os níveis de log e o endereço do central | Aceite | Modifiability |
 
 ## Por escrever
 

@@ -255,7 +255,7 @@ o código ainda por commitar; a medição final, a partir do \texttt{main}, é f
 host e identificador de origem); o que o teste prova é que o remote não cria identificadores novos ao repetir
 um envio e que não marca como entregue nada que o central não tenha gravado. \cen{AV1} cumpre-se.
 
-\subsection{Manutenção: cenário MO1 e métricas de código}
+\subsection{Manutenção e testabilidade: MO1, MO2, TE2, TE3 e métricas de código}
 \label{sec:mo1}
 
 \paragraph{\cen{MO1}: uma métrica de alerta nova.}
@@ -292,6 +292,37 @@ dados real. O teste que compara o registo com o \texttt{CHECK} da base de dados 
 acompanha a métrica. A alteração foi feita com um assistente de programação, em pouco mais de um minuto de
 relógio; esse tempo não representa o de uma pessoa sem assistência, mas a dimensão da alteração (um ficheiro
 novo a seguir um modelo que já existe) deixa folga larga para o alvo de uma pessoa-dia. \cen{MO1} cumpre-se.
+
+\paragraph{\cen{MO2}: uma definição por repositório.}
+A Tabela~\ref{tab:mo2} conta, antes e depois de \dec{12}, quantas vezes a lista dos níveis de log está escrita em
+Go, por repositório (dados em \texttt{docs/metrics/iter-6/te2-te3-mo2.md}). As cópias que ficam no SQL e nas
+traduções do \emph{protobuf} são cobertas por seis testes de consistência. Para confirmar que apanham uma
+divergência, retirámos um nível do \texttt{CHECK} do central e, noutra vez, da lista do SDK: em ambos os casos o
+teste respetivo falhou, e a alteração foi revertida. No remote, as duas validações do endereço do central
+passaram a uma. \cen{MO2} cumpre-se.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{\cen{MO2}: lista dos níveis de log escrita em Go, por repositório}
+  \label{tab:mo2}
+  \begin{tabular}{lccl}
+    \toprule
+    Repositório & Antes & Depois & Verificada contra \\
+    \midrule
+    central & 5 & 1 & \texttt{CHECK} do SQL, \emph{protobuf}, SQL das métricas \\
+    remote & 1 & 1 & \texttt{CHECK} do \emph{buffer}, \emph{protobuf} \\
+    SDK & 1 (privada) & 1 (exportada) & \texttt{CHECK} do \emph{buffer} \\
+    hello-world & 1 & 0 & usa a do SDK \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{\cen{TE2} e \cen{TE3}: \emph{handlers} e tempo.}
+Com as interfaces de \dec{14}, a cobertura dos \emph{handlers} passou de 9,5\,\% para 95,6\,\% (alvo
+$\ge$ 60\,\%). Os testes cobrem todos os \emph{handlers}, desenham as páginas reais e correm em cerca de 0,2~s,
+sem base de dados. Nos testes dos quatro repositórios, os \texttt{time.Sleep} passaram de 1 para 0 (alvo 0). O
+resumo diário é testado em seis casos com o relógio e o fuso controlados: antes, às e depois das 9~h, no fim do
+mês, no dia em que a hora muda, e noutro fuso. \cen{TE2} e \cen{TE3} cumprem-se.
 
 \gerado{metricas-codigo-antes-depois.tex}
 
