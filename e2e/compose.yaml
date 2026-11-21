@@ -1,0 +1,127 @@
+# Sistema completo para os testes ponta a ponta (ADR-0012), construído a partir dos
+# repositórios irmãos: PostgreSQL, central, balanceador com TLS, remote e uma aplicação
+# com o SDK (hello-world).
+#
+# Não usar diretamente: ./correr.py gera o certificado, as chaves e a configuração em
+# .estado/ e passa as chaves pelo ambiente.
+name: monitor-e2e
+
+x-central: &central
+  build:
+    context: ../../monitor-central
+  env_file: [.estado/central.env]
+  environment:
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    PORT: "3333"
+    GRPC_PORT: "3334"
+    METRICS_ADDR: ":9464"
+    FRONTEND_PATH: /app/frontend
+
+# Intervalos curtos para o teste caber em minutos (ADR-0012, "Consequências").
+x-remote: &remote
+  build:
+    context: ../../monitor-remote
+    dockerfile: ../monitor-platform/e2e/remote.Dockerfile
+  depends_on:
+    nginx: {condition: service_started}
+  environment: &remote-env
+    CENTRAL_GRPC_URL: https://nginx:3334
+    SSL_CERT_FILE: /certs/ca.crt
+    SQLITE_PATH: /data/buffer.db
+    COLLECTION_INTERVAL: 5s
+    STATS_POST_INTERVAL: 5s
+    ERROR_POST_INTERVAL: 2s
+    DISK_PATH: /
+    BUFFER_CHECK_INTERVAL: 10s
+  volumes:
+    - ./.estado/tls/ca.crt:/certs/ca.crt:ro
+
+x-hello-world: &hello-world
+  build:
+    context: ../../monitor-hello-world
+    dockerfile: ../monitor-platform/e2e/hello-world.Dockerfile
+    additional_contexts:
+      sdk: ../../monitor-go-sdk
+  profiles: [aplicacao]
+  restart: "no"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: monitor
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: monitor
+    volumes:
+      - ../../monitor-central/deployments/database/init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U monitor -d monitor"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    <<: *central
+    command: ["/app/bin/migrate"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  backend:
+    <<: *central
+    depends_on:
+      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "3", "-O", "/dev/null", "http://127.0.0.1:3333/health/ready"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # Fica de pé quando o central cai (AV1): o remote vê UNAVAILABLE, como atrás de um
+  # balanceador em produção.
+  nginx:
+    image: nginx:1.28.0-alpine
+    depends_on:
+      backend: {condition: service_healthy}
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./.estado/tls:/certs:ro
+
+  # Host registado no central.
+  remote:
+    <<: *remote
+    environment:
+      <<: *remote-env
+      HOST_API_KEY: ${E2E_CHAVE_PRINCIPAL:?gerada por correr.py}
+    volumes:
+      - ./.estado/tls/ca.crt:/certs/ca.crt:ro
+      - buffer-principal:/data
+
+  # SE1: um agente com uma chave inválida ou revogada, com o seu próprio buffer.
+  remote-intruso:
+    <<: *remote
+    profiles: [se1]
+    environment:
+      <<: *remote-env
+      HOST_API_KEY: ${E2E_CHAVE_INTRUSO:-definida-por-correr-py}
+    volumes:
+      - ./.estado/tls/ca.crt:/certs/ca.crt:ro
+      - buffer-intruso:/data
+
+  # A aplicação: corre uma vez por pedido (docker compose run), como um processo que
+  # regista logs com o SDK no buffer do host.
+  hello-world:
+    <<: *hello-world
+    volumes:
+      - buffer-principal:/data
+
+  hello-world-intruso:
+    <<: *hello-world
+    volumes:
+      - buffer-intruso:/data
+
+volumes:
+  buffer-principal:
+  buffer-intruso:

@@ -376,7 +376,69 @@ teste passou antes e depois da mudança. Cada estratégia tem testes unitários,
 porque a validação das regras deixou de estar acima dos limites de complexidade. A medição de \cen{MO1}, com uma
 métrica nova real, é feita com \dec{17}.
 
-\porescrever{\dec{12}, \dec{14}, \dec{15}.}
+\subsubsection{Higiene e testes ponta a ponta (\dec{15}, ADR-0012)}
+\label{sec:d15}
+
+\paragraph{Problema.}
+Dois problemas, resolvidos no mesmo passo porque ambos preparam os repositórios para quem não os escreveu. O
+primeiro é higiene: uma segunda forma de escrever logs no \emph{buffer}, no remote, que nenhum binário usava e
+que repetia a validação do SDK (408 linhas, com o teste); a lista das rotas autenticadas do central mantida à
+mão ao lado do grupo de rotas que a autenticação de facto protege; o módulo do SDK com o nome de uma conta que
+não é a da organização; READMEs que apontavam para ficheiros que não existem. O segundo é mais sério: nenhum
+teste juntava os componentes. Os testes de cada repositório substituem o outro lado por um falso, e
+\cen{AV1} (central em baixo, 0 perdas e 0 duplicados) e \cen{SE1} (chave inválida ou revogada, nada gravado)
+são propriedades do sistema inteiro: dependem do SDK, do \emph{buffer}, da retentativa do remote, do
+balanceador, da autenticação e da idempotência do central ao mesmo tempo.
+
+\paragraph{Decisão.}
+Na higiene, o código morto sai; as rotas autenticadas passam a ser uma tabela única, registada dentro do grupo
+autenticado, de onde derivam o log das rotas e um teste que confirma que cada uma, sem sessão, redireciona para
+o \emph{login}; o módulo do SDK passa para a organização; um \emph{script} cria um \texttt{go.work} local para
+desenvolver vários módulos ao mesmo tempo (o CI continua a compilar cada repositório sozinho).
+Para o resto, um teste ponta a ponta: um Compose com o sistema real construído a partir dos repositórios
+(PostgreSQL, central, balanceador, remote e uma aplicação com o SDK) e um condutor em Python, só com a
+biblioteca padrão, que provisiona os hosts, provoca as falhas e verifica o estado nos dois lados: no PostgreSQL
+do central e no SQLite do remote. O remote fala com o balanceador por TLS, com um certificado de teste gerado a
+cada execução, como em produção. Os cenários são o caminho feliz, \cen{AV1}, \cen{SE1} (chave inválida e chave
+revogada) e \cen{MN1}; o resultado de cada um (medido, limite, passa ou falha) fica num ficheiro. Corre todas
+as noites no GitHub e à mão.
+
+\paragraph{Teoria.}
+Na modificabilidade, \emph{Refactor} e \emph{Reduce Size of a Module}: código morto e listas paralelas são
+duas fontes da mesma verdade. Na testabilidade, \emph{Sandbox}: o sistema corre isolado, com dados e chaves
+de teste, num ambiente descartável; e \emph{Limit Nondeterminism}: o condutor espera por condições com prazo,
+nunca por tempos fixos, e os intervalos do remote são curtos para o teste caber em minutos.
+
+\paragraph{Alternativas.}
+Um teste em Go com contentores geridos pelo próprio teste traria uma dependência grande para um repositório sem
+código Go de produção; o Compose já é a forma de executar o sistema. Ligar o remote ao central sem TLS
+obrigaria a abrir uma exceção que o remote recusa de propósito fora de \emph{loopback}, e deixaria o caminho de
+produção por testar. Pôr o remote na rede do contentor do central, para usar \emph{loopback}, também não
+serve: parar o central destrói essa rede, e o teste deixava de representar uma falha do central. Correr o
+teste em cada PR custaria minutos por PR e dependeria do \texttt{main} de seis repositórios; à noite, uma
+regressão aparece com um dia de atraso, o que chega para um sistema deste tamanho.
+
+\paragraph{Trade-offs.}
+Os intervalos curtos provam o mecanismo, não a cadência de produção, que fica nos testes com relógio injetado
+(\cen{AV3}, \cen{MN2}). A provisão dos hosts e a revogação da chave são feitas diretamente na base de dados,
+com o mesmo cálculo que o central faz; a interface web fica fora deste teste.
+
+\paragraph{O que o teste encontrou.}
+Na primeira execução, \cen{MN1} falhou: a quarentena chegou ao central em 10,0~s, dois ciclos de 5~s. A
+fotografia do \emph{buffer} só viaja com estatísticas (\dec{17}), e a recolha e a entrega de estatísticas
+correm em temporizadores independentes com o mesmo intervalo. Quando a entrega acorda antes da recolha, o que
+acontece sempre no arranque e, em regime estável, sempre que as fases se cruzam, não há nada para enviar e o
+central fica um ciclo atrás. Nenhum teste unitário o via, porque cada um tinha estatísticas pendentes. A
+correção é pequena: um ciclo sem estatísticas espera, no máximo um intervalo, pela recolha seguinte, que avisa o
+\emph{sender}, e envia-a logo, com uma fotografia nova. Com os intervalos de produção (30~s), o atraso evitado
+é de até 30~s.
+
+\paragraph{Verificação.}
+Os resultados de \cen{AV1}, \cen{SE1} e \cen{MN1} estão nas secções~\ref{sec:av1-av4}, \ref{sec:aval-se}
+e~\ref{sec:mn}. A remoção do código morto baixou o lint do remote de 21 para 20 \emph{issues}; o do central
+ficou igual (54).
+
+\porescrever{\dec{12}, \dec{14}.}
 
 \subsection{Disponibilidade e monitorabilidade}
 

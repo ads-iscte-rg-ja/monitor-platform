@@ -1,0 +1,53 @@
+# Testes ponta a ponta (ADR-0012): o sistema inteiro, construído a partir do main dos seis
+# repositórios, num Compose descartável. Corre todas as noites e à mão; não é obrigatório nos
+# PRs (demora minutos e depende do main de todos os repositórios).
+name: e2e
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC, fora da hora cheia em que o GitHub atrasa os agendamentos
+  workflow_dispatch:
+    inputs:
+      paragem:
+        description: "Segundos com o central em baixo no cenário AV1"
+        default: "60"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: E2E (feliz, AV1, MN1, SE1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      # Mesma disposição que o espaço de trabalho local: os repositórios lado a lado.
+      - uses: actions/checkout@v7
+        with: {path: monitor-platform}
+      - uses: actions/checkout@v7
+        with: {repository: ads-iscte-rg-ja/monitor-api, path: monitor-api}
+      - uses: actions/checkout@v7
+        with: {repository: ads-iscte-rg-ja/monitor-central, path: monitor-central}
+      - uses: actions/checkout@v7
+        with: {repository: ads-iscte-rg-ja/monitor-remote, path: monitor-remote}
+      - uses: actions/checkout@v7
+        with: {repository: ads-iscte-rg-ja/monitor-go-sdk, path: monitor-go-sdk}
+      - uses: actions/checkout@v7
+        with: {repository: ads-iscte-rg-ja/monitor-hello-world, path: monitor-hello-world}
+
+      - name: Correr os cenários
+        env:
+          PARAGEM: ${{ inputs.paragem || '60' }}
+        run: monitor-platform/e2e/correr.py --paragem "$PARAGEM"
+
+      - name: Guardar resultados e logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-resultados
+          path: monitor-platform/e2e/resultados/
+          if-no-files-found: warn

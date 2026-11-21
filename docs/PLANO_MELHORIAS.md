@@ -657,6 +657,10 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
     N recebidos e 0 duplicados) e **MN1**.
 * **Teoria:** *Refactor*, *Reduce Size of a Module*; *Sandbox* (testability).
 * **Verificação:** E2E verde no CI noturno.
+* **Estado (21/11):** implementado ([ADR-0012](adr/0012-higiene-e-testes-ponta-a-ponta.md)), em
+  `monitor-platform/e2e/` (a raiz `monitor-ws` não é um repositório; o `go.work` é local, criado por
+  `scripts/go-work.sh`). AV1, SE1 (inválida e revogada) e MN1 passam ponta a ponta; o MN1 encontrou um defeito
+  no remote (um ciclo de estatísticas vazio atrasava a fotografia do *buffer* um ciclo), corrigido.
 
 ### 7.4 Disponibilidade e monitorabilidade
 

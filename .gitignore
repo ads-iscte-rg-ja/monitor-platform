@@ -16,7 +16,14 @@ report/main.pdf
 # Resultados brutos de carga (os resumos vão para docs/metrics)
 loadtest/results/
 
+# E2E: certificado e chaves de teste de cada execução; resultados brutos (os resumos vão para docs/metrics)
+e2e/.estado/
+e2e/resultados/
+
 # IDE / SO
 .idea/
 .vscode/
 .DS_Store
+
+# Python
+__pycache__/
