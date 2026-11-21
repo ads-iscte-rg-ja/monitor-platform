@@ -364,5 +364,26 @@ ou estado do \emph{buffer} de outro host que não o principal, e o host revogado
 \emph{buffer} do remote, os 10 logs e a estatística ficam pendentes, sem quarentena: corrigida a chave,
 seriam entregues. \cen{SE1} cumpre-se.
 
+\paragraph{\cen{SE2}: XSS e \emph{clickjacking}.}
+Um teste verifica que todas as respostas, de página, de API, de erro e de rota inexistente, levam a CSP e os outros
+cabeçalhos, e o teste das páginas falha se alguma tiver um \emph{script inline} ou de uma CDN. A prova principal
+foi feita num navegador real, com a CSP em \emph{enforce}: as sete páginas da interface carregaram sem nenhum
+relatório de violação; um \emph{script} injetado na página, como faria um XSS, não executou; e a página posta num
+\texttt{<iframe>} foi bloqueada. Os dois bloqueios chegaram ao \emph{endpoint} de relatórios do central
+(dados em \texttt{docs/metrics/iter-6/se2-se3.md}). \cen{SE2} cumpre-se.
+
+\paragraph{\cen{SE3}: \emph{endpoint} de saúde para \emph{loopback} ou metadados.}
+A guarda das \emph{probes} é testada com 14 endereços que têm de ser recusados (\emph{loopback}, metadados das
+\emph{clouds}, \emph{link-local}, \emph{multicast}, endereços IPv4 escritos como IPv6) e 6 que têm de passar
+(redes privadas e públicas). Num teste ponta a ponta, \emph{probes} reais para \texttt{127.0.0.1} e para
+\texttt{localhost}, um nome que só depois de resolvido se sabe que é \emph{loopback}, não chegaram ao servidor
+local, e os dois \emph{hosts} ficaram em baixo; sem a guarda, o mesmo servidor recebeu a \emph{probe}, o que mostra
+que foi a guarda a travá-la. \cen{SE3} cumpre-se.
+
+\paragraph{OWASP ASVS 5.0.0, nível 1.}
+Dos 70 requisitos, antes de \dec{18} cumpriam-se 36, 25 não se aplicavam (não há \emph{upload} de ficheiros,
+OAuth, \emph{tokens} autocontidos, XML nem WebSockets) e 9 falhavam; depois, cumprem-se 42 e falham 3, com o risco
+aceite e um gatilho no ADR-0016 (avaliação completa em \texttt{docs/seguranca/asvs-n1.md}).
+
 \subsection{Resumo dos cenários}
 \porescrever{tabela cenário $\rightarrow$ medida-alvo $\rightarrow$ valor medido $\rightarrow$ cumprido (\Sim/\Parc/\Nao).}

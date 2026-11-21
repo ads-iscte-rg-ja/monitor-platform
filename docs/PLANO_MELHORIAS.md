@@ -723,6 +723,11 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Alternativas rejeitadas:** build Node do Tailwind (viola a restrição de "sem build"); bloquear todos os
   IPs privados (inutiliza o produto em redes internas).
 * **Verificação:** testes dos headers e do validador de dial.
+* **Estado (21/11):** implementado ([ADR-0016](adr/0016-endurecimento-por-checklist-asvs.md)) com o ASVS **5.0.0**
+  (a versão atual; 70 requisitos de nível 1, avaliados em `docs/seguranca/asvs-n1.md`: 9 → 3 falhas). Desvio: a CSP
+  fica em *enforce* por omissão, depois de verificada num navegador real sem violações; *Report-Only* continua
+  disponível (`CSP_MODE`). Tailwind servido localmente, verificado contra a integridade do npm; guarda SSRF no
+  `Dialer.Control`; *cookie* `__Host-`; `Clear-Site-Data` no *logout*. SE2 e SE3 cumprem-se.
 
 ---
 
