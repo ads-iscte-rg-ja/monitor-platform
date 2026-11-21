@@ -175,10 +175,76 @@ O tamanho antes de cada verificação chegou a 1,36~MiB: é o excesso entre duas
 propósito (meio limite por ciclo). Com o limite por omissão de 512~MiB e uma rajada real, o excesso estimado é
 inferior a 1\,\%. Os contadores sobrevivem a reabrir o ficheiro, como num reinício do agente. \cen{AV4} cumpre-se.
 
+\paragraph{\cen{AV3}: retoma sem reinício.}
+Um teste no remote, com o relógio injetado e um central falso em memória, recusa a chave com
+\texttt{PERMISSION\_DENIED}. A entrega pausa e, durante 4~min~59~s, nenhuma das duas categorias faz pedidos. O
+operador corrige a causa; aos 5~minutos, a \emph{probe} envia um só registo, que leva o estado do \emph{buffer}
+com a pausa assinalada, o central aceita-o, e a entrega retoma no mesmo ciclo e entrega tudo, sem reiniciar o
+agente. Outros testes fixam que uma \emph{probe} falhada marca a seguinte para 5~minutos depois, que só há uma
+\emph{probe} de cada vez, e que o \texttt{SIGHUP} troca a chave e faz a \emph{probe} de imediato. No processo
+real, dois \texttt{SIGHUP} seguidos (chave nova e depois um \texttt{.env} sem chave) deixam o agente vivo,
+com a chave nova no primeiro caso e a anterior no segundo (dados em \texttt{docs/metrics/iter-6/av3.txt}).
+\cen{AV3} cumpre-se.
+
 \porescrever{AV1: perdas e duplicados (E2E de \dec{15}).}
 
 \subsection{Manutenção: cenário MO1 e métricas de código}
+\label{sec:mo1}
+
+\paragraph{\cen{MO1}: uma métrica de alerta nova.}
+Com o mecanismo de \dec{13} no lugar, implementámos uma métrica real que o projeto precisava: o número de
+registos em quarentena reportado por cada agente (\texttt{buffer\_quarantined}, \dec{17}). A Tabela~\ref{tab:mo1}
+compara o que a alteração tocou com a linha de base contada antes de \dec{13}: 7 sítios em 5 ficheiros (três
+Go, um modelo HTML e a migração), a que se somam os dois ficheiros Go que qualquer migração obriga a mudar
+(dados em \texttt{docs/metrics/iter-6/mo1.md}).
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{\cen{MO1}: o que uma métrica de alerta nova exige, antes e depois de \dec{13}}
+  \label{tab:mo1}
+  \begin{tabular}{lccl}
+    \toprule
+    Medida & Antes & Depois & Alvo \\
+    \midrule
+    Ficheiros Go com código da métrica & 3 & 1 & --- \\
+    Ficheiros Go que registam a migração & 2 & 2 & --- \\
+    Ficheiros Go de produção, no total & 5 & 3 & $\le$ 3 \Sim \\
+    Migrações & 1 & 1 & 1 \Sim \\
+    Modelos HTML & 1 & 0 & --- \\
+    Sítios a mudar fora da métrica e da migração & 6 & 0 & 0 \Sim \\
+    Camadas tocadas & 3 & 1 & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Dos três ficheiros Go, só um é da métrica: a estratégia, com 36 linhas. Os outros dois registam a migração e
+mudam em qualquer migração, de métricas ou não. Um executor que descobrisse as migrações pelo nome do ficheiro
+tirá-los-ia, mas a ordem explícita das migrações é uma garantia que preferimos manter. Os testes tocados foram
+dois: o do registo e o de caracterização, que passou a fixar também o valor da métrica nova numa base de
+dados real. O teste que compara o registo com o \texttt{CHECK} da base de dados confirmou que a migração
+acompanha a métrica. A alteração foi feita com um assistente de programação, em pouco mais de um minuto de
+relógio; esse tempo não representa o de uma pessoa sem assistência, mas a dimensão da alteração (um ficheiro
+novo a seguir um modelo que já existe) deixa folga larga para o alvo de uma pessoa-dia. \cen{MO1} cumpre-se.
+
 \gerado{metricas-codigo-antes-depois.tex}
+
+\subsection{Monitorabilidade}
+\label{sec:mn}
+
+\paragraph{\cen{MN1}: quarentena visível no central.}
+No remote, um teste põe um registo em quarentena com 150 estatísticas pendentes e verifica que os dois lotes do
+ciclo levam a mesma fotografia, com a quarentena contada. No central, um teste de integração em PostgreSQL envia
+um lote com três registos em quarentena e lê-os na API do \emph{dashboard}; verifica também que uma fotografia
+mais antiga não substitui a mais recente e que uma inválida é ignorada sem perder as estatísticas. A quarentena
+fica visível no lote seguinte, ou seja, em $\le$ 1 ciclo de estatísticas. O teste ponta a ponta de \dec{15}
+repete-o com os componentes reais.
+
+\paragraph{\cen{MN2}: \emph{job} parado.}
+Um teste corre um \emph{job} liderado com intervalo de 15~s que bloqueia, com o relógio controlado: aos 30~s o
+\texttt{/health/ready} ainda responde 200, um segundo depois responde 503 e nomeia o \emph{job}, e o
+\texttt{/health/live} continua a responder 200. Um \emph{job} liderado por outra instância nunca conta. Quando
+a iteração termina, a instância volta a estar pronta. A deteção acontece em $\le$ 2 intervalos. \cen{MN2}
+cumpre-se (dados em \texttt{docs/metrics/iter-6/mn1-mn2.txt}).
 
 \subsection{Resumo dos cenários}
 \porescrever{tabela cenário $\rightarrow$ medida-alvo $\rightarrow$ valor medido $\rightarrow$ cumprido (\Sim/\Parc/\Nao).}

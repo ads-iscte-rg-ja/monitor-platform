@@ -456,7 +456,124 @@ carga do modelo.
 fixam a ordem de cada fase, o evento CRITICAL do limite rígido e que um descarte que não pode ser contado não é
 gravado.
 
-\porescrever{\dec{16}--\dec{17}.}
+\subsubsection{Estado do \emph{buffer} no central e \texttt{/health/ready} (\dec{17}, ADR-0010)}
+\label{sec:d17}
+
+\paragraph{Problema.}
+O central não via o \emph{buffer} dos hosts. O remote sabe quantos registos tem pendentes, quantos pôs em
+quarentena, há quanto tempo espera o mais antigo e, desde \dec{19}, quantos descartou; nada disto saía do
+host. Um registo em quarentena é um dado que nunca chega, sem ninguém saber (\cen{MN1}). Do lado do central, o
+\texttt{/health} só testava a base de dados. Desde \dec{8}, cada \emph{job} de fundo corre na instância que o
+lidera; se bloquear, a liderança mantém-se (a sessão PostgreSQL continua viva), nenhuma outra instância o
+assume, e o \texttt{/health} continua a responder 200 enquanto os alertas deixam de ser avaliados (\cen{MN2}).
+
+\paragraph{Decisão.}
+O pedido de estatísticas do contrato ganha um campo opcional \texttt{buffer} (\texttt{monitor-api} v1.1.0, uma
+alteração aditiva que o \texttt{buf breaking} confirma): uma fotografia do \emph{buffer} com pendentes,
+quarentena, idade do pendente mais antigo, pausa da entrega, tamanho e descartes por nível. Vai no pedido de
+estatísticas porque esse já é o sinal periódico do host, a cada 30~s: não há chamada nova nem autenticação a
+mais. O remote tira uma fotografia por ciclo e envia-a em todos os lotes desse ciclo. O central guarda a mais
+recente de cada host, na mesma transação das estatísticas, e mostra-a na API do \emph{dashboard}. Um estado
+inválido é registado no log e ignorado, e as estatísticas são aceites na mesma: um dado acessório não pode
+travar a telemetria, e o remote pausaria a entrega perante uma rejeição do lote. Com o estado no central, a
+quarentena passa a poder gerar um alerta: a métrica \texttt{buffer\_quarantined}, que é também a prova de
+\cen{MO1} (secção~\ref{sec:mo1}).
+
+Para a saúde, o central passa a ter dois pontos (Tabela~\ref{tab:health}). Cada iteração de um \emph{job} é um
+batimento; um \emph{job} que esta instância lidera e que não completa uma iteração há mais de duas vezes o seu
+intervalo torna a instância não pronta. O registo dos batimentos recebe o relógio por injeção, o que permite
+testá-lo sem esperas.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{\dec{17}: os pontos de saúde do central}
+  \label{tab:health}
+  \begin{tabularx}{\textwidth}{lXX}
+    \toprule
+    Ponto & Responde 200 quando & Para quem \\
+    \midrule
+    \texttt{/health/live} & o processo responde (sem dependências) & reiniciar um processo bloqueado \\
+    \texttt{/health/ready} & a base de dados responde e cada \emph{job} liderado bateu há $\le$ 2 intervalos;
+      senão 503, com os \emph{jobs} atrasados & retirar a instância do tráfego; Compose \\
+    \texttt{/health} & igual a \texttt{/health/ready} & compatibilidade \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\paragraph{Teoria.}
+Nas táticas de disponibilidade, \emph{Heartbeat} (cada iteração de um \emph{job} é um batimento e a sua falta é a
+falha), \emph{Monitor} (o registo dos batimentos vigia os \emph{jobs}) e \emph{Self-Test} (o
+\texttt{/health/ready} verifica as dependências da própria instância). O estado do \emph{buffer} no central é
+\emph{Inform Actors} e \emph{Maintain System Model}: o central passa a ter uma imagem de cada agente. Separar
+\emph{liveness} de \emph{readiness} distingue duas respostas diferentes: reiniciar e retirar do tráfego.
+
+\paragraph{O que ficou de fora, e porquê.}
+O plano previa que o balanceador usasse o \texttt{/health/ready}. O nginx de código aberto só tem verificações
+passivas (falhas de ligação); as ativas são da versão comercial. O \emph{ready} serve o Compose e qualquer
+orquestrador com \emph{readiness probe}. Mudar de balanceador fica com um gatilho: um \emph{job} bloqueado em
+produção que o \emph{ready} detetou e o balanceador não retirou. A pausa da entrega também só chega ao central
+quando o remote volta a falar com ele, o que hoje não acontece em pausa; ganha utilidade com \dec{16}. A
+apresentação do estado no HTML do \emph{dashboard} fica para depois: a API já o expõe.
+
+\paragraph{Alternativas.}
+Uma chamada nova só para o estado custaria mais uma autenticação por ciclo para um dado que cabe no pedido que
+já existe. Rejeitar o lote com um estado inválido faria o remote pausar toda a entrega. Expor o estado no
+\texttt{/metrics} do central, com o host como \emph{label}, daria 1.000 hosts vezes seis séries numa ferramenta
+pensada para operar o central. Considerar parado um \emph{job} que falha confundiria duas coisas: um \emph{job}
+que falha está vivo e já tem métrica de falhas (\dec{4}).
+
+\paragraph{Trade-offs.}
+Mais uma escrita, de uma linha, por lote de estatísticas, na mesma transação: o número de instruções por lote
+continua fixo (\dec{5}). Um ciclo legítimo mais longo do que dois intervalos marca a instância como não pronta;
+é intencional, porque um ciclo assim atrasado é um problema real.
+
+\paragraph{Verificação.}
+\cen{MN1} e \cen{MN2} são provados por testes, descritos na secção~\ref{sec:mn}.
+
+\subsubsection{O remote retoma a entrega sem reinício (\dec{16}, ADR-0011)}
+\label{sec:d16}
+
+\paragraph{Problema.}
+O remote pausa a entrega quando o central responde com um código que não se resolve a tentar outra vez: chave
+inválida ou revogada, permissão negada, ou uma rejeição que não identifica nenhum registo (contrato violado).
+A pausa evita gastar a fila em pedidos inúteis, mas era definitiva: os dois ciclos de entrega terminavam e só
+um reinício do agente os voltava a pôr a correr. Uma chave corrigida no \texttt{.env}, ou um erro do central
+que durou minutos, deixava os dados parados até alguém reiniciar o agente (\cen{AV3}).
+
+\paragraph{Decisão.}
+A pausa deixa de terminar os ciclos. Enquanto dura, o agente faz uma \emph{probe} a cada 5~minutos: um pedido
+com um só registo. A \emph{probe} é partilhada pelas duas categorias de dados, porque ambas usam a mesma chave:
+quem a reserva marca logo a seguinte, e a outra categoria dorme até lá. Se o central aceitar o registo, ou o
+validar e rejeitar (o que prova que autenticou e leu o lote), a entrega retoma no mesmo ciclo, com lotes
+completos. Qualquer outra resposta mantém a pausa até à \emph{probe} seguinte. O sinal \texttt{SIGHUP}, que
+antes terminava o agente, passa a reler a chave do \texttt{.env} e a antecipar a \emph{probe}; o resto da
+configuração continua a exigir reinício. O relógio do agente é injetável, para testar os 5~minutos sem esperar.
+
+\paragraph{Teoria.}
+Nas táticas de disponibilidade, \emph{Retry}, mas com cadência fixa e carga mínima, porque a causa provável não
+desaparece em segundos; e uma versão branda de \emph{Escalating Restart}: reinicia-se só a entrega, e só depois
+de uma prova de que a causa desapareceu. Mudar a chave com o agente a correr é \emph{Defer Binding}. A
+\emph{probe} de estatísticas leva o estado do \emph{buffer} com a pausa assinalada (\dec{17}): o central fica
+a saber que o host está parado.
+
+\paragraph{O que ficou de fora, e porquê.}
+Recarregar toda a configuração no \texttt{SIGHUP}: o endereço do central e os intervalos estão em ligações e
+ciclos já criados, e reconstruí-los com o agente a correr é muito mais estado para casos que um reinício
+resolve bem. Só a chave muda sem reinício, que é o caso que motivou a decisão.
+
+\paragraph{Alternativas.}
+Tentar outra vez com o \emph{backoff} normal mandaria lotes completos de 100 registos a cada poucos segundos,
+todos recusados, multiplicados por 1.000 hosts. Reler o \texttt{.env} periodicamente leria o disco sem motivo e
+o operador não saberia quando a chave nova entra em vigor. Uma \emph{probe} com um pedido vazio não serve: o
+contrato rejeita lotes vazios antes de distinguir os outros casos.
+
+\paragraph{Trade-offs.}
+Um host com a chave revogada faz 12 pedidos por hora, de um registo cada; com 1.000 hosts nessa situação, são
+3,3 pedidos por segundo, uma fração desprezável da ingestão. Para caber nos limites de complexidade, a função
+que entrega um lote foi partida em quatro; o lint do remote desceu de 24 para 21 \emph{issues}.
+
+\paragraph{Verificação.}
+\cen{AV3} é provado por um teste com o relógio injetado, descrito na secção~\ref{sec:av1-av4}.
 
 \subsection{Segurança}
 \porescrever{\dec{18}.}

@@ -1,0 +1,26 @@
+# AV3 (D16, ADR-0011): 4xx transitório ou chave corrigida -> entrega retomada em <= 5 min sem reiniciar
+# 2026-11-20T19:28Z; remote main=d796037 + alterações do D17 e D16 (por commitar); go version go1.27.4 linux/amd64
+# cd monitor-remote && go test -race -count=1 -run 'Pause|Probe|Reload|RunLoop|OnlyOne|APIKeyCanBeReplaced|ReloadAPIKey|LoadRemembers' -v ./internal/sender/ ./internal/requests/ ./internal/config/
+
+--- PASS: TestPausedDeliveryResumesWithinFiveMinutes (0.17s)
+--- PASS: TestFailedProbeKeepsThePauseAndBooksTheNextOne (0.12s)
+--- PASS: TestProbeRejectedAsARecordResumesDelivery (0.14s)
+--- PASS: TestUnusedProbeIsGivenBack (0.12s)
+--- PASS: TestOnlyOneProbeAtATime (0.00s)
+--- PASS: TestReloadedCredentialProbesAtOnce (0.12s)
+--- PASS: TestRunLoopSurvivesAPause (0.17s)
+--- PASS: TestReloadOnSignal (0.11s)
+--- PASS: TestCredentialFailurePausesBothCategoriesWithoutQuarantine (0.11s)
+ok  	monitor-remote/internal/sender	2.098s
+--- PASS: TestAPIKeyCanBeReplaced (0.01s)
+ok  	monitor-remote/internal/requests	1.026s
+--- PASS: TestLoadRemembersWhereTheKeyCameFrom (0.00s)
+--- PASS: TestReloadAPIKey (0.00s)
+ok  	monitor-remote/internal/config	1.018s
+
+## Processo real: SIGHUP (antes terminava o agente)
+# chave mudada no .env + kill -HUP; depois .env sem chave + kill -HUP; depois SIGTERM
+  remote-agent: 2026/11/20 19:27:52 SIGHUP: host key reloaded
+  remote-agent: 2026/11/20 19:27:53 SIGHUP: host key not reloaded: HOST_API_KEY is missing from .env
+  remote-agent: 2026/11/20 19:27:54 agent stopped
+  (o processo continuou vivo depois dos dois SIGHUP e saiu com 0 no SIGTERM)
