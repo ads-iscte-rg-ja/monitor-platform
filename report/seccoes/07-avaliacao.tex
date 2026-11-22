@@ -257,9 +257,9 @@ tudo o que o remote marcou como entregue tem de estar no central uma só vez, e 
 O tempo de recuperação é o do \emph{backoff} do remote: depois de 60~s de falhas seguidas, a espera entre
 tentativas já ia em cerca de 40~s (32 a 48~s, com a variação aleatória); o limite do \emph{backoff} é 5~minutos, que é por isso o
 atraso máximo depois de uma falha longa. Com 1~h em baixo, a entrega completa demorou 202 e 216~s: até 5~minutos de
-espera pela tentativa seguinte, e depois 500 logs e 599 estatísticas em lotes. As duas primeiras execuções usaram o
-código ainda por \emph{commit}; a terceira correu o \texttt{e2e.yml} no GitHub sobre o \texttt{main} de todos os
-repositórios (\texttt{docs/metrics/iter-7/e2e/}). Os duplicados são impossíveis no central por construção (recibos por
+espera pela tentativa seguinte, e depois 500 logs e 599 estatísticas em lotes. As duas primeiras execuções foram locais; a
+terceira correu o \texttt{e2e.yml} no GitHub sobre o \texttt{main} de todos os repositórios
+(\texttt{docs/metrics/iter-7/e2e/}). Os duplicados são impossíveis no central por construção (recibos por
 \emph{host} e identificador de origem); o que o teste prova é que o remote não cria identificadores novos ao repetir
 um envio e que não marca como entregue nada que o central não tenha gravado. \cen{AV1} cumpre-se.
 
@@ -344,7 +344,7 @@ do gRPC, de \dec{4} e de \dec{5}--\dec{6} por cobertura nova abaixo de 80\,\%; n
 \cen{TE1} cumpre-se.
 
 \paragraph{\cen{TE2} e \cen{TE3}: \emph{handlers} e tempo.}
-Com \dec{14}, a cobertura dos \emph{handlers} passou de 9,5\,\% para 95,6\,\% (alvo $\ge$ 60\,\%), em testes de
+Com \dec{14}, a cobertura unitária dos \emph{handlers} passou de 9,5\,\% para 95,6\,\% (alvo $\ge$ 60\,\%), em testes de
 0,2~s sem base de dados. Os \texttt{time.Sleep} nos testes passaram de 1 para 0. O resumo diário é testado em seis
 casos com relógio e fuso controlados (antes, às e depois das 9~h, fim do mês, mudança de hora, outro fuso).
 \cen{TE2} e \cen{TE3} cumprem-se.

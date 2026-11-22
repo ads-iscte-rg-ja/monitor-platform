@@ -211,7 +211,7 @@ Por ordem de valor (detalhe em D20 e na revisão de D1, no plano):
   repositórios medidos e com CI), separadores de milhares e *host* em itálico uniformizados. READMEs: central
   (retenção ligada por omissão, *bulkhead*, esquema 8) e SDK (v0.2.0).
 * **E2E de 1 h a partir do `main`:** corrido no GitHub a 22/11 (run 45014597006), todos os cenários passaram
-  (`docs/metrics/iter-7/e2e/`). O agendamento noturno ainda não disparou; as menções a outro trabalho nos ADR-0001/0002 e no plano foram retiradas (22/11).
+  (`docs/metrics/iter-7/e2e/`). O agendamento noturno também já correu (22/11, run 45016898494, sucesso); as menções a outro trabalho nos ADR-0001/0002 e no plano foram retiradas (22/11).
 * **Carga repetida:** todos os cenários correram mais duas vezes (22/11, `docs/metrics/iter-7/repeticao-2` e `-3`,
   sem falhas); `tabelas.py --repeticoes` dá o mínimo–máximo das três execuções nas tabelas. Nenhum veredicto mudou;
   o que mais variou foi a latência do *dashboard* (SC4 métricas de 1 mês 188–652 ms, SC2 44–168 ms). Texto dos

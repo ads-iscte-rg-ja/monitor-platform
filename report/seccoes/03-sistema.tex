@@ -65,8 +65,7 @@ seta a tracejado = dependência de dados entre o SDK e o remote, que não aparec
 \end{figure}
 
 As camadas eram só convenção; passaram a regras \texttt{depguard} verificadas em cada PR
-(secção~\ref{sec:pipeline}). A primeira execução encontrou uma só violação, \texttt{handlers/health.go} a usar
-\texttt{database}, corrigida na iteração~1.
+(secção~\ref{sec:pipeline}), e a violação da figura foi corrigida na iteração~1.
 
 A dependência mais importante não é um \emph{import}: o SDK escreve nas tabelas do \emph{buffer}, cujo esquema
 pertence ao remote (Shared-Data), e por isso verifica-se por testes (secção~\ref{sec:pipeline}).
@@ -152,7 +151,7 @@ na escalabilidade e na manutenção.
 \subsection{Lacunas identificadas}
 \label{sec:lacunas}
 
-A análise do código, as estimativas e a baseline identificaram as lacunas da Tabela~\ref{tab:lacunas}, que o
+A análise do código, as estimativas e a \emph{baseline} identificaram as lacunas da Tabela~\ref{tab:lacunas}, que o
 capítulo~\ref{sec:decisoes} trata.
 
 \begin{table}[htbp]

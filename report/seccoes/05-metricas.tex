@@ -54,8 +54,7 @@ alteração; o acoplamento, por exemplo, não tem valor certo, e interessa a evo
 \paragraph{Limites.}
 McCabe recomenda complexidade ciclomática até 10~\cite{mccabe1976}, mas em Go cada \texttt{if err != nil} soma um;
 usa-se 15. A cognitiva~\cite{campbell2018} é a principal, por não penalizar o tratamento de erros linear; o limite
-de 15 é o do SonarQube Cloud, para as análises local e remota concordarem. Cobertura (80\,\%) e duplicação (3\,\%)
-aplicam-se só ao código novo (secção~\ref{sec:pipeline}).
+de 15 é o do SonarQube Cloud, para as análises local e remota concordarem.
 
 \paragraph{Porque a cobertura não chega.}
 A cobertura mede o que foi executado, não o que foi verificado. A testabilidade é a probabilidade de um teste
@@ -64,11 +63,11 @@ mede-se numa amostra (os \emph{services} do central), na avaliação final (sec�
 
 \paragraph{Uma métrica prevista que se revelou inútil.}
 O plano previa o \emph{technical debt ratio} do SonarQube Cloud ($\le 5\,\%$) para ``a dívida técnica está
-controlada?''. Na baseline deu 0,0\,\% nos quatro repositórios, apesar de 66 \emph{issues} de lint e de complexidade
+controlada?''. Na \emph{baseline} deu 0,0\,\% nos quatro repositórios, apesar de 66 \emph{issues} de lint e de complexidade
 cognitiva até 46. O rácio divide o tempo de correção dos \emph{code smells} detetados pelo custo de escrever o código
 (30 minutos por linha): no central, 5 minutos contra cerca de 3\,400 horas, quando passar de A a B exigiria perto de
 170 horas, que as poucas regras para Go nunca acumulam. Reflete a cobertura das regras, não o código; foi retirado,
-e a pergunta passa às métricas de modificabilidade e testabilidade, que a baseline mostrou sensíveis aos problemas
+e a pergunta passa às métricas de modificabilidade e testabilidade, que a \emph{baseline} mostrou sensíveis aos problemas
 reais.
 
 \subsection{Ferramentas e alternativas}
@@ -98,9 +97,8 @@ CI, custo de operação nulo (duas pessoas, três semanas) e resultados exportá
 
 \paragraph{Porque o SonarQube Cloud, se o lint já mede quase tudo.}
 O lint, o govulncheck e as métricas próprias já cobrem quase tudo, mas o pipeline ficaria sem uma análise
-independente, sem as linguagens que não são Go e sem histórico. A baseline confirmou o valor: o Sonar chegou sozinho
-aos mesmos dois falsos positivos e encontrou em SQL, JavaScript e HTML um problema real de segurança
-(secção~\ref{sec:baseline}). Os \emph{gates} ficam nas ferramentas que correm localmente; o Sonar é segunda opinião,
+independente, sem as linguagens que não são Go e sem histórico; a \emph{baseline} confirmou-o
+(Tabela~\ref{tab:baseline-sonar}). Os \emph{gates} ficam nas ferramentas que correm localmente; o Sonar é segunda opinião,
 histórico e \emph{dashboard}, gratuito para repositórios públicos.
 
 \paragraph{Versões fixadas.}
@@ -147,7 +145,7 @@ a cobertura unitária e de integração.
 Com 66 \emph{issues} de lint e 25,9\,\% de cobertura no central (secção~\ref{sec:baseline}), um \emph{gate}
 absoluto falharia desde o primeiro dia. O lint só falha por \emph{issues} novas (\texttt{only-new-issues}), e o
 \emph{quality gate} compara com o \texttt{main} (\emph{Clean as You Code}): a qualidade sobe à medida que o código é
-tocado, o crescimento incremental do ADD~\cite{bastofernandes2026}. Na baseline, o parâmetro \texttt{lint-blocking}
+tocado, o crescimento incremental do ADD~\cite{bastofernandes2026}. Na \emph{baseline}, o parâmetro \texttt{lint-blocking}
 pôs o lint e o \emph{gate} só a reportar; testes e vulnerabilidades falham sempre. Para \cen{TE1}, o \texttt{main} só
 aceita PR com as fases verdes, também para administradores (proteção de ramo, gratuita só em repositórios
 públicos). Sem revisão obrigatória: com duas pessoas, bloquearia o trabalho.
@@ -169,7 +167,7 @@ por os repositórios estarem lado a lado; no CI, o remote passou a ser clonado e
 (\texttt{sibling-repos}). Uma alteração incompatível no remote só é apanhada no CI seguinte do SDK (limitação
 conhecida).
 
-\subsection{Baseline}
+\subsection{\emph{Baseline}}
 \label{sec:baseline}
 
 Antes de qualquer alteração mediu-se o sistema tal como estava (iteração~0). O \emph{script}
@@ -250,7 +248,7 @@ segurança por oito \emph{issues}, triadas na Tabela~\ref{tab:baseline-sonar}.
 
 \begin{table}[htbp]
   \centering\small
-  \caption{Triagem dos \emph{issues} do SonarQube Cloud no central (baseline)}
+  \caption{Triagem dos \emph{issues} do SonarQube Cloud no central (\emph{baseline})}
   \label{tab:baseline-sonar}
   \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.36\linewidth}c>{\raggedright\arraybackslash}X}
     \toprule
@@ -272,7 +270,7 @@ integridade). O \emph{rating} é dado pelo pior \emph{issue}, aqui falsos positi
 por isso o relatório usa os \emph{issues} triados.
 
 \paragraph{Síntese.}
-A baseline deu quatro ações na iteração~1, por custo e benefício: (1)~a \emph{toolchain} e o \texttt{x/text}, para
+A \emph{baseline} deu quatro ações na iteração~1, por custo e benefício: (1)~a \emph{toolchain} e o \texttt{x/text}, para
 as 91 vulnerabilidades (89 da biblioteca padrão); (2)~um \texttt{HealthService}, para a violação de camadas;
 (3)~testes no SDK, que as aplicações incorporam; (4)~documentar as exceções do \texttt{gosec}. A complexidade
 trata-se nas decisões que tocam essas funções (\dec{5}, \dec{13}, \dec{19}).

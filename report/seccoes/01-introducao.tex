@@ -3,23 +3,11 @@
 
 \subsection{Contexto e motivação}
 
-O Monitor é um sistema de monitorização distribuído escrito em Go. Tem quatro componentes, cada um no seu
-repositório:
-\begin{itemize}
-  \item \texttt{monitor-central}: servidor central com PostgreSQL. Recebe a telemetria por uma API de
-        ingestão autenticada, avalia alertas, envia notificações por email, verifica a disponibilidade
-        das aplicações e serve o \emph{dashboard};
-  \item \texttt{monitor-remote}: agente instalado em cada \emph{host} monitorizado. Recolhe métricas da
-        máquina, guarda-as num \emph{buffer} SQLite local e entrega-as ao central em lotes, com novas
-        tentativas e quarentena de registos inválidos;
-  \item \texttt{monitor-go-sdk}: biblioteca mínima que as aplicações usam para registar erros no
-        \emph{buffer} do agente, sem credenciais nem rede;
-  \item \texttt{monitor-hello-world}: aplicação de exemplo que usa o SDK.
-\end{itemize}
-Durante o trabalho surgiram mais dois repositórios: \texttt{monitor-api}, com o contrato de ingestão
-entre o remote e o central (secção~\ref{sec:d11}), e \texttt{monitor-platform}, com o pipeline de CI
-partilhado, as medições, as decisões e este relatório (secção~\ref{sec:pipeline}). Os seis repositórios são
-públicos, na organização \url{\Organizacao} (Tabela~\ref{tab:repositorios}).
+O Monitor é um sistema de monitorização distribuído escrito em Go, com quatro componentes, cada um no seu
+repositório: o servidor central, o agente de cada \emph{host}, o SDK das aplicações e uma aplicação de exemplo.
+Durante o trabalho surgiram mais dois: \texttt{monitor-api}, com o contrato de ingestão (secção~\ref{sec:d11}), e
+\texttt{monitor-platform}, com o pipeline de CI partilhado, as medições, as decisões e este relatório
+(secção~\ref{sec:pipeline}). Os seis são públicos, na organização \url{\Organizacao} (Tabela~\ref{tab:repositorios}).
 
 \begin{table}[htbp]
   \centering\small
@@ -29,12 +17,12 @@ públicos, na organização \url{\Organizacao} (Tabela~\ref{tab:repositorios}).
     \toprule
     Repositório & Conteúdo \\
     \midrule
-    \repo{monitor-central} & servidor central (ingestão, alertas, \emph{probes}) e \emph{dashboard} \\
-    \repo{monitor-remote} & agente de cada \emph{host} e \emph{buffer} SQLite \\
-    \repo{monitor-go-sdk} & biblioteca para as aplicações \\
+    \repo{monitor-central} & servidor central com PostgreSQL: ingestão autenticada, alertas e emails, verificação da disponibilidade das aplicações (\emph{probes}) e \emph{dashboard} \\
+    \repo{monitor-remote} & agente de cada \emph{host}: recolhe métricas, guarda-as num \emph{buffer} SQLite e entrega-as em lotes, com novas tentativas e quarentena de registos inválidos \\
+    \repo{monitor-go-sdk} & biblioteca mínima com que as aplicações registam erros no \emph{buffer} do agente, sem credenciais nem rede \\
     \repo{monitor-hello-world} & aplicação de exemplo \\
-    \repo{monitor-api} & contrato de ingestão gRPC, versionado \\
-    \repo{monitor-platform} & CI partilhado, testes de carga, medições, ADR e relatório \\
+    \repo{monitor-api} & contrato de ingestão gRPC, versionado (novo) \\
+    \repo{monitor-platform} & CI partilhado, testes de carga, medições, ADR e relatório (novo) \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -88,7 +76,7 @@ táticas e padrões, iterações ADD, \emph{generate and test}). Contribuições
   \item a priorização justificada dos atributos de qualidade, com os \emph{trade-offs} explícitos, a
         \emph{utility tree} e os cenários de seis partes;
   \item uma infraestrutura de medição: métricas derivadas por GQM, um pipeline de CI partilhado pelos
-        cinco repositórios de código e uma medição de baseline reproduzível;
+        cinco repositórios de código e uma medição de \emph{baseline} reproduzível;
   \item decisões arquiteturais registadas como ADR, cada uma ligada a táticas, alternativas rejeitadas e
         ao cenário que a verifica;
   \item a avaliação antes/depois, com testes de carga e métricas de código;
@@ -96,6 +84,6 @@ táticas e padrões, iterações ADD, \emph{generate and test}). Contribuições
 \end{enumerate}
 
 Os capítulos seguem essa ordem: teoria (\ref{sec:enquadramento}), arquitetura inicial e lacunas
-(\ref{sec:sistema}), requisitos (\ref{sec:requisitos}), métricas e baseline (\ref{sec:metricas}), decisões
+(\ref{sec:sistema}), requisitos (\ref{sec:requisitos}), métricas e \emph{baseline} (\ref{sec:metricas}), decisões
 (\ref{sec:decisoes}), avaliação (\ref{sec:avaliacao}), evolução, discussão e conclusões. Os anexos têm a reprodução
 e os ADR. As medições, os ADR e o relatório estão em \url{\Repositorio}.

@@ -289,7 +289,7 @@ componentes reais confirmou os valores. Lint do central de 60 para 58.
 \label{sec:d5}
 
 \paragraph{Problema.}
-Na baseline de carga só a recuperação falhava: o \emph{pool} esgotava-se (25 de 25) com o CPU abaixo de 30\,\%
+Na \emph{baseline} de carga só a recuperação falhava: o \emph{pool} esgotava-se (25 de 25) com o CPU abaixo de 30\,\%
 (secção~\ref{sec:aval-escala}). Cada registo custava dois \emph{statements} (recibo e registo), cerca de 200 por
 lote, sempre com a ligação ocupada (S2); os alertas faziam um UPDATE por regra não violada a cada 15~s (S3).
 
@@ -333,7 +333,7 @@ partilhado. \emph{Degradation}: sob sobrecarga, a ingestão abranda para o \emph
 que é seguro porque o agente faz \emph{Retry}.
 
 \paragraph{O que ficou de fora, e porquê.}
-O plano previa justiça por \emph{host} (um \emph{token bucket}) contra S10. A baseline refutou o risco: com 1\,\%
+O plano previa justiça por \emph{host} (um \emph{token bucket}) contra S10. A \emph{baseline} refutou o risco: com 1\,\%
 dos \emph{hosts} a 200 logs/s, os restantes tiveram atraso p95 de 6~ms (Tabela~\ref{tab:carga-sc5}). Fica desenhada
 no ADR, com o gatilho: atraso p95 dos restantes acima de 1~s em \cen{SC5}, ou um \emph{host} com mais de metade das
 admissões.
@@ -704,7 +704,7 @@ e não logo a seguir. \textbf{Verificação:} \cen{MO2} na secção~\ref{sec:mo1
 
 \paragraph{Problema.}
 Os \emph{handlers} guardavam serviços concretos: testar um obrigava a montar serviço, repositório e PostgreSQL, e a
-cobertura da camada era de 9,5\,\% (\cen{TE2}). O fuso de Lisboa estava escrito em quatro sítios, e o resumo diário
+cobertura unitária da camada era de 9,5\,\% (\cen{TE2}). O fuso de Lisboa estava escrito em quatro sítios, e o resumo diário
 usava o relógio da máquina, sem forma de o testar sem esperar; no remote havia um \texttt{time.Sleep} num teste
 (\cen{TE3}).
 
