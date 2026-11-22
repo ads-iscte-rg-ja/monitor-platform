@@ -4,13 +4,13 @@
 > **Base teórica:** slides de ADS (ISCTE, 01 a 08): QA, tácticas, padrões, GoF, utility tree, ADD,
 > documentação e conformidade (07), estilos arquiteturais, falácias da computação distribuída e conascência (08).
 > Os slides 07 e 08 chegaram a 21/11: o que mudam no plano está em D20 e na revisão de D1, E3 e §9.
-> **Contexto:** projeto proposto pela equipa (2 pessoas). O mesmo sistema é avaliado em **EUVI**
-> (UI/UX) e em **ADS** (arquitetura). Os repos vão ficar públicos.
+> **Contexto:** projeto proposto pela equipa (2 pessoas), avaliado pela arquitetura. A interface (UI/UX) vai
+> continuar a mudar depois desta entrega, noutro trabalho. Os repos vão ficar públicos.
 > **Prioridades da equipa para ADS:** (1) métricas de qualidade, (2) escalabilidade, (3) manutenção,
 > e todas as decisões justificadas e defendidas.
 > **Prazo:** 9 de dezembro de 2026 (3 semanas a partir de 18/11). **Relatório:** LaTeX detalhado, no
-> formato do relatório `mqtt-secure` (§13). **EUVI** mexe no frontend a partir da 1.ª semana de dezembro,
-> possivelmente só depois da entrega de ADS.
+> formato do relatório `mqtt-secure` (§13). O trabalho na interface começa na 1.ª semana de dezembro,
+> possivelmente só depois desta entrega.
 > **Baseline técnica (18/11/2026):** build, vet e gofmt limpos; testes unitários verdes; 16/16 testes de
 > integração verdes depois da correção `db.Exec`. Cobertura unitária: central 25,8%, remote 68,0%,
 > hello-world 56,8%, SDK 0%.
@@ -29,7 +29,7 @@
 7. Decisões (ADR)
 8. **Plano de evolução para 10.000+ hosts (backlog com gatilhos)**
 9. Decisões rejeitadas
-10. Fronteira ADS / EUVI
+10. Fronteira entre arquitetura e apresentação
 11. Âmbito para 9/12 e calendário
 12. Pontos por esclarecer
 13. Estrutura do relatório (LaTeX)
@@ -55,7 +55,7 @@ justificação de onde veio, sobretudo das estimativas *back-of-the-envelope* (s
 | G1 | **Nenhuma telemetria se perde**, mesmo com o central em baixo | Um monitor que perde dados durante um incidente falha exatamente quando é preciso |
 | G2 | O operador sabe depressa quando um host ou uma app tem problemas | É a razão de existir do produto |
 | G3 | **Crescer de dezenas para milhares de hosts** sem reescrever o sistema | Prioridade definida pela equipa |
-| G4 | **Manter e evoluir com custo controlado**: 2 pessoas, 2 cadeiras, código partilhado | Prioridade definida pela equipa; o código muda por razões de ADS e de EUVI ao mesmo tempo |
+| G4 | **Manter e evoluir com custo controlado**: 2 pessoas, código que continua a evoluir | Prioridade definida pela equipa; a arquitetura e a interface mudam ao mesmo tempo |
 | G5 | Seguro por omissão | Os repos vão ser públicos e a API de ingestão fica exposta na rede |
 | G6 | Integrar uma app nova custa pouco | SDK mínimo, sem credenciais |
 
@@ -72,14 +72,14 @@ tradeoffs."* Esta secção torna esses trade-offs explícitos.
 | Rank | QA | Prioridade | Justificação |
 |---|---|---|---|
 | 1 | **Scalability** | Alta | G3. Escolha explícita da equipa. É também o QA com **maior impacto arquitetural**: mudar de 1 para N instâncias, ou de tabelas simples para particionadas, é caro de fazer tarde (slide 02: *"the earlier a problem is detected in design the cheaper"*). |
-| 2 | **Modifiability / Maintainability** | Alta | G4. *"Most of the cost of SW occurs after initial release"* (slide 03). Neste projeto há duas cadeiras a mudar o mesmo código, por isso a mudança é **garantida** e não apenas provável. |
+| 2 | **Modifiability / Maintainability** | Alta | G4. *"Most of the cost of SW occurs after initial release"* (slide 03). Neste projeto a interface vai continuar a mudar depois da entrega, por isso a mudança é **garantida** e não apenas provável. |
 | 3 | **Availability** (com integridade dos dados) | Alta | G1/G2. Num sistema de monitorização é um **requisito de domínio**: um monitor indisponível ou que perde dados não tem valor. Já está quase toda implementada, por isso aqui o trabalho é **provar** e **não regredir** ao escalar. |
 | 4 | **Testability** | Alta (habilitador) | Não é um objetivo em si: é o que permite mudar (2) e escalar (1) sem regressões. A baseline mostrou o risco: os testes de integração estavam partidos e ninguém sabia. |
 | 5 | **Monitorability** | Média-Alta | Sem medir, não se demonstra escalabilidade. Também é exigência do domínio: o monitor tem de mostrar as próprias perdas. |
 | 6 | **Security** | Média | O *baseline* já é forte (HMAC, CSRF, bcrypt, auditoria). Com os repos públicos e a API exposta, sobe de Baixa para Média, mas o sistema não guarda dados pessoais sensíveis nem pagamentos. Avaliamos por **checklist** (slide 04) em vez de lhe dar prioridade de desenho. |
 | 7 | **Performance** | Média, **subordinada à escalabilidade** | A telemetria é assíncrona: um operador não espera 50 ms vs 200 ms numa ingestão. Interessa o **throughput sob carga crescente**, que medimos como escalabilidade, e a latência do dashboard. Por isso a performance não aparece como QA independente com prioridade alta. |
 | 8 | **Interoperability** | Baixa-Média | Há um único agente (Go). O contrato fica documentado para permitir agentes futuros, mas não desenhamos para *service discovery* nem para múltiplos protocolos. |
-| 9 | **Usability** | **Baixa em ADS** | Não é irrelevante: é tratada **em EUVI**. Em ADS limitamo-nos ao suporte arquitetural (separação MVC que permite a EUVI mudar a UI sem tocar no domínio, e dados disponíveis para *Maintain System Model*). Evita trabalho duplicado entre cadeiras (§10). |
+| 9 | **Usability** | **Baixa** | Não é irrelevante: está fora do âmbito de um trabalho de arquitetura. Limitamo-nos ao suporte arquitetural (separação MVC que permite mudar a UI sem tocar no domínio, e dados disponíveis para *Maintain System Model*) (§10). |
 
 ### 2.2 Trade-offs explícitos e como os resolvemos
 
@@ -90,7 +90,7 @@ tradeoffs."* Esta secção torna esses trade-offs explícitos.
 | **Scalability vs Availability**: controlo de admissão (`RESOURCE_EXHAUSTED`) rejeita pedidos | Rejeitar **sem perder**: o remote guarda e volta a tentar depois do `RetryInfo` | *Limit Event Response* no central + *Retry* no remote |
 | **Modifiability vs Performance**: estratégias por métrica vs uma query set-based | Manter **uma só query set-based**, montada a partir das estratégias (D13) | *Increase Cohesion* sem *N+1 queries* |
 | **Security vs Performance**: HMAC por pedido, bcrypt no login | Aceitar o custo: HMAC custa µs; o bcrypt só corre no login | — |
-| **Security vs Modifiability da UI (EUVI)**: uma CSP restritiva pode partir scripts inline | CSP primeiro em **Report-Only**, depois *enforce* de forma coordenada | *Change Default Settings* faseado |
+| **Security vs Modifiability da UI**: uma CSP restritiva pode partir scripts inline | CSP primeiro em **Report-Only**, depois *enforce* de forma coordenada | *Change Default Settings* faseado |
 | **Testability vs Simplicity**: interfaces e *clock* injetado acrescentam indireção | Interfaces **pequenas, definidas por quem as consome** (idioma Go) | *Abstract Data Sources*, *Limit Nondeterminism* |
 
 ---
@@ -119,7 +119,7 @@ Utility
 ├── Modifiability
 │   ├── MO1 (H,H) Nova métrica de alerta → ≤1 pessoa-dia, ≤3 ficheiros Go + 1 migração
 │   ├── MO2 (H,M) Alterar uma regra do protocolo → 1 sítio por repo; divergência detetada por teste de contrato
-│   └── MO3 (H,M) EUVI muda a apresentação de uma página → 0 alterações em services/repositories
+│   └── MO3 (H,M) Mudança de apresentação de uma página → 0 alterações em services/repositories
 ├── Availability
 │   ├── AV1 (H,H) Central em baixo 1 h → 0 registos perdidos, 0 duplicados
 │   ├── AV2 (H,M) Host deixa de responder → offline + alerta em ≤ timeout + 60 s, **mesmo com 1.000 hosts**
@@ -137,7 +137,7 @@ Utility
 │   └── SE3 (M,M) Health endpoint para metadados de cloud ou loopback → rejeitado
 ├── Interoperability
 │   └── IO1 (L,M) Agente noutra linguagem implementável só com o `.proto` do monitor-api (ADR-0003)
-└── Usability (tratada em EUVI)
+└── Usability (fora do âmbito; só o suporte arquitetural, §10)
     └── US1 (M,L) Pico de 1 amostra → sem alerta se se exigir duração sustentada
 ```
 
@@ -686,7 +686,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
   (1 novo + 2 de registo da migração) + 1 migração, 0 alterações no avaliador. Cumpre.
 
 #### D14. Testabilidade: interfaces nos handlers, relógio injetável, timezone configurável
-* **Problema:** M5, M6, TE2, TE3; **MO3** (EUVI muda a UI → os handlers têm de ser testáveis em isolamento).
+* **Problema:** M5, M6, TE2, TE3; **MO3** (a UI muda → os handlers têm de ser testáveis em isolamento).
 * **Decisão:** cada handler declara a interface mínima de que precisa (*accept interfaces*). `Clock`
   injetado. `APP_TIMEZONE` carregada uma vez no arranque.
 * **Teoria:** *Abstract Data Sources*, *Limit Nondeterminism*, *Specialized Interfaces*; *Defer Binding*.
@@ -732,7 +732,7 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Problema:** A2, A3, MN1, MN2.
 * **Decisão:** o payload de stats ganha `buffer` **opcional** (`pending`, `quarantined`,
   `oldest_pending_age_s`, `delivery_paused`, `size_bytes`, `dropped_by_level` de D19), como mudança aditiva ao contrato D11. O central guarda o último
-  valor por host, expõe-o na view model e na API JSON (a apresentação é decidida em EUVI, §10) e permite
+  valor por host, expõe-o na view model e na API JSON (a apresentação fica fora deste plano, §10) e permite
   alertas `buffer_quarantined` (D13). `/health/live` e `/health/ready` (BD + heartbeat de cada job de que esta instância é líder).
 * **Teoria:** *Monitor*, *Heartbeat*, *Self-Test*; *Inform Actors*; *Maintain System Model*.
 * **Verificação:** MN1 com o E2E; MN2 com um teste que bloqueia um job e espera 503.
@@ -753,9 +753,9 @@ As decisões estão agrupadas pelo QA dominante. Cada uma dá origem a um ADR em
 * **Decisão:**
   1. checklist **OWASP ASVS nível 1** como método (slide 04: *checklists*), com o resultado no ADR;
   2. headers num middleware (CSP, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`, HSTS com `COOKIE_SECURE`).
-     A CSP começa em **Report-Only** para não partir o trabalho de EUVI, e passa a *enforce* em coordenação;
+     A CSP começa em **Report-Only** para não partir o trabalho na interface, e passa a *enforce* em coordenação;
   3. Tailwind servido de `frontend/public/vendor/` (a CDN deixa de ser ponto de falha e de ataque); esta
-     alteração é feita em coordenação com EUVI;
+     alteração é feita em coordenação com o trabalho na interface;
   4. guarda contra SSRF no `net.Dialer.Control` das probes, aplicada **depois da resolução DNS**: rejeita
      loopback, link-local e metadados de cloud, e permite RFC1918 (as redes internas são o caso normal);
   5. gosec e govulncheck no CI (D2).
@@ -849,30 +849,30 @@ A ordem real é decidida pelos gatilhos.
 |---|---|---|
 | Reescrever em microserviços já | Rejeitado | A análise de §4.3 mostra que os limites a 1.000 hosts estão em 4 pontos concretos, que se resolvem com tácticas locais. Os microserviços trariam custo operacional sem ASR que o pague; o caminho existe em E3. Slide 08: o registo, o recibo e a avaliação de alertas vivem na mesma transação ACID, e *"transaction boundaries are an indicator of service granularity"*: separá-los exigiria uma *saga*; *"MS couldn't exist without DevOps"*, o que uma equipa de 2 não sustenta; e cada fronteira de rede nova soma as 8 falácias. |
 | Broker (Kafka/RabbitMQ) já | Adiado (E1) | O store-and-forward com recibos idempotentes já dá at-least-once com deduplicação. Constraints do Broker (slide 04): latência, indireção, *"point of attack/failure/bottleneck"*. Slide 08: a topologia *broker* do estilo *event-driven* dificulta o tratamento de erros e não recupera transações, que é exatamente o que os recibos garantem hoje. |
-| SPA (React/Vue) | Rejeitado em ADS | O MVC server-side serve a UI; a decisão de UI pertence a EUVI e a restrição de "sem build" mantém-se. |
+| SPA (React/Vue) | Rejeitado em ADS | O MVC server-side serve a UI; a decisão de UI fica fora deste plano e a restrição de "sem build" mantém-se. |
 | Push em tempo real (SSE / Observer) | Adiado (E5) | O polling de 15 s, que pausa quando o separador está oculto (`dashboard.js:56`), cumpre G2. |
 | Migrações no SQLite do remote | Adiado | Rejeitar buffers incompatíveis é deliberado e seguro até haver hosts em produção com dados por entregar durante um upgrade. |
 | Kubernetes | Rejeitado | O Compose com `--scale` demonstra SC3. O K8s é infraestrutura, não arquitetura de software, e não muda nenhuma decisão do plano. |
 
 ---
 
-## 10. Fronteira ADS / EUVI
+## 10. Fronteira entre arquitetura e apresentação
 
-O mesmo frontend (`monitor-central/frontend`) é alterado pelas duas cadeiras. Esta decisão fica num **ADR próprio**.
-EUVI começa a mexer na 1.ª semana de dezembro, possivelmente só depois de 9/12. Por isso, as alterações
-de ADS que tocam no frontend (D18: CSP e Tailwind local) ficam **concluídas até 30/11**, antes de EUVI
-começar. A CSP fica em Report-Only, para não bloquear nada que EUVI venha a acrescentar.
+O frontend (`monitor-central/frontend`) vai continuar a ser alterado depois desta entrega, num trabalho de
+interface (UI/UX) que começa na 1.ª semana de dezembro, possivelmente só depois de 9/12. Por isso, as
+alterações deste plano que tocam no frontend (D18: CSP e Tailwind local) ficam **concluídas até 30/11**, antes
+de esse trabalho começar. A CSP fica em Report-Only, para não bloquear nada que a interface venha a acrescentar.
 
 | Área | Dono | Regra |
 |---|---|---|
-| Templates, CSS, JS, fluxos e apresentação | **EUVI** | ADS não muda a apresentação |
-| Handlers, view models, APIs JSON (`/api/v1/dashboard/*`) | **ADS** | Qualquer dado novo para a UI é exposto aqui primeiro; EUVI decide como mostrar |
+| Templates, CSS, JS, fluxos e apresentação | **Interface** | Este plano não muda a apresentação |
+| Handlers, view models, APIs JSON (`/api/v1/dashboard/*`) | **Arquitetura** | Qualquer dado novo para a UI é exposto aqui primeiro; a interface decide como mostrar |
 | `partials/layout.html` (CSP, vendor do Tailwind) | **Partilhado** | Mudanças só por PR revisto pelas duas frentes; CSP em Report-Only primeiro |
-| Testes de render (`templating/pages`) | ADS | Garantem que a mudança de UI não parte o escaping nem os assets |
+| Testes de render (`templating/pages`) | Arquitetura | Garantem que a mudança de UI não parte o escaping nem os assets |
 
 **Justificação:** é o padrão **MVC** aplicado à organização (slide 04: *"GUI is the most frequently
 modified part of SW; important to keep GUI modifications separate"*). Torna o cenário **MO3** mensurável:
-uma mudança de UI vinda de EUVI faz 0 alterações em services e repositories.
+uma mudança de UI faz 0 alterações em services e repositories.
 
 ---
 
@@ -888,7 +888,7 @@ de implementação**. Num relatório de arquitetura isso conta como trabalho de 
 | Prioridade | Decisões | Porquê |
 |---|---|---|
 | **Must** (implementado e medido) | D1 docs, D2 métricas e ferramentas, D3 CI, D4 `/metrics`, D10 testes de carga, D5 escritas set-based, D6 admissão + justiça por host, D7 probes, **D19 buffer com limite**, D8 escala horizontal, retenção por omissão (parte de D9), D13 Strategy de métricas, **D20 estilo e documentação (slides 07–08, acrescentado a 21/11)** | São o núcleo das 3 prioridades: medir (D2, D4, D10), escalar (D5–D8, D19) e provar a manutenção com um exemplo mensurável (D13 → MO1); D20 não tem código, mas é o que liga o desenho aos slides 07–08 |
-| **Should** | D11 contrato com códigos, D14 interfaces + clock, D12 fontes únicas, D17 estado do buffer no central, D18 CSP e Tailwind local (até 30/11, antes de EUVI) | Melhoram manutenção e monitorabilidade, mas a defesa do relatório não depende deles |
+| **Should** | D11 contrato com códigos, D14 interfaces + clock, D12 fontes únicas, D17 estado do buffer no central, D18 CSP e Tailwind local (até 30/11, antes do trabalho na interface) | Melhoram manutenção e monitorabilidade, mas a defesa do relatório não depende deles |
 | **Could** | Particionamento (resto de D9), D16 recuperação do remote sem restart, *mutation testing*, E2E completo | Têm valor, mas o risco (migração) ou o custo é alto para o prazo. O particionamento fica **desenhado** no ADR, mesmo que não seja implementado |
 | **Won't** (nesta entrega) | E1–E8 (§8) | Plano de evolução para 10k+, com gatilhos |
 
@@ -897,7 +897,7 @@ de implementação**. Num relatório de arquitetura isso conta como trabalho de 
 | Semana | Pessoa A: ingestão e remote | Pessoa B: núcleo do central | Relatório |
 |---|---|---|---|
 | **S1: 18–24 nov** | CI nos 4 repos (D3); harness k6 com perfil misto de logs (D10) | golangci-lint + SonarQube Cloud + **relatório de métricas de baseline** (D2); `/metrics` + slog (D4) | Esqueleto LaTeX; cap. 1–4 (introdução, enquadramento, arquitetura atual, requisitos) |
-| **S2: 25 nov–1 dez** | **Medição de baseline** (k6); D6 admissão + justiça; D5 inserts set-based; D19 buffer com limite | D7 probes; D8 leader election + `APP_ROLE` + login limiter em PG + nginx; retenção; D18 antes de EUVI | Cap. 5 (métricas e ferramentas) e cap. 6 (decisões) à medida que os ADRs são escritos |
+| **S2: 25 nov–1 dez** | **Medição de baseline** (k6); D6 admissão + justiça; D5 inserts set-based; D19 buffer com limite | D7 probes; D8 leader election + `APP_ROLE` + login limiter em PG + nginx; retenção; D18 antes do trabalho na interface | Cap. 5 (métricas e ferramentas) e cap. 6 (decisões) à medida que os ADRs são escritos |
 | **S3: 2–6 dez** | **Medição depois** (k6 com 1 e 3 instâncias); D11 contrato; D17 (lado do remote) | D13 Strategy (+ medir MO1); D14; D17 (lado do central); métricas de código **depois** | Cap. 7 (avaliação, com tabelas geradas) e cap. 8 (evolução) |
 | **Fecho: 7–9 dez** | Revisão cruzada | Revisão cruzada | Discussão, conclusões, resumo, anexos; entrega a 9/12 |
 
@@ -934,7 +934,7 @@ report/
 ├── gerado/          ← tabelas .tex/.csv produzidas pelo script de análise (k6 + Sonar + coupling)
 └── seccoes/
     ├── 00-resumo.tex
-    ├── 01-introducao.tex            contexto, objetivos G1–G6, relação com EUVI, contribuições
+    ├── 01-introducao.tex            contexto, objetivos G1–G6, contribuições
     ├── 02-enquadramento.tex         QA e cenários, tácticas, padrões, GoF, ADD, GQM; estilos, falácias e conascência (08); notações e conformidade (07)
     ├── 03-sistema.tex               Monitor as-is (reconstrução): views (TikZ, com legenda), estilo, padrões e tácticas existentes
     ├── 04-requisitos.tex            priorização de QA e trade-offs (§2), utility tree, cenários
@@ -945,8 +945,7 @@ report/
     ├── 09-discussao.tex             trade-offs observados, ameaças à validade
     ├── 10-conclusoes.tex
     ├── anexo-a-reproducao.tex       comandos para reproduzir todas as medições
-    ├── anexo-b-adrs.tex             ADRs completos
-    └── anexo-c-configuracao.tex     .golangci.yml, quality gate do Sonar, perfis k6
+    └── anexo-b-adrs.tex             lista dos ADRs (a configuração das ferramentas ficou no cap. 5)
 ```
 
 **Ameaças à validade** que o cap. 9 tem de assumir honestamente:

@@ -4,37 +4,31 @@
 \subsection{O que as medições confirmaram, e o que contrariaram}
 \label{sec:tradeoffs-observados}
 
-O capítulo~\ref{sec:requisitos} fez uma análise barata e cedo: estimativas, um perfil de logs e uma lista de
-riscos. As medições, mais caras e mais tardias, deram mais confiança, como o slide~04 antecipa. Em quatro
-pontos contrariaram a análise, e em todos o desenho mudou por causa disso.
+A análise do capítulo~\ref{sec:requisitos} foi barata e cedo; as medições, mais caras e tardias, deram mais
+confiança, como os diapositivos~04 antecipam. Em quatro pontos contrariaram a análise, e o desenho mudou.
 
 \paragraph{O estrangulamento estava onde a análise o punha, mas por outra razão.}
-A análise apontava para as escritas linha a linha (S2) e para a falta de controlo de admissão (S4). A
-\emph{baseline} confirmou-o: depois de uma hora de indisponibilidade, o \emph{dashboard} ficava com p95 de pelo
-menos 10~s, com CPU baixo e o \emph{pool} esgotado. \dec{5} e \dec{6} resolveram-no (262~ms). Mas a mesma
-medição mostrou que o limite seguinte era a base de dados, e não o central: com duas e três instâncias, o
-débito subiu 1,01 e 1,04 vezes (\cen{SC3}). A equipa registou o resultado e o gatilho para escalar a base de
-dados (E9), em vez de ajustar o alvo do cenário.
+A \emph{baseline} confirmou S2 e S4 (\emph{dashboard} $\ge$ 10~s na recuperação, CPU baixo, \emph{pool} esgotado),
+e \dec{5} e \dec{6} resolveram-nos. Mas o limite seguinte era a base de dados, não o central: com duas e três
+instâncias, o débito subiu 1,01 e, no máximo, 1,04 vezes (\cen{SC3}). Registou-se o resultado e o gatilho E9, sem ajustar o
+alvo.
 
 \paragraph{Um risco previsto não se verificou.}
-O vizinho ruidoso (S10) parecia o risco mais provável do perfil de logs. Medido, não se verificou: com 1\,\% dos
-\emph{hosts} a 200 logs/s, os restantes mantiveram um atraso p95 de 7~ms (\cen{SC5}). A justiça por \emph{host},
-que o plano previa, não foi implementada, e o ADR-0006 regista a medição que a dispensou.
+O vizinho ruidoso (S10) parecia o risco mais provável; medido, os restantes \emph{hosts} mantiveram 5~ms
+(\cen{SC5}). A justiça por \emph{host} não foi implementada, e o ADR-0006 regista porquê.
 
 \paragraph{O volume de dados não era o problema; a forma das consultas era.}
-O plano previa particionar a telemetria (\dec{9}). Com 30 dias de dados, \cen{SC4} falhou, mas por quatro
-consultas sem limite temporal que o particionamento não teria ajudado; e o efeito mais grave não era a
-lentidão do \emph{dashboard}, mas a ingestão parada pelas ligações que ele ocupava. A correção foi outra (consultas
-com custo limitado e um \emph{bulkhead}), e o particionamento ficou adiado por um critério escrito antes da medição.
+Com 30 dias, \cen{SC4} falhou por quatro consultas sem limite temporal, que o particionamento previsto não ajudaria,
+e o efeito mais grave era a ingestão parada. A correção foi outra (\dec{9}), e o particionamento ficou adiado por um
+critério escrito antes da medição.
 
 \paragraph{Medir também encontrou defeitos.}
-O teste ponta a ponta encontrou um defeito que nenhum teste unitário via: um ciclo de estatísticas vazio
-esperava pela recolha seguinte, e \cen{MN1} demorava dois ciclos (\dec{15}). A verificação de segurança num
-\emph{browser} real encontrou o seletor de \emph{hosts} do \emph{dashboard} partido desde o início (\dec{18}). E a
-medição de \cen{SC4} encontrou uma migração que nunca terminaria numa base de dados grande (\dec{9}).
+O E2E encontrou o atraso de dois ciclos em \cen{MN1} (\dec{15}); o navegador real, o seletor de \emph{hosts}
+partido desde o início (\dec{18}); \cen{SC4}, uma migração que não terminaria numa base grande (\dec{9}); e o
+\emph{mutation testing}, limites da ingestão por testar (secção~\ref{sec:mo1}).
 
 \paragraph{\emph{Trade-offs} aceites.}
-Os principais estão nos ADR e repetem-se aqui porque são os que mais pesam:
+Os que mais pesam:
 \begin{itemize}
 \item a base de dados partilhada é, ao mesmo tempo, o que dá as garantias de integridade (registo e recibo na
 mesma transação) e o estrangulamento das escritas e ponto único de falha (ADR-0018);
@@ -52,41 +46,33 @@ mais tarde: o sistema troca latência por estabilidade.
 \label{sec:ameacas}
 
 \paragraph{Uma só máquina.}
-O gerador de carga, o central, a base de dados e o Prometheus correm na mesma máquina. Os limites de CPU e de
-memória separam o sistema medido do gerador, mas não o disco, a \emph{cache} de páginas do sistema operativo, nem
-a rede, que é local e não tem latência nem perdas. Os números absolutos valem para esta máquina; o que se
-compara são as iterações entre si, medidas da mesma forma.
+Gerador, central, base de dados e Prometheus partilham a máquina: os limites de CPU e memória não isolam o disco,
+a \emph{cache} de páginas nem a rede, que é local e sem perdas. Comparam-se iterações medidas da mesma forma.
 
 \paragraph{Carga sintética.}
-Os 1\,000 \emph{hosts} são simulados pelo k6, com o mesmo contrato e as mesmas regras de envio do remote, mas não
-são 1\,000 processos reais: o \emph{buffer} SQLite, a recolha e o SDK de cada \emph{host} não estão sob carga. O
-histórico de \cen{SC4} é gerado com o mesmo perfil, e as suas consultas veem dados mais regulares do que os
-reais (as mesmas aplicações, os mesmos níveis em proporção fixa).
+Os 1\,000 \emph{hosts} são simulados: o \emph{buffer}, a recolha e o SDK de cada um não estão sob carga. O histórico
+de \cen{SC4} é mais regular do que dados reais.
 
 \paragraph{O perfil de logs é uma hipótese.}
-A taxa de erros por perfil de \emph{host} foi proposta pela equipa (capítulo~\ref{sec:requisitos}). Para reduzir
-a dependência dela, o cenário principal foi repetido com duas e cinco vezes mais logs (análise de
-sensibilidade).
+Proposto pela equipa; a análise de sensibilidade (2 e 5 vezes mais logs) reduz a dependência dele.
 
 \paragraph{Os alvos foram escolhidos pela equipa.}
-Não há enunciado com requisitos: os 1\,000 \emph{hosts}, os 300~ms e os 15~minutos são propostas da equipa,
-justificadas no capítulo~\ref{sec:requisitos}. Um alvo mais apertado poderia mudar algum veredicto.
+Sem enunciado, os 1\,000 \emph{hosts}, os 300~ms e os 15~minutos são propostas justificadas no
+capítulo~\ref{sec:requisitos}; um alvo mais apertado poderia mudar algum veredicto.
 
 \paragraph{As métricas de código são \emph{proxies}.}
-Complexidade, acoplamento e cobertura medem propriedades associadas à manutenção, mas não a manutenção. Por
-isso os cenários de manutenção foram medidos também diretamente: \cen{MO1} com uma alteração real, \cen{MO2}
-com testes que apanham divergências, \cen{MO3} com uma experiência controlada.
+Por isso a manutenção também foi medida diretamente: \cen{MO1} com uma alteração real, \cen{MO2} com divergências
+provocadas, \cen{MO3} com uma experiência controlada.
 
-\paragraph{Medições únicas.}
-Cada cenário de carga correu uma vez por iteração, sem repetições para estimar a variância. Há, ainda assim,
-três indicações do ruído entre corridas: as duas corridas finais de \cen{SC4}, nas mesmas condições (p95 da
-ingestão de 5,4 e 4,5~ms, da consulta mais lenta de 210 e 198~ms); o \emph{dashboard} durante \cen{SC2} nas
-iterações~4, 5 e~7 (262, 380 e 145~ms); e a repetição de todos os cenários na iteração~7, sem nenhuma
-regressão. As conclusões assentam em diferenças muito maiores do que essas (de segundos para milissegundos, ou
-de 1,0 para 1,8 vezes).
+\paragraph{Poucas repetições.}
+Na iteração~7, cada cenário de carga correu três vezes; nas anteriores, uma. Três execuções mostram o ruído, mas
+não estimam a variância. O que mais variou foi a latência do \emph{dashboard}: com 30 dias, as métricas de 24~h e
+de um mês (15 a 166 e 188 a 652~ms no p95); durante \cen{SC2}, 44 a 168~ms; sob \cen{SC3}, 84 a 194~ms. Débito,
+rejeições e contagens variaram pouco (\cen{SC3}: menos de 2\,\%), e nenhum veredicto mudou entre execuções. As comparações com iterações anteriores têm uma só execução do lado de lá,
+mas as conclusões assentam em diferenças muito maiores do que o ruído (de segundos para milissegundos, ou de 1,0
+para 1,8 vezes).
 
 \paragraph{A equipa mediu o seu próprio trabalho.}
-As decisões, as medições e a sua interpretação são da mesma equipa. Para o compensar, os critérios de decisão
-foram escritos antes das medições sempre que possível (\dec{9}), os resultados negativos estão no relatório
-(\cen{SC3}, \cen{SC4} antes, os defeitos encontrados), e os dados brutos e os \emph{scripts} estão no
-repositório para quem os quiser repetir (anexo~\ref{anx:reproducao}).
+Para o compensar, os critérios de decisão foram escritos antes das medições sempre que possível (\dec{9}), os
+resultados negativos estão no relatório, e os dados e \emph{scripts} estão no repositório
+(anexo~\ref{anx:reproducao}).

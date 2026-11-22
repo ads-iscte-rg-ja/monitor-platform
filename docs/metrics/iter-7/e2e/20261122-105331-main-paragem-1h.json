@@ -1,0 +1,130 @@
+{
+  "data": "2026-11-22T10:53:31+00:00",
+  "versoes": {
+    "monitor-api": "7f42c4e",
+    "monitor-central": "ed445f1",
+    "monitor-remote": "b1b8ae5",
+    "monitor-go-sdk": "?",
+    "monitor-hello-world": "27c500d",
+    "monitor-platform": "35da1e3"
+  },
+  "parametros": {
+    "n": 500,
+    "paragem_s": 3600.0
+  },
+  "cenarios": [
+    {
+      "id": "feliz",
+      "descricao": "500 logs do hello-world e as estatísticas do remote chegam ao central",
+      "passa": true,
+      "medido": {
+        "entrega_s": 0.56,
+        "logs": 500,
+        "estatisticas": 1,
+        "quarentena": 0,
+        "estado_do_buffer_reportado": true
+      },
+      "limite": "500 logs no central; ≥ 1 estatística; estado do buffer reportado",
+      "erro": null
+    },
+    {
+      "id": "AV1",
+      "descricao": "central morto (SIGKILL) 3600 s; 500 logs gerados durante a falha",
+      "passa": true,
+      "medido": {
+        "paragem_s": 3603.8,
+        "logs_gerados_no_buffer": 500,
+        "pendentes_no_regresso": {
+          "logs": 500,
+          "estatisticas": 599
+        },
+        "recuperacao_s": 216.3,
+        "pendentes_no_fim": {
+          "logs": 0,
+          "estatisticas": 0
+        },
+        "quarentena": 0,
+        "error_log": {
+          "entregues_pelo_remote": 1000,
+          "no_central": 1000,
+          "perdidos": 0,
+          "duplicados": 0,
+          "sem_origem_no_buffer": 0
+        },
+        "machine_stat": {
+          "entregues_pelo_remote": 637,
+          "no_central": 637,
+          "perdidos": 0,
+          "duplicados": 0,
+          "sem_origem_no_buffer": 0
+        }
+      },
+      "limite": "0 perdidos, 0 duplicados, 0 pendentes de logs, 0 em quarentena",
+      "erro": null
+    },
+    {
+      "id": "MN1",
+      "descricao": "um registo pendente corrompido no buffer fica em quarentena e o central vê-o",
+      "passa": true,
+      "medido": {
+        "atraso_s": 6.03,
+        "quarentena_no_central": 1,
+        "outros_logs_entregues": 4
+      },
+      "limite": "≤ 1 ciclo de recolha (5 s + 1 s de amostragem do CPU) + 1 s de observação",
+      "erro": null
+    },
+    {
+      "id": "SE1-inválida",
+      "descricao": "remote com uma chave inválida: 10 logs no buffer",
+      "passa": true,
+      "medido": {
+        "pausa_s": 1.1,
+        "linhas_no_central": {
+          "logs": 0,
+          "estatisticas": 0,
+          "estado_do_buffer": 0,
+          "host_revogado_visto": 0
+        },
+        "buffer": {
+          "logs": 10,
+          "estatisticas": 1,
+          "logs_pendentes": 10,
+          "estatisticas_pendentes": 1,
+          "quarentena": 0,
+          "logs_enviados": 0,
+          "estatisticas_enviadas": 0
+        }
+      },
+      "limite": "UNAUTHENTICATED e pausa; 0 linhas no central; registos intactos e pendentes no buffer",
+      "erro": null
+    },
+    {
+      "id": "SE1-revogada",
+      "descricao": "remote com uma chave revogada: 10 logs no buffer",
+      "passa": true,
+      "medido": {
+        "pausa_s": 1.1,
+        "linhas_no_central": {
+          "logs": 0,
+          "estatisticas": 0,
+          "estado_do_buffer": 0,
+          "host_revogado_visto": 0
+        },
+        "buffer": {
+          "logs": 10,
+          "estatisticas": 1,
+          "logs_pendentes": 10,
+          "estatisticas_pendentes": 1,
+          "quarentena": 0,
+          "logs_enviados": 0,
+          "estatisticas_enviadas": 0
+        }
+      },
+      "limite": "UNAUTHENTICATED e pausa; 0 linhas no central; registos intactos e pendentes no buffer",
+      "erro": null
+    }
+  ],
+  "arranque_s": 111.1,
+  "passa": true
+}

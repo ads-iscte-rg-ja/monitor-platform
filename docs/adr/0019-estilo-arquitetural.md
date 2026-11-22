@@ -116,7 +116,7 @@ mecanismos de variação do slide 07:
 | Alternativa | Porque foi rejeitada |
 |---|---|
 | **Microserviços** (ingestão, alertas, *dashboard*, notificações, cada um com a sua base de dados) | O registo, o recibo e a avaliação de alertas partilham uma transação; o slide 08 diz que *"transaction boundaries are an indicator of service granularity"*, e separá-los exigiria uma *saga*. *"MS couldn't exist without DevOps"*, o que uma equipa de 2 não sustenta. Cada fronteira de rede nova traz as 8 falácias. Os limites a 1.000 *hosts* resolveram-se com táticas locais (ADR-0005, 0006, 0013, 0017) |
-| ***Service-based*** já (`ingest`, `web` e `worker` em *deploys* separados, a mesma base de dados) | É o passo seguinte, e o `APP_ROLE` já o prepara. Fica como **E3**, com o gatilho "ingestão e *dashboard* a competir pelo CPU", que as medições não mostraram (CPU do central ≤ 15 % em SC4) |
+| ***Service-based*** já (`ingest`, `web` e `worker` em *deploys* separados, a mesma base de dados) | É o passo seguinte, e o `APP_ROLE` já o prepara. Fica como **E3**, com o gatilho "ingestão e *dashboard* a competir pelo CPU", que as medições não mostraram (CPU do central ≤ 16 % em SC4, na medição final da iter-7) |
 | ***Event-driven* com *broker*** (Kafka, NATS) entre a API e a base de dados | O *store-and-forward* com recibos já dá *at-least-once* sem duplicados; na topologia *broker*, o tratamento de erros é difícil e não há recuperação da transação (slide 08). Fica como **E1**, com gatilho |
 | **SOA orquestrada** | O slide 08 apresenta-a como o exemplo dos limites da partição técnica levada ao extremo |
 | ***Space-based*** (dados em memória replicados) | Pensado para elasticidade com picos de utilizadores; aqui o estado tem de ser durável e transacional |

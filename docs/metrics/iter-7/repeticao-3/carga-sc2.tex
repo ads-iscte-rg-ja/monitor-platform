@@ -1,0 +1,21 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Cenário SC2: recuperação após 1 h com o central em baixo (iter-7/repeticao-3)}
+  \label{tab:carga-sc2}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}Xlrc}
+    \toprule
+    Medida & Alvo & Medido & Cumpre \\
+    \midrule
+    \emph{Hosts} que entregaram todo o \emph{backlog} & todos & 1\,000 de 1\,000 & \Sim \\
+    Registos do \emph{backlog} entregues & todos & 441\,000 de 441\,000 & \Sim \\
+    \emph{Backlog} absorvido & $\le$ 15 min & 0,7 min & \Sim \\
+    p95 do \emph{dashboard} durante a recuperação & $<$ 1 s & 44 ms & \Sim \\
+    Lotes não entregues & 0 & 0,00\,\% & \Sim \\
+    Rejeições por sobrecarga (repetidas pelo agente) & --- & 25,0\,\% & --- \\
+    Erros (\emph{timeouts} e outros) & --- & 0,0\,\% & --- \\
+    Esperas por ligação à BD & --- & 0 & --- \\
+    Confirmados ao agente / gravados & iguais & 441\,000 / 441\,000 & \Sim \\
+    Duplicados na base de dados & 0 & 0 & \Sim \\
+    \bottomrule
+  \end{tabularx}
+\end{table}

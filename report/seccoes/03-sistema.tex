@@ -1,28 +1,20 @@
 \section{O sistema Monitor: arquitetura atual}
 \label{sec:sistema}
 
-Este capítulo descreve o sistema tal como estava no início do trabalho (iteração~0), numa vista de cada
-categoria de estruturas (secção~\ref{sec:enquadramento}). Não havia nenhuma documentação de arquitetura, por
-isso o primeiro passo foi uma \textbf{reconstrução} (secção~\ref{sec:documentacao}): um processo
-interpretativo e iterativo, a partir da leitura do código, do grafo de \emph{imports} de cada repositório e da
-primeira execução das regras de camadas do \texttt{depguard}, que confirmou o que a leitura sugeria. As vistas
-finais, depois das decisões, estão no capítulo~\ref{sec:decisoes} (secção~\ref{sec:d20}).
+Este capítulo descreve o sistema no início (iteração~0), numa vista por categoria de estruturas. Sem documentação de
+arquitetura, o primeiro passo foi uma \textbf{reconstrução} (secção~\ref{sec:documentacao}): iterativa, a partir do
+código, do grafo de \emph{imports} e da primeira execução do \texttt{depguard}, que confirmou a leitura. As vistas
+finais estão na secção~\ref{sec:d20}.
 
-A notação é \textbf{informal com legenda}: caixas e setas, com o significado de cada uma dado na legenda da
-figura. Foi uma escolha de custo e benefício: UML completo custaria mais do que o que acrescentaria a este
-relatório (ADR-0001). As partes que precisam de ser exatas usam notações verificáveis por máquina: o contrato
-de ingestão é um ficheiro Protocol Buffers, verificado pelo \texttt{buf}, e as regras de camadas são
-configuração do \texttt{depguard}, verificada em cada \emph{pull request}.
+A notação é \textbf{informal com legenda}, por custo e benefício (ADR-0001). O que precisa de ser exato usa notações
+verificáveis por máquina: o contrato em Protocol Buffers (\texttt{buf}) e as camadas no \texttt{depguard}.
 
 \subsection{Vista de módulos}
 
-A Figura~\ref{fig:modulos} mostra a decomposição e a relação de uso. O central segue o padrão
-\textbf{Layered}: \texttt{handlers} (HTTP) usam \texttt{services} (regras de negócio), que usam
-\texttt{repositories} (acesso a dados). O pacote \texttt{server} é a raiz de composição: cria todos os
-objetos, liga-os e arranca os \emph{jobs} de fundo. Os \texttt{services} declaram as interfaces dos
-repositórios de que precisam, e por isso dependem de abstrações e não de implementações (inversão de
-dependências). No remote, o \texttt{sender} orquestra a entrega: lê do \emph{buffer} (\texttt{repository})
-e envia pelo cliente HTTP (\texttt{requests}); estes dois pacotes não se conhecem um ao outro.
+O central segue o padrão \textbf{Layered} (Figura~\ref{fig:modulos}): \texttt{handlers} usam \texttt{services}, que
+usam \texttt{repositories}; o \texttt{server} é a raiz de composição e arranca os \emph{jobs}. Os \texttt{services}
+declaram as interfaces dos repositórios de que precisam (inversão de dependências). No remote, o \texttt{sender} lê
+do \emph{buffer} (\texttt{repository}) e envia pelo cliente (\texttt{requests}), que não se conhecem.
 
 \begin{figure}[htbp]
   \centering
@@ -72,21 +64,16 @@ seta a tracejado = dependência de dados entre o SDK e o remote, que não aparec
   \label{fig:modulos}
 \end{figure}
 
-Até aqui, as camadas eram só uma convenção. Passaram a ser regras \texttt{depguard} verificadas em cada
-\emph{pull request} (secção~\ref{sec:pipeline}): no central, \texttt{handlers} não usam
-\texttt{repositories} nem \texttt{database}, \texttt{services} não usam \texttt{handlers} nem
-\texttt{database}, e as camadas inferiores não usam as superiores; no remote, \texttt{requests} e
-\texttt{repository} não se usam um ao outro. A primeira execução encontrou uma única violação,
-\texttt{handlers/health.go} a usar \texttt{database} diretamente, corrigida na iteração~1.
+As camadas eram só convenção; passaram a regras \texttt{depguard} verificadas em cada PR
+(secção~\ref{sec:pipeline}). A primeira execução encontrou uma só violação, \texttt{handlers/health.go} a usar
+\texttt{database}, corrigida na iteração~1.
 
-A dependência mais importante entre componentes não é um \emph{import}. O SDK escreve diretamente nas
-tabelas do \emph{buffer} SQLite cujo esquema pertence ao remote. É uma interface de dados partilhada
-(Shared-Data) que não aparece em nenhum \texttt{go.mod}, e por isso tem de ser verificada por testes
-(secção~\ref{sec:pipeline}).
+A dependência mais importante não é um \emph{import}: o SDK escreve nas tabelas do \emph{buffer}, cujo esquema
+pertence ao remote (Shared-Data), e por isso verifica-se por testes (secção~\ref{sec:pipeline}).
 
 \subsection{Vista de componentes e conectores}
 
-A Tabela~\ref{tab:cc} mostra os componentes em execução e os conectores entre eles.
+Os componentes em execução e os seus conectores estão na Tabela~\ref{tab:cc}.
 
 \begin{table}[htbp]
   \centering\small
@@ -104,16 +91,12 @@ A Tabela~\ref{tab:cc} mostra os componentes em execução e os conectores entre 
   \end{tabularx}
 \end{table}
 
-O fluxo de telemetria é \textbf{store-and-forward}. A recolha e o SDK escrevem no \emph{buffer} local e
-marcam cada registo como pendente na tabela \texttt{delivery\_status}. Os \emph{workers} de envio leem
-lotes de até 100 registos, do mais recente para o mais antigo, e enviam-nos ao central. Se o central não
-responde ou devolve 429/5xx, voltam a tentar com \emph{backoff} exponencial, \emph{jitter} e respeitando
-o \texttt{Retry-After}. Um registo que o central rejeita como inválido é posto em quarentena, para não
-bloquear os restantes. Do lado do central, cada registo é gravado na mesma transação que um
-\textbf{recibo} identificado por \emph{host}, tipo e identificador de origem: um reenvio do mesmo registo
-encontra o recibo e não cria um duplicado. É isto que dá entrega \emph{at-least-once} com deduplicação,
-e que permite cumprir G1 com o central em baixo. Na iteração~2 o conector entre remote e central passou
-de HTTP/JSON a gRPC, com um contrato explícito, mantendo este comportamento (secção~\ref{sec:d11}).
+A telemetria é \textbf{store-and-forward}: recolha e SDK escrevem no \emph{buffer} e marcam cada registo como
+pendente; os \emph{workers} enviam lotes de até 100, dos mais recentes para os mais antigos, e repetem com
+\emph{backoff} exponencial, \emph{jitter} e \texttt{Retry-After}; um registo inválido vai para quarentena. O central
+grava cada registo na mesma transação que um \textbf{recibo} (\emph{host}, tipo, identificador de origem), por isso
+um reenvio não duplica: entrega \emph{at-least-once} com deduplicação, que cumpre G1. Na iteração~2 o conector
+passou de HTTP/JSON a gRPC, com o mesmo comportamento (secção~\ref{sec:d11}).
 
 \subsection{Vista de alocação}
 
@@ -132,22 +115,18 @@ de HTTP/JSON a gRPC, com um contrato explícito, mantendo este comportamento (se
   \end{tabularx}
 \end{table}
 
-A vista de alocação (Tabela~\ref{tab:alocacao}) mostra duas propriedades relevantes. O central corre
-como uma única instância, e os \emph{jobs} de fundo vivem dentro do processo HTTP: correr várias
-instâncias, tal como está, duplicaria cada \emph{job} (secção~\ref{sec:lacunas}). E o \emph{buffer} vive no disco do
-\emph{host} monitorizado: o que lá se acumula ocupa recursos do sistema que o Monitor devia proteger.
+Na alocação (Tabela~\ref{tab:alocacao}), o central é uma só instância com os \emph{jobs} no processo HTTP (várias
+duplicariam cada \emph{job}), e o \emph{buffer} ocupa o disco do \emph{host} que o Monitor devia proteger.
 
 \subsection{Padrões e táticas já presentes}
 \label{sec:tacticas-existentes}
 
-O estilo do sistema, registado depois no ADR-0019 (secção~\ref{sec:d20}), já era este: distribuído, com um
-agente em \emph{pipeline} por \emph{host} e um central monolítico em camadas. O sistema usa os padrões
-\textbf{Layered} (central), \textbf{Client-Server} (remote--central),
-\textbf{Shared-Data} (SQLite entre SDK e remote; PostgreSQL) e \textbf{MVC} no servidor (\emph{templates}
-separados dos \emph{handlers} e dos serviços). Usa também dois padrões de integração: \emph{Transactional
-Outbox}, para os emails, e \emph{Store-and-Forward}, para a telemetria. Ao nível GoF há
+O estilo, registado depois no ADR-0019, já era distribuído: um agente em \emph{pipeline} por \emph{host} e um
+central monolítico em camadas. Os padrões são \textbf{Layered}, \textbf{Client-Server}, \textbf{Shared-Data} (SQLite
+entre SDK e remote; PostgreSQL) e \textbf{MVC}, com \emph{Transactional Outbox} (emails) e \emph{Store-and-Forward}
+(telemetria). Ao nível GoF há
 \emph{Chain of Responsibility}/\emph{Decorator} nos \emph{middlewares} HTTP e \emph{Adapter} entre o
-cliente de email e o envio de alertas~\cite{gamma1994}; não há \emph{Singletons}. A
+cliente de email e o envio de alertas (diapositivos~05, \cite{gamma1994}); não há \emph{Singletons}. A
 Tabela~\ref{tab:tacticas-existentes} mostra as táticas já implementadas.
 
 \begin{table}[htbp]
@@ -167,15 +146,14 @@ Tabela~\ref{tab:tacticas-existentes} mostra as táticas já implementadas.
   \end{tabularx}
 \end{table}
 
-O sistema estava, portanto, bem desenhado para a disponibilidade e razoavelmente para a segurança. As
-lacunas concentram-se onde a equipa pôs as prioridades: escalabilidade e manutenção.
+O sistema estava bem desenhado para a disponibilidade e razoavelmente para a segurança; as lacunas concentram-se
+na escalabilidade e na manutenção.
 
 \subsection{Lacunas identificadas}
 \label{sec:lacunas}
 
-A análise do código, as estimativas do capítulo~\ref{sec:requisitos} e a baseline
-(secção~\ref{sec:baseline}) identificaram as lacunas da Tabela~\ref{tab:lacunas}. São estas lacunas que as
-decisões do capítulo~\ref{sec:decisoes} tratam.
+A análise do código, as estimativas e a baseline identificaram as lacunas da Tabela~\ref{tab:lacunas}, que o
+capítulo~\ref{sec:decisoes} trata.
 
 \begin{table}[htbp]
   \centering\small
@@ -200,7 +178,7 @@ decisões do capítulo~\ref{sec:decisoes} tratam.
     \multicolumn{2}{l}{\textit{Manutenção e testabilidade}} \\
     M1 & Sem CI: os testes de integração estiveram partidos sem que ninguém desse por isso \\
     M2 & Protocolo implícito: o remote decide quarentenas pelo texto, em inglês, das mensagens de erro do central \\
-    M3--M4 & Conhecimento duplicado: níveis de log em 10 sítios; cada métrica de alerta espalhada por pelo menos 6 sítios em 3 camadas \\
+    M3--M4 & Conhecimento duplicado: níveis de log em 10 sítios; cada métrica de alerta espalhada por 7 sítios em 5 ficheiros e 3 camadas \\
     M5--M6 & \emph{Handlers} dependem de serviços concretos; relógio e fuso horário fixos no código \\
     \midrule
     \multicolumn{2}{l}{\textit{Disponibilidade, monitorabilidade e segurança}} \\

@@ -4,48 +4,36 @@
 \subsection{Método de medição}
 \label{sec:metodo}
 
-As medições de carga correm num ambiente próprio, descrito em código no ficheiro
-\texttt{loadtest/compose.yaml}: o
-central e o PostgreSQL~16 com \textbf{2 vCPU e 4~GB cada}, e o Prometheus a recolher as métricas do central a
-cada 5~s (\dec{4}). A máquina é um AMD Ryzen~7 3700X com 16 \emph{threads} e 31~GB de memória. Cada medição
-recria o ambiente do zero, com a base de dados vazia e o central acabado de arrancar, para nenhuma herdar
-dados nem \emph{caches} da anterior. As medições não correm no CI, porque os \emph{runners} partilhados dão
-números com demasiado ruído.
+O ambiente de carga está descrito em código (\texttt{loadtest/compose.yaml}): central e PostgreSQL~16 com
+\textbf{2 vCPU e 4~GB cada}, e o Prometheus a recolher as métricas a cada 5~s (\dec{4}), num AMD Ryzen~7 3700X
+(16 \emph{threads}, 31~GB). Cada medição recria o ambiente do zero, sem dados nem \emph{caches} da anterior. Não
+corre no CI, cujos \emph{runners} partilhados dão demasiado ruído.
 
 \paragraph{Agentes simulados.}
-O k6 simula 1\,000 \emph{hosts}, um por utilizador virtual, cada um com a sua chave e a sua ligação gRPC. Cada
-um comporta-se como o \texttt{monitor-remote}: envia estatísticas a cada 30~s e erros a cada 10~s, em lotes
-de até 100 registos, tenta de novo com \emph{backoff} nas falhas transitórias e desiste nas definitivas. Os
-erros seguem o perfil da Tabela~\ref{tab:perfil-logs}, atribuído de forma determinística pelo índice do
-\emph{host}. Simular os agentes em vez de correr 1\,000 processos \texttt{monitor-remote} é o que torna a
-medição possível numa só máquina; a simulação usa o mesmo contrato (\texttt{.proto} do \texttt{monitor-api})
-e as mesmas regras de envio.
+O k6 simula 1\,000 \emph{hosts}, cada um com a sua chave e ligação gRPC, com as regras do \texttt{monitor-remote}:
+estatísticas a cada 30~s, erros a cada 10~s, lotes de até 100, \emph{backoff} de 5~s a duplicar até 5~min
+($\pm$20\,\%) ou o \texttt{RetryInfo}, se maior (k6 2.4.0). Os erros
+seguem o perfil da Tabela~\ref{tab:perfil-logs}, atribuído pelo índice do \emph{host}. Usa o mesmo contrato
+(\texttt{.proto}) que o remote; simular é o que torna a medição possível numa só máquina.
 
 \paragraph{Três fontes, cada uma para o que mede bem.}
-O k6 dá a visão do agente: latência de cada pedido, atraso acrescentado pelo central (definido na
-secção~\ref{sec:requisitos}) e lotes que o agente teria posto de parte. O Prometheus dá a do servidor:
-percentis da ingestão e do \emph{dashboard}, CPU, memória e ocupação do \emph{pool} de ligações. A base de dados
-dá a integridade: no fim de cada medição compara-se o número de registos confirmados ao agente com o número
-gravado, e procuram-se duplicados. As contagens vêm do k6 e da base de dados, e não dos contadores do
-Prometheus, que perdem o que acontece antes da primeira recolha.
+O k6 dá a visão do agente (latência, atraso acrescentado pelo central, lotes perdidos); o Prometheus a do servidor
+(percentis, CPU, memória, \emph{pool}); a base de dados a integridade (confirmados ao agente contra gravados, e
+duplicados). As contagens vêm do k6 e da base de dados, não do Prometheus, que perde o que acontece antes da
+primeira recolha.
 
 \paragraph{Medições.}
-\texttt{nominal} (\cen{SC1}) corre 10~minutos com o perfil de logs; \texttt{nominal-x2} e
-\texttt{nominal-x5} repetem-no com a taxa de logs multiplicada por 2 e por 5, porque o perfil é uma hipótese
-(análise de sensibilidade). \texttt{noisy-neighbour} (\cen{SC5}) põe 1\,\% dos \emph{hosts} a 200 logs/s durante
-2~minutos, a meio de uma medição nominal. \texttt{recovery-storm} (\cen{SC2}) dá a cada \emph{host} 1~h de
-\emph{backlog} (cerca de 441\,000 registos no total) e põe-nos todos a enviar ao mesmo tempo, enquanto o
-\emph{dashboard} é consultado a cada 2~s. \texttt{capacidade-1}, \texttt{-2} e \texttt{-3} (\cen{SC3}) põem a mesma
-carga acima da capacidade com 1, 2 e 3 instâncias atrás do nginx. \texttt{dashboard-30d} (\cen{SC4}) gera
-primeiro 31 dias de histórico e corre a carga nominal por cima, com as consultas do \emph{dashboard}, em duas
-fases: sem e com a retenção (secção~\ref{sec:sc4}). Desde \dec{9}, a retenção está ligada por omissão, por isso
-as medições finais correm com ela ativa, ao contrário das iterações 3 a 5; sem dados expirados, cada execução
-não apaga nada e custa poucos milissegundos.
+\texttt{nominal} (\cen{SC1}): 10~minutos com o perfil de logs; \texttt{nominal-x2} e \texttt{-x5}: o mesmo com
+2 e 5 vezes mais logs (sensibilidade). \texttt{noisy-neighbour} (\cen{SC5}): 1\,\% dos \emph{hosts} a 200 logs/s
+durante 2~minutos. \texttt{recovery-storm} (\cen{SC2}): 1~h de \emph{backlog} por \emph{host} (441\,000 registos),
+enviado ao mesmo tempo, com o \emph{dashboard} consultado a cada 2~s. \texttt{capacidade-1/2/3} (\cen{SC3}): carga
+acima da capacidade com 1, 2 e 3 instâncias atrás do nginx. \texttt{dashboard-30d} (\cen{SC4}): 31 dias de
+histórico com a carga nominal e consultas por cima (secção~\ref{sec:sc4}). Desde \dec{9} a retenção está ligada por
+omissão e corre em todas as medições finais; sem dados expirados, custa milissegundos.
 
 \paragraph{Arquitetura e níveis de teste.}
-A arquitetura define as unidades e as interfaces que cada nível de teste exercita
-(secção~\ref{sec:documentacao}). A Tabela~\ref{tab:niveis-teste} diz em que nível se verifica cada grupo de
-cenários.
+A arquitetura define as unidades e interfaces de cada nível de teste (secção~\ref{sec:documentacao}); a
+Tabela~\ref{tab:niveis-teste} diz onde se verifica cada cenário.
 
 \begin{table}[htbp]
   \centering\small
@@ -65,164 +53,125 @@ cenários.
 \end{table}
 
 \paragraph{Limitações.}
-O gerador de carga corre na mesma máquina que o sistema medido. Os limites de CPU do central e da base de
-dados impedem que o k6 lhes tire recursos, mas não isolam totalmente a memória e o disco partilhados. Os
-números absolutos dependem desta máquina; o que se compara são as iterações entre si, medidas da mesma
-forma.
+O gerador corre na mesma máquina; os limites de CPU isolam o sistema medido, mas não a memória e o disco. Os
+números absolutos valem para esta máquina; comparam-se iterações medidas da mesma forma.
 
 \subsection{Escalabilidade: antes e depois}
 \label{sec:aval-escala}
 
-As tabelas desta secção comparam duas iterações, medidas da mesma forma (secção~\ref{sec:metodo}): a
-iteração~3, com o contrato gRPC e as métricas mas antes de qualquer decisão de escalabilidade (a
-\emph{baseline} de carga), e a iteração~7, a versão final, com todas as decisões e a retenção ligada por
-omissão. O texto cita também a iteração~4, a primeira medição depois de \dec{5} (escritas em lote) e \dec{6}
-(controlo de admissão), para separar o efeito destas duas decisões do das seguintes.
+As tabelas comparam a iteração~3 (\emph{baseline} de carga: gRPC e métricas, sem decisões de escalabilidade) com a
+iteração~7 (versão final). O texto cita a iteração~4, a primeira depois de \dec{5} e \dec{6}, para separar o seu
+efeito.
 
 \gerado{carga-sc1.tex}
 
 \paragraph{Regime normal (\cen{SC1}).}
-Já na \emph{baseline}, \cen{SC1} cumpria-se com uma folga muito grande (Tabela~\ref{tab:carga-sc1}): p95 da
-ingestão de 6~ms contra um limite de 300~ms, e o central a usar 4\,\% dos 2 vCPU. O débito medido, 122 registos
-por segundo, coincide com a estimativa feita antes de qualquer medição (cerca de 90 logs e 33 estatísticas por
-segundo, secção~\ref{sec:estimativas}): a medição confirmou a estimativa e a conclusão que se tirou dela, de que
-a ingestão nominal não era o problema de escala. Na versão final, o p95 é de 5~ms e o CPU de 3\,\%.
+Já na \emph{baseline} se cumpria com grande folga (Tabela~\ref{tab:carga-sc1}): p95 de 6~ms para um limite de
+300~ms, com 4\,\% do CPU. Os 122 registos/s medidos coincidem com a estimativa (cerca de 90 logs e 33 estatísticas
+por segundo, secção~\ref{sec:estimativas}), o que confirma que a ingestão nominal não era o problema. Na versão
+final: 4 a 5~ms e 3\,\%.
 
 \gerado{carga-sensibilidade.tex}
 
 \paragraph{Sensibilidade ao perfil de logs.}
-Como o perfil de logs é uma hipótese, cada medição nominal repetiu-se com o dobro e o quíntuplo da taxa de logs
-(Tabela~\ref{tab:carga-sensibilidade}). Na \emph{baseline}, com cinco vezes mais logs, o p95 subia para 10~ms e o
-CPU para 8\,\%; na versão final ficam em 5~ms e 4\,\%, praticamente iguais ao regime normal, porque o custo de
-um lote deixou de crescer com o número de registos. \cen{SC1} cumpre-se em todos os casos: a conclusão não
-depende de a hipótese estar certa.
+Com cinco vezes mais logs (Tabela~\ref{tab:carga-sensibilidade}), a \emph{baseline} subia para 10~ms e 8\,\% de
+CPU; a versão final fica em 5~ms e 4\,\%, porque o custo de um lote deixou de crescer com o número de registos.
+\cen{SC1} cumpre-se sempre: a conclusão não depende de a hipótese estar certa.
 
 \gerado{carga-sc5.tex}
 
 \paragraph{Vizinho ruidoso (\cen{SC5}).}
-Enquanto 1\,\% dos \emph{hosts} envia 200 logs por segundo, o atraso p95 dos restantes foi de 6~ms na
-\emph{baseline} e de 5~ms depois (Tabela~\ref{tab:carga-sc5}). O risco que motivava a parte de justiça entre
-\emph{hosts} de \dec{6} (lacuna S10) não se materializou a esta escala. É o \emph{generate and test} a funcionar: a
-medição refutou uma hipótese da análise, e essa parte de \dec{6} ficou desenhada mas não implementada
-(secção~\ref{sec:d6}). Os próprios \emph{hosts} em rajada também ganharam: o seu atraso p95 desceu de 43 para 11~ms.
+Com 1\,\% dos \emph{hosts} a 200 logs/s, o atraso p95 dos restantes foi de 6~ms na \emph{baseline} e 5~ms depois
+(Tabela~\ref{tab:carga-sc5}). O risco S10 não se materializou, e a justiça por \emph{host} de \dec{6} ficou só
+desenhada (secção~\ref{sec:d6}). Os \emph{hosts} em rajada também ganharam: de 43 para 11~ms.
 
 \gerado{carga-sc2.tex}
 
 \paragraph{Recuperação (\cen{SC2}).}
-Era o único cenário que falhava, e falhava onde a análise previa (Tabela~\ref{tab:carga-sc2}). Na
-\emph{baseline}, os 1\,000 \emph{hosts} entregavam as 441\,000 linhas do \emph{backlog} em 1,4~minutos, sem perdas
-nem duplicados, mas o \emph{dashboard} ficava inutilizável, com p95 de pelo menos 10~s (o limite superior do
-histograma). O CPU do central nunca passou de 30\,\%; o recurso esgotado era o \emph{pool} de ligações à base de
-dados (25 de 25), com mais de 11\,000 esperas por uma ligação livre, e 9,5\,\% das tentativas de envio
-acabavam em \emph{timeout}.
+Era o único cenário que falhava, onde a análise previa (Tabela~\ref{tab:carga-sc2}). Na \emph{baseline}, as
+441\,000 linhas chegavam em 1,4~minutos, sem perdas nem duplicados, mas o \emph{dashboard} ficava inutilizável (p95
+$\ge$ 10~s, o topo do histograma). O CPU não passou de 30\,\%: esgotado estava o \emph{pool} (25 de 25), com mais
+de 11\,000 esperas por ligação e 9,5\,\% dos envios em \emph{timeout}.
 
-Depois de \dec{5} e \dec{6} (iteração~4), o \emph{dashboard} passou a ter p95 de 262~ms durante a recuperação, e
-\cen{SC2} passou a cumprir-se; na versão final, com o \emph{bulkhead} de \dec{9}, é de 145~ms. A ingestão nunca ocupa mais de 15 ligações (o limite de \dec{6}), e já não há esperas nem
-\emph{timeouts}. Quase um quarto das tentativas (24,8\,\% na versão final) é rejeitado por sobrecarga, mas são
-rejeições intencionais: o agente volta a enviar depois do atraso indicado, e as 441\,000 linhas chegam todas, sem
-duplicados. O resultado menos óbvio é que a recuperação ficou \emph{mais rápida}, 42~s em vez de 1,4~minutos,
-apesar das rejeições. Com escritas em lote cada pedido ocupa uma ligação durante muito menos tempo, e limitar quantos
-pedidos competem pela base de dados ao mesmo tempo elimina a contenção que, antes, fazia cada um demorar
-segundos. O \emph{trade-off} previsto em \dec{6} (recuperação mais lenta em troca de estabilidade) não se
-verificou: as duas decisões juntas melhoraram ambos os critérios.
+Depois de \dec{5} e \dec{6} (iteração~4), o \emph{dashboard} ficou em 262~ms e \cen{SC2} passou a cumprir-se; na
+versão final, com o \emph{bulkhead} de \dec{9}, entre 44 e 168~ms. A ingestão não passa das 15 ligações, sem esperas nem
+\emph{timeouts}; cerca de 25\,\% das tentativas são rejeições intencionais, reenviadas depois do atraso indicado. O
+resultado menos óbvio é a recuperação ficar \emph{mais rápida} (42 a 44~s em vez de 1,4~minutos) apesar das rejeições:
+cada lote ocupa a ligação muito menos tempo, e limitar a concorrência elimina a contenção. O \emph{trade-off}
+previsto em \dec{6} não se verificou: melhoraram os dois critérios.
 
 \paragraph{Regressão (iterações~5 e~7).}
-Depois de \dec{8}, as medições de \cen{SC1}, \cen{SC2}, \cen{SC5} e da sensibilidade repetiram-se com uma
-instância. Todos os cenários continuaram a cumprir-se, com valores dentro da variação entre execuções (o p95 do
-\emph{dashboard} durante a recuperação foi de 380~ms, contra 262~ms na iteração~4; o limite é 1~s). A medição
-final (iteração~7) repetiu todos os cenários de carga sobre a versão entregue, com a retenção ligada, e nenhum
-regrediu. A retenção corre também durante \cen{SC2}, mas sem dados expirados cada execução custa
-milissegundos (p95 de 9,5~ms).
+Depois de \dec{8} (iteração~5), \cen{SC1}, \cen{SC2}, \cen{SC5} e a sensibilidade continuaram a cumprir-se (o
+\emph{dashboard} na recuperação a 380~ms, contra 262~ms). A iteração~7 correu três vezes todos os cenários sobre a versão
+entregue, com a retenção ligada (9,5~ms no p95 por execução), sem regressões; as tabelas dão o mínimo e o
+máximo das três.
 
 \subsection{Escala horizontal (\cen{SC3})}
 \label{sec:aval-sc3}
 
 \gerado{carga-sc3.tex}
 
-\cen{SC3} mede o débito com 1, 2 e 3 instâncias atrás do nginx, com a mesma carga: os 1\,000 \emph{hosts} enviam
-lotes de 100 erros sem pausa (Tabela~\ref{tab:carga-sc3}). A parte de coordenação cumpre-se: em todas as
-medições, cada \emph{job} teve um único líder e correu numa só instância, e no ensaio da secção~\ref{sec:d8} a
-troca de líder demorou 12~s, contra um limite de 30~s. A parte do débito \textbf{não se cumpre}: duas e três
-instâncias confirmaram 1,01 e 1,04 vezes os registos de uma na medição final (1,01 e 1,03 na iteração~5),
-contra os 1,8 e 2,5 vezes pedidos.
+Com 1, 2 e 3 instâncias e a mesma carga (lotes de 100 erros sem pausa, Tabela~\ref{tab:carga-sc3}), a coordenação
+cumpre-se: cada \emph{job} teve um só líder, e a troca de líder levou 12~s (limite 30~s, secção~\ref{sec:d8}). O
+débito \textbf{não}: 1,01 e 1,03 a 1,04 vezes o de uma instância (1,01 e 1,03 na iteração~5), contra 1,8 e 2,5.
 
-A tabela mostra porquê. Cada instância do central usa em média 11\,\% ou menos do seu CPU; o que sobe com as
-instâncias é a latência de cada pedido (p95 de 100, 199 e 312~ms), quase na proporção da concorrência admitida
-(15, 30 e 45 pedidos). Pela lei de Little, débito igual com o triplo da concorrência e o triplo da latência quer dizer que os
-pedidos passam a esperar num recurso partilhado: o PostgreSQL. Uma amostragem dos processos ativos do
-PostgreSQL durante a carga confirma-o: 56\,\% das amostras estavam a executar, 26\,\% à espera do registo de
-transações (WAL: inserção, escrita e sincronização) e 11\,\% em contenção nas mesmas páginas de dados. O limite
-é o caminho de escrita da base de dados, e não o central.
+Cada instância usa 11\,\% ou menos do CPU; o que sobe é a latência (p95 de cerca de 100, 200 e 310~ms), quase na proporção
+da concorrência admitida (15, 30 e 45). Pela lei de Little, o mesmo débito com o triplo da concorrência e da
+latência significa espera num recurso partilhado. Amostrados os processos do PostgreSQL, 56\,\% executavam, 26\,\%
+esperavam pelo WAL (inserção, escrita, sincronização) e 11\,\% disputavam as mesmas páginas: o limite é o caminho de
+escrita da base de dados.
 
-A premissa de \cen{SC3}, uma carga acima da capacidade de uma instância, deixou de existir com \dec{5}. As
-escritas em lote tornaram o central tão leve que o estrangulamento passou para a base de dados. Uma instância
-confirmou cerca de 22\,000 registos por segundo no minuto de pico, cerca de 180 vezes os 122 registos por segundo
-do regime normal. Este fator é um limite superior: foi medido com lotes cheios, o caso mais eficiente, e os
-\emph{hosts} reais enviam lotes pequenos. Mesmo assim, a folga cobre com margem os 10\,000 \emph{hosts} do
-\emph{backlog} do projeto (cerca de 1\,200 registos por segundo).
+A premissa de \cen{SC3}, carga acima da capacidade de uma instância, deixou de existir com \dec{5}: uma instância
+confirmou cerca de 22\,000 registos/s no minuto de pico, cerca de 180 vezes o regime normal. É um limite superior
+(lotes cheios), mas cobre com margem os 10\,000 \emph{hosts} do plano de evolução (cerca de 1\,200 registos/s).
 
-Por isso, a equipa decidiu não escalar a base de dados. Réplicas de leitura não aumentam o débito de escrita;
-\emph{sharding} seria uma complexidade que nenhum cenário pede; e desligar a sincronização do WAL poria em risco
-\cen{AV1}, porque o agente apaga do \emph{buffer} o que o central confirma. Escalar a base de dados fica como
-evolução E9 (secção~\ref{sec:evolucao}), com um gatilho medido: débito sustentado acima de metade da capacidade aqui medida. \dec{8} mantém
-o seu valor pela disponibilidade: o central deixa de ser um ponto único de falha, e um \emph{job} sobrevive à
-morte da instância que o corria. É o \emph{generate and test} outra vez: a medição mostrou que a premissa de um
-cenário deixou de ser verdadeira, e o relatório regista-o em vez de ajustar o alvo.
+Por isso, a base de dados não foi escalada: réplicas de leitura não aumentam a escrita, \emph{sharding} é
+complexidade que nenhum cenário pede, e desligar a sincronização do WAL poria \cen{AV1} em risco, porque o agente
+apaga o que o central confirma. Fica como E9, com o gatilho de um débito sustentado acima de metade do medido.
+\dec{8} vale pela disponibilidade: o central deixa de ser ponto único de falha. O relatório regista a premissa que
+deixou de ser verdadeira, em vez de ajustar o alvo.
 
-Na iteração~5, o \emph{dashboard} também piorava sob esta carga extrema (p95 de 4,9~s com uma instância e de
-9,4~s com três): o limite de admissão de \dec{6} é por instância, e três instâncias metem três vezes mais
-pedidos em simultâneo na base de dados. Na versão final fica entre 84 e 174~ms: em cada instância, a ingestão
-(15 ligações) e o \emph{dashboard} (5, o \emph{bulkhead} de \dec{9}) têm compartimentos separados dentro do
-\emph{pool} de 25, e as consultas, agora de custo limitado, libertam a ligação depressa. A regra de configuração mantém-se: com N instâncias, \texttt{INGEST\_MAX\_INFLIGHT} deve ser o orçamento
-total da ingestão a dividir por N (ADR-0007).
+Na iteração~5, o \emph{dashboard} piorava sob esta carga (4,9~s com uma instância, 9,4~s com três: a admissão é
+por instância). Na versão final fica entre 84 e 194~ms: ingestão (15) e \emph{dashboard} (5, o \emph{bulkhead} de
+\dec{9}) têm compartimentos separados no \emph{pool} de 25, e as consultas libertam a ligação depressa. Com N
+instâncias, \texttt{INGEST\_MAX\_INFLIGHT} é o orçamento total a dividir por N (ADR-0007).
 
 \subsection{Trinta dias de dados (\cen{SC4})}
 \label{sec:sc4}
 
 \gerado{carga-sc4.tex}
 
-A Tabela~\ref{tab:carga-sc4} compara a medição de \cen{SC4} antes de \dec{9} com a medição final, cada uma em
-duas fases de 10~minutos sobre 31 dias de histórico (89~M estatísticas, 239~M erros, 143 a 150~GB). Antes, a
-primeira fase corria sem retenção e a segunda com a retenção a 30 dias a cada minuto; na versão final a
-retenção está ligada por omissão, e as duas fases são duas corridas com ela. \textbf{Antes, \cen{SC4} falhava nas duas partes.} As sete consultas do
-\emph{dashboard} tinham p95 entre 29 e 74~s, e a ingestão, mesmo sem retenção, confirmava só cerca de 11\,000
-dos 73\,000 registos esperados em 10~minutos, com 58\,\% dos pedidos rejeitados por sobrecarga e um atraso
-acrescentado pelo central de 636~s no p95. Nenhum registo se perdeu: os que não entraram ficaram nos agentes,
-por entregar, como \dec{19} e o ADR-0020 preveem. A causa foi isolada medindo cada consulta sozinha
-(secção~\ref{sec:d9}): quatro consultas sem limite temporal ocupavam todo o \emph{pool} de ligações.
+A Tabela~\ref{tab:carga-sc4} compara \cen{SC4} antes de \dec{9} e na versão final, em duas fases de 10~minutos
+sobre 31 dias de histórico (89~M estatísticas, 239~M erros, 143 a 150~GB); antes, a primeira fase corria sem
+retenção, e na versão final ambas a têm. \textbf{Antes, \cen{SC4} falhava nas duas partes}: as sete consultas tinham
+p95 entre 29 e 74~s, e a ingestão confirmava cerca de 11\,000 dos 73\,000 registos esperados, com 58\,\% de
+rejeições e 636~s de atraso no p95. Nada se perdeu: o resto ficou nos agentes (ADR-0020). A causa eram quatro
+consultas sem limite temporal (secção~\ref{sec:d9}).
 
-\textbf{Depois, \cen{SC4} cumpre-se.} Na medição final, o p95 das sete consultas fica entre 15 e 210~ms (o pior
-é o das métricas de um mês de um \emph{host}; na iteração~6, a primeira medição depois de \dec{9}, era de
-287~ms), e a ingestão sobre 30 dias de dados fica ao nível da medição nominal com a base vazia: p95 de 5~ms,
-nenhum pedido rejeitado, todos os registos confirmados, sem duplicados. O CPU do PostgreSQL desceu de 67\,\%
-para 7\,\% em média. Isoladas, as quatro consultas passaram de 55~s, 17~s, 13~s e
-5,3~s para 19~ms, 0,6~ms, 2~ms e 265~ms (estas últimas com a \emph{cache} fria).
+\textbf{Depois, cumpre-se}: as sete consultas ficam entre 14 e 652~ms (o pior, as métricas de um mês, de 188 a 652~ms;
+287~ms na iteração~6), e a ingestão sobre 30 dias iguala a da base vazia (p95 de 5 a 7~ms, sem rejeições nem duplicados). O CPU do
+PostgreSQL desceu de 67 para 7 a 11\,\% em média. Isoladas, as quatro consultas passaram de 55, 17, 13 e 5,3~s para 19,
+0,6, 2 e 265~ms (\emph{cache} fria).
 
 \paragraph{A retenção e a decisão de não particionar.}
-Antes, cada execução da retenção demorava até 27~s, perto do \emph{timeout}, não pelo seu custo, mas porque
-esperava pelas ligações que o \emph{dashboard} ocupava. Depois, cada execução demora 0,2 a 0,3~s em média
-(0,48~s no p95, nas três corridas com retenção) e o número de registos expirados desce cerca de 733 mil por
-hora: a retenção remove 2,6 vezes o que entra, e o atraso acumulado esvazia-se. O p95 da ingestão não subiu com
-a retenção (na iteração~6, 7,4~ms sem ela e 4,9~ms com ela; a fase com retenção corre depois e encontra a
-\emph{cache} quente, e a diferença é da ordem do ruído). Nenhuma das três condições escritas no ADR-0017 antes da medição se
-verifica, por isso \textbf{o particionamento não se fez}. Fica como o passo seguinte, com um gatilho sobre
-métricas que já existem: a duração da retenção (p95 acima de 15~s), o p95 da ingestão nos minutos em que a
-retenção corre, e o número de registos com mais de 30 dias. É o resultado mais claro do \emph{generate and
-test} deste trabalho: o plano previa particionar, e a medição mostrou que o problema estava noutro sítio.
+Antes, cada execução da retenção chegava a 27~s, à espera das ligações ocupadas pelo \emph{dashboard}. Depois,
+demora 0,2 a 0,3~s em média (0,48 a 0,78~s no p95), e os expirados descem 727 a 734 mil por hora: remove 2,6 vezes o
+que entra. A ingestão não abrandou com a retenção (iteração~6: 7,4~ms sem ela, 4,9~ms com ela, dentro do ruído).
+Nenhuma das três condições escritas antes no ADR-0017 se verifica, por isso \textbf{não se particionou}; o gatilho
+(E10) usa métricas que já existem. É o resultado mais claro do \emph{generate and test}: o plano previa
+particionar, e a medição mostrou que o problema estava noutro sítio.
 
 \subsection{Disponibilidade e integridade dos dados}
 \label{sec:av1-av4}
 
-\paragraph{\cen{AV2}: \emph{host} sem resposta, com 1.000 \emph{hosts}.}
-Um teste de integração, num PostgreSQL real, regista 1.000 \emph{hosts} com \emph{endpoints} num servidor
-local; metade nunca responde, e as \emph{probes} esgotam os 5~s de \emph{timeout}. O servidor regista quando cada
-\emph{host} recebe cada \emph{probe}. Antes de \dec{7}, o teste corre um ciclo; depois, corre o \emph{job} durante
-3~minutos, como em produção. A Tabela~\ref{tab:av2} compara os dois (dados em
-\texttt{docs/metrics/iter-6/av2-antes.txt} e \texttt{av2-depois.txt}).
+\paragraph{\cen{AV2}: \emph{host} sem resposta, com 1\,000 \emph{hosts}.}
+Um teste de integração regista 1\,000 \emph{hosts} com \emph{endpoints} num servidor local que anota cada
+\emph{probe}; metade nunca responde (5~s de \emph{timeout}). Antes de \dec{7} corre um ciclo; depois, o \emph{job}
+durante 3~minutos (Tabela~\ref{tab:av2}; dados em \texttt{docs/metrics/iter-6/av2-*.txt}).
 
 \begin{table}[htbp]
   \centering\small
-  \caption{\cen{AV2}: 1.000 \emph{hosts}, metade sem resposta, antes e depois de \dec{7}}
+  \caption{\cen{AV2}: 1\,000 \emph{hosts}, metade sem resposta, antes e depois de \dec{7}}
   \label{tab:av2}
   \begin{tabular}{lrrl}
     \toprule
@@ -237,17 +186,15 @@ local; metade nunca responde, e as \emph{probes} esgotam os 5~s de \emph{timeout
   \end{tabular}
 \end{table}
 
-A mediana do intervalo é 30,3~s e o máximo fica abaixo dos 38~s calculados. A iteração mais longa é a primeira,
-com os 1.000 \emph{hosts} devidos ao mesmo tempo; nas seguintes, o \emph{jitter} já os espalhou. O pior atraso
-soma ao intervalo máximo uma avaliação de alertas (15~s), sem contar com a fase entre a falha e a próxima
-avaliação, que só o reduz. \cen{AV2} cumpre-se.
+A mediana do intervalo é 30,3~s, e o máximo fica abaixo dos 38~s calculados. A iteração mais longa é a primeira,
+com todos devidos ao mesmo tempo; depois o \emph{jitter} espalha-os. O pior atraso é o intervalo máximo mais uma
+avaliação (15~s). \cen{AV2} cumpre-se.
 
 \paragraph{\cen{AV4}: rajada com o central em baixo.}
-Um teste de integração no remote usa um \emph{buffer} SQLite real com um limite de 1~MiB (o rígido a 4~MiB) e
-simula 12 ciclos de rajada com o central em baixo: em cada ciclo, uma aplicação escreve 1.000 INFO, 50 WARN e
-20 ERROR, e o \emph{worker} de \dec{19} corre uma vez. Cada ciclo escreve metade do limite de uma só vez, muito
-mais do que uma rajada real escreve em 10~s, para forçar descartes em quase todos os ciclos.
-A Tabela~\ref{tab:av4} resume o resultado (dados em \texttt{docs/metrics/iter-6/av4.txt}).
+Um teste no remote, com um \emph{buffer} SQLite real (limite 1~MiB, rígido 4~MiB) e o central em baixo, corre 12
+ciclos: em cada um, uma aplicação escreve 1\,000 INFO, 50 WARN e 20 ERROR (meio limite, muito acima de uma rajada
+real em 10~s, para forçar descartes) e o \emph{worker} de \dec{19} corre uma vez (Tabela~\ref{tab:av4}; dados em
+\texttt{docs/metrics/iter-6/av4.txt}).
 
 \begin{table}[htbp]
   \centering
@@ -258,80 +205,72 @@ A Tabela~\ref{tab:av4} resume o resultado (dados em \texttt{docs/metrics/iter-6/
     \toprule
     Medida & Valor & Alvo \\
     \midrule
-    Logs escritos (INFO / WARN / ERROR) & 12.000 / 600 / 240 & --- \\
+    Logs escritos (INFO / WARN / ERROR) & 12\,000 / 600 / 240 & --- \\
     Tamanho depois de cada ciclo (máximo) & 0,88~MiB & $\le$ 1~MiB \Sim \\
     ERROR perdidos & 0 de 240 & 0 \Sim \\
     WARN perdidos & 0 de 600 & só depois dos INFO \Sim \\
-    INFO descartados, contados e persistidos & 11.500 & todos contados \Sim \\
+    INFO descartados, contados e persistidos & 11\,500 & todos contados \Sim \\
     INFO que restam & os 500 mais recentes & mais antigos primeiro \Sim \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-O tamanho antes de cada verificação chegou a 1,36~MiB: é o excesso entre duas verificações, aqui exagerado de
-propósito (meio limite por ciclo). Com o limite por omissão de 512~MiB e uma rajada real, o excesso estimado é
-inferior a 1\,\%. Os contadores sobrevivem a reabrir o ficheiro, como num reinício do agente. \cen{AV4} cumpre-se.
+Antes de cada verificação o tamanho chegou a 1,36~MiB, o excesso entre verificações, aqui exagerado de propósito;
+com 512~MiB e uma rajada real fica abaixo de 1\,\%. Os contadores sobrevivem a um reinício. \cen{AV4} cumpre-se.
 
 \paragraph{\cen{AV3}: retoma sem reinício.}
-Um teste no remote, com o relógio injetado e um central falso em memória, recusa a chave com
-\texttt{PERMISSION\_DENIED}. A entrega pausa e, durante 4~min~59~s, nenhuma das duas categorias faz pedidos. O
-operador corrige a causa; aos 5~minutos, a \emph{probe} envia um só registo, que leva o estado do \emph{buffer}
-com a pausa assinalada, o central aceita-o, e a entrega retoma no mesmo ciclo e entrega tudo, sem reiniciar o
-agente. Outros testes fixam que uma \emph{probe} falhada marca a seguinte para 5~minutos depois, que só há uma
-\emph{probe} de cada vez, e que o \texttt{SIGHUP} troca a chave e faz a \emph{probe} de imediato. No processo
-real, dois \texttt{SIGHUP} seguidos (chave nova e depois um \texttt{.env} sem chave) deixam o agente vivo,
-com a chave nova no primeiro caso e a anterior no segundo (dados em \texttt{docs/metrics/iter-6/av3.txt}).
-\cen{AV3} cumpre-se.
+Com relógio injetado e um central falso que recusa a chave (\texttt{PERMISSION\_DENIED}), a entrega pausa e
+durante 4~min~59~s não há pedidos; corrigida a causa, aos 5~minutos a \emph{probe} envia um registo (com a pausa
+assinalada) e a entrega retoma no mesmo ciclo, sem reinício. Outros testes fixam a \emph{probe} seguinte a 5~minutos
+de uma falhada, uma só de cada vez, e o \texttt{SIGHUP} a trocar a chave. No processo real, dois \texttt{SIGHUP}
+(chave nova; \texttt{.env} sem chave) deixam o agente vivo, com a chave nova e depois a anterior (dados em
+\texttt{docs/metrics/iter-6/av3.txt}). \cen{AV3} cumpre-se.
 
 \paragraph{\cen{AV1}: central em baixo, ponta a ponta.}
-O teste ponta a ponta de \dec{15} mata o central (\texttt{docker compose kill}, sem paragem graciosa), com o
-balanceador de pé, e a aplicação escreve 500 logs com o SDK durante a falha. O remote continua a recolher
-estatísticas e a tentar entregar, recebendo \texttt{UNAVAILABLE}. Quando o central volta, o condutor espera
-que o \emph{buffer} esvazie, para o remote para ter um estado estável e compara os dois lados registo a
-registo, pelo identificador de origem: tudo o que o remote marcou como entregue tem de estar no central, uma só
-vez, e nada no central pode faltar no \emph{buffer}. A comparação abrange o \emph{buffer} inteiro, incluindo os
-500 logs do caminho feliz entregues antes da falha. A Tabela~\ref{tab:av1} resume as execuções (dados em
-\texttt{docs/metrics/iter-6/e2e/}).
+O E2E de \dec{15} mata o central (\texttt{docker compose kill}) com o balanceador de pé, e a aplicação escreve 500
+logs com o SDK durante a falha. Quando o central volta e o \emph{buffer} esvazia, o condutor compara os dois lados
+registo a registo, pelo identificador de origem, no \emph{buffer} inteiro (incluindo os 500 logs entregues antes):
+tudo o que o remote marcou como entregue tem de estar no central uma só vez, e nada a mais
+(Tabela~\ref{tab:av1}; dados em \texttt{docs/metrics/iter-6/e2e/}).
 
 \begin{table}[htbp]
   \centering\small
-  \caption{\cen{AV1}: central morto, 500 logs gerados durante a falha}
+  \caption{\cen{AV1}: central morto, 500 logs gerados durante a falha (locais a 21/11; \texttt{main} no GitHub a 22/11)}
   \label{tab:av1}
-  \begin{tabular}{lrrl}
+  \begin{tabular}{lrrrl}
     \toprule
-    Medida & 60~s em baixo & 1~h em baixo & Alvo \\
+    Medida & 60~s & 1~h & 1~h, \texttt{main} & Alvo \\
     \midrule
-    Duração real da falha & 63~s & 3.603~s & --- \\
-    Pendentes quando o central volta (logs / estatísticas) & 500 / 10 & 500 / 599 & --- \\
-    Logs entregues e no central & 1.000 / 1.000 & 1.000 / 1.000 & --- \\
-    Estatísticas entregues e no central & 18 / 18 & 634 / 634 & --- \\
-    Perdidos & 0 & 0 & 0 \Sim \\
-    Duplicados & 0 & 0 & 0 \Sim \\
-    No central sem origem no \emph{buffer} & 0 & 0 & 0 \Sim \\
-    Pendentes ou em quarentena no fim & 0 & 0 & 0 \Sim \\
-    Tempo até entregar tudo, depois de o central voltar & 36,7~s & 202,0~s & --- \\
+    Duração real da falha & 63~s & 3\,603~s & 3\,604~s & --- \\
+    Pendentes no regresso (logs / estatísticas) & 500 / 10 & 500 / 599 & 500 / 599 & --- \\
+    Logs entregues / no central & 1\,000 / 1\,000 & 1\,000 / 1\,000 & 1\,000 / 1\,000 & --- \\
+    Estatísticas entregues / no central & 18 / 18 & 634 / 634 & 637 / 637 & --- \\
+    Perdidos & 0 & 0 & 0 & 0 \Sim \\
+    Duplicados & 0 & 0 & 0 & 0 \Sim \\
+    No central sem origem no \emph{buffer} & 0 & 0 & 0 & 0 \Sim \\
+    Pendentes ou em quarentena no fim & 0 & 0 & 0 & 0 \Sim \\
+    Tempo até entregar tudo após o regresso & 36,7~s & 202,0~s & 216,3~s & --- \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 O tempo de recuperação é o do \emph{backoff} do remote: depois de 60~s de falhas seguidas, a espera entre
 tentativas já ia em cerca de 40~s (32 a 48~s, com a variação aleatória); o limite do \emph{backoff} é 5~minutos, que é por isso o
-atraso máximo depois de uma falha longa. Com 1~h em baixo, a entrega completa demorou 202~s: até 5~minutos de
-espera pela tentativa seguinte, e depois 500 logs e 599 estatísticas em lotes. As duas execuções foram feitas com
-o código ainda por \emph{commit}; o \emph{workflow} de ponta a ponta (\texttt{e2e.yml}) repete-as a partir do
-\texttt{main}. Os duplicados são impossíveis no central por construção (recibos por
-host e identificador de origem); o que o teste prova é que o remote não cria identificadores novos ao repetir
+atraso máximo depois de uma falha longa. Com 1~h em baixo, a entrega completa demorou 202 e 216~s: até 5~minutos de
+espera pela tentativa seguinte, e depois 500 logs e 599 estatísticas em lotes. As duas primeiras execuções usaram o
+código ainda por \emph{commit}; a terceira correu o \texttt{e2e.yml} no GitHub sobre o \texttt{main} de todos os
+repositórios (\texttt{docs/metrics/iter-7/e2e/}). Os duplicados são impossíveis no central por construção (recibos por
+\emph{host} e identificador de origem); o que o teste prova é que o remote não cria identificadores novos ao repetir
 um envio e que não marca como entregue nada que o central não tenha gravado. \cen{AV1} cumpre-se.
 
 \subsection{Manutenção, testabilidade e interoperabilidade: MO1--MO3, TE2, TE3, IO1 e métricas de código}
 \label{sec:mo1}
 
 \paragraph{\cen{MO1}: uma métrica de alerta nova.}
-Com o mecanismo de \dec{13} no lugar, implementámos uma métrica real que o projeto precisava: o número de
-registos em quarentena reportado por cada agente (\texttt{buffer\_quarantined}, \dec{17}). A Tabela~\ref{tab:mo1}
-compara o que a alteração tocou com a linha de base contada antes de \dec{13}: 7 sítios em 5 ficheiros (três
-Go, um modelo HTML e a migração), a que se somam os dois ficheiros Go que qualquer migração obriga a mudar
-(dados em \texttt{docs/metrics/iter-6/mo1.md}).
+Com \dec{13}, implementou-se uma métrica real: os registos em quarentena de cada agente
+(\texttt{buffer\_quarantined}, \dec{17}). A Tabela~\ref{tab:mo1} compara-a com a contagem feita antes de \dec{13}
+(7 sítios em 5 ficheiros), somando os dois ficheiros Go que qualquer migração muda (dados em
+\texttt{docs/metrics/iter-6/mo1.md}).
 
 \begin{table}[htbp]
   \centering\small
@@ -352,22 +291,17 @@ Go, um modelo HTML e a migração), a que se somam os dois ficheiros Go que qual
   \end{tabular}
 \end{table}
 
-Dos três ficheiros Go, só um é da métrica: a estratégia, com 36 linhas. Os outros dois registam a migração e
-mudam em qualquer migração, de métricas ou não. Um executor que descobrisse as migrações pelo nome do ficheiro
-tirá-los-ia, mas a ordem explícita das migrações é uma garantia que preferimos manter. Os testes tocados foram
-dois: o do registo e o de caracterização, que passou a fixar também o valor da métrica nova numa base de
-dados real. O teste que compara o registo com o \texttt{CHECK} da base de dados confirmou que a migração
-acompanha a métrica. A alteração foi feita com um assistente de programação, em pouco mais de um minuto de
-relógio; esse tempo não representa o de uma pessoa sem assistência, mas a dimensão da alteração (um ficheiro
-novo a seguir um modelo que já existe) deixa folga larga para o alvo de uma pessoa-dia. \cen{MO1} cumpre-se.
+Dos três ficheiros Go, só um é da métrica (a estratégia, 36 linhas); os outros dois mudam em qualquer migração, e
+mantêm-se pela ordem explícita das migrações. Tocaram-se dois testes (registo e caracterização), e o que compara o
+registo com o \texttt{CHECK} confirmou que a migração acompanha a métrica. A alteração foi feita com um assistente
+de programação, em pouco mais de um minuto, tempo que não representa o de uma pessoa; mas um ficheiro novo a seguir
+um modelo existente deixa folga larga para uma pessoa-dia. \cen{MO1} cumpre-se.
 
 \paragraph{\cen{MO2}: uma definição por repositório.}
-A Tabela~\ref{tab:mo2} conta, antes e depois de \dec{12}, quantas vezes a lista dos níveis de log está escrita em
-Go, por repositório (dados em \texttt{docs/metrics/iter-6/te2-te3-mo2.md}). As cópias que ficam no SQL e nas
-traduções do \emph{protobuf} são cobertas por seis testes de consistência. Para confirmar que apanham uma
-divergência, retirámos um nível do \texttt{CHECK} do central e, noutra vez, da lista do SDK: em ambos os casos o
-teste respetivo falhou, e a alteração foi revertida. No remote, as duas validações do endereço do central
-passaram a uma. \cen{MO2} cumpre-se.
+A Tabela~\ref{tab:mo2} conta as listas dos níveis de log em Go, antes e depois de \dec{12} (dados em
+\texttt{docs/metrics/iter-6/te2-te3-mo2.md}); as cópias no SQL e no \emph{protobuf} têm seis testes de
+consistência. Retirar um nível do \texttt{CHECK} do central e, noutra vez, da lista do SDK fez falhar o teste
+respetivo. No remote, as duas validações do endereço passaram a uma. \cen{MO2} cumpre-se.
 
 \begin{table}[htbp]
   \centering\small
@@ -386,100 +320,85 @@ passaram a uma. \cen{MO2} cumpre-se.
 \end{table}
 
 \paragraph{\cen{MO3}: uma mudança de apresentação.}
-Medimo-lo com uma experiência controlada, numa cópia do central descartada no fim (dados e \emph{diff} em
-\texttt{docs/metrics/iter-6/mo3.md}). Fizemos duas alterações de apresentação típicas, escolhidas antes de olhar
-para o código que as serve. No \emph{dashboard}, os incidentes abertos passaram a ser o primeiro cartão, e o
-cartão de erros passou a mostrar quantos dos erros de hoje são críticos. Na página de erros, o nível passou a
-\emph{badge} com uma cor por severidade, e o ambiente ganhou uma coluna própria. As duas tocaram quatro
-ficheiros, todos em \texttt{frontend/} (um modelo HTML por página, o JavaScript do \emph{dashboard} e a folha de
-estilos), e nenhum ficheiro Go: \textbf{0 alterações em \texttt{services} e \texttt{repositories}}. Os testes
-dos \emph{handlers}, que desenham os modelos reais, passaram sem alterações. \cen{MO3} cumpre-se. Não usámos
-o histórico do git como medida porque os \emph{commits} são por iteração e juntam alterações de várias
-naturezas. O limite da medida é o do próprio cenário: uma página que precise de um dado novo já não é só
-apresentação, e toca nas camadas de baixo por desenho.
+Experiência controlada numa cópia descartável do central (\texttt{docs/metrics/iter-6/mo3.md}): duas alterações de
+apresentação típicas, escolhidas antes de ver o código (no \emph{dashboard}, os incidentes abertos em primeiro e os
+erros críticos de hoje; na página de erros, o nível como \emph{badge} colorido e uma coluna para o ambiente).
+Tocaram quatro ficheiros, todos em \texttt{frontend/}, e nenhum Go: \textbf{0 alterações em \texttt{services} e
+\texttt{repositories}}; os testes dos \emph{handlers} passaram. \cen{MO3} cumpre-se. O histórico do git não serve de
+medida, porque os \emph{commits} juntam alterações de várias naturezas; e uma página que precise de um dado novo já
+não é só apresentação.
 
 \paragraph{\cen{IO1}: um agente noutra linguagem.}
-O gerador de carga do D10 é esse agente: está escrito em JavaScript, para o k6, e o único artefacto do sistema
-que usa é o \texttt{.proto} do \texttt{monitor-api}, montado só de leitura (dados em
-\texttt{docs/metrics/iter-6/io1.md}). Tudo o que precisa de saber sobre o comportamento está nos comentários do
-contrato: a autenticação, a deduplicação por \texttt{source\_id}, o que fazer com cada código gRPC e com o
-\texttt{RetryInfo}. A lógica de agente ocupa 101 linhas. Com as mesmas garantias do remote, confirmou 73\,229
-registos na medição de \cen{SC4}, todos gravados, sem duplicados nem lotes perdidos, e fez o mesmo nos
-441\,000 registos de \cen{SC2}. \cen{IO1} cumpre-se, com dois limites: a durabilidade local (o \emph{buffer}) é
-responsabilidade de cada agente e não do contrato, e o agente foi escrito pela mesma equipa que escreveu o
-contrato.
+O gerador de carga de \dec{10} é esse agente: JavaScript para o k6, que só usa o \texttt{.proto} do
+\texttt{monitor-api} (\texttt{docs/metrics/iter-6/io1.md}). O comportamento (autenticação, deduplicação por
+\texttt{source\_id}, reação a cada código e ao \texttt{RetryInfo}) está nos comentários do contrato; a lógica de
+agente tem 101 linhas. Confirmou 73\,229 registos em \cen{SC4} (iteração~6) e os 441\,000 de \cen{SC2}, todos
+gravados, sem duplicados. \cen{IO1} cumpre-se, com dois limites: a durabilidade local cabe a cada agente, e o agente
+é da mesma equipa que escreveu o contrato.
 
 \paragraph{\cen{TE1}: integração contínua.}
-Nos últimos 20 \emph{runs} com sucesso de cada repositório (lidos no GitHub a 21/11), o CI demorou em mediana
-entre 89~s (\texttt{monitor-api}) e 141~s (\texttt{monitor-central}), e no máximo 401~s (\texttt{monitor-hello-world}),
-abaixo dos 10~minutos (alvo). Uma falha bloqueia o \emph{merge}: o \texttt{main} de cada repositório está
-protegido, também para os administradores, e aconteceu durante o trabalho. A Higiene do PR de \dec{5} e
-\dec{6} falhou por falta de um \texttt{go mod tidy}, e o \emph{quality gate} do SonarQube recusou os PR do gRPC,
-de \dec{4} e de \dec{5}--\dec{6} por cobertura do código novo abaixo de 80\,\%; nenhum entrou antes de ser
-corrigido. \cen{TE1} cumpre-se.
+Nos últimos 20 \emph{runs} de cada repositório (21/11), o CI demorou em mediana entre 89~s (\texttt{monitor-api})
+e 141~s (\texttt{monitor-central}), e no máximo 401~s (alvo: 10~minutos). Uma falha bloqueia o \emph{merge}, e
+aconteceu: a higiene falhou no PR de \dec{5}--\dec{6} (\texttt{go mod tidy}), e o \emph{quality gate} recusou os PR
+do gRPC, de \dec{4} e de \dec{5}--\dec{6} por cobertura nova abaixo de 80\,\%; nenhum entrou sem correção.
+\cen{TE1} cumpre-se.
 
 \paragraph{\cen{TE2} e \cen{TE3}: \emph{handlers} e tempo.}
-Com as interfaces de \dec{14}, a cobertura dos \emph{handlers} passou de 9,5\,\% para 95,6\,\% (alvo
-$\ge$ 60\,\%). Os testes cobrem todos os \emph{handlers}, desenham as páginas reais e correm em cerca de 0,2~s,
-sem base de dados. Nos testes dos quatro repositórios, os \texttt{time.Sleep} passaram de 1 para 0 (alvo 0). O
-resumo diário é testado em seis casos com o relógio e o fuso controlados: antes, às e depois das 9~h, no fim do
-mês, no dia em que a hora muda, e noutro fuso. \cen{TE2} e \cen{TE3} cumprem-se.
+Com \dec{14}, a cobertura dos \emph{handlers} passou de 9,5\,\% para 95,6\,\% (alvo $\ge$ 60\,\%), em testes de
+0,2~s sem base de dados. Os \texttt{time.Sleep} nos testes passaram de 1 para 0. O resumo diário é testado em seis
+casos com relógio e fuso controlados (antes, às e depois das 9~h, fim do mês, mudança de hora, outro fuso).
+\cen{TE2} e \cen{TE3} cumprem-se.
 
 \gerado{metricas-codigo-antes-depois.tex}
+
+\paragraph{Os testes detetam faltas? \emph{Mutation testing}.}
+A cobertura diz o que foi executado, não o que foi verificado (secção~\ref{sec:gqm}). Na amostra prevista, os
+\emph{services} do central, o gremlins gerou mutantes (uma condição, um limite ou uma operação trocados) que os
+testes unitários têm de apanhar: dos 265 executados, 211 foram mortos, uma eficácia de 79,6\,\%; outros 29 estão em
+linhas sem testes unitários (\texttt{docs/metrics/iter-7/mutacao.md}). Mostrou o que a cobertura esconde: 23 dos 54
+sobreviventes eram limites na validação da ingestão (\texttt{>} trocado por \texttt{>=}), em linhas cobertas, mas
+sem nenhum teste no valor exato. Um teste de tabela com cada limite e um passo além, sem mudar produção, levou a
+eficácia a 87,9\,\% (233 mortos); na ingestão fica um sobrevivente, equivalente. É uma métrica de tendência, lenta
+demais para \emph{gate}.
 
 \subsection{Monitorabilidade}
 \label{sec:mn}
 
 \paragraph{\cen{MN1}: quarentena visível no central.}
-No remote, um teste põe um registo em quarentena com 150 estatísticas pendentes e verifica que os dois lotes do
-ciclo levam a mesma fotografia, com a quarentena contada. No central, um teste de integração em PostgreSQL envia
-um lote com três registos em quarentena e lê-os na API do \emph{dashboard}; verifica também que uma fotografia
-mais antiga não substitui a mais recente e que uma inválida é ignorada sem perder as estatísticas. A quarentena
-fica visível no lote seguinte.
-
-O teste ponta a ponta de \dec{15} repete-o com os componentes reais: corrompe um log pendente no \emph{buffer}
-(metadados que deixam de ser JSON), espera que o remote o ponha em quarentena e mede quanto tempo demora a
-aparecer no central. Na primeira execução falhou, com 10,0~s para ciclos de 5~s: um ciclo de entrega que acorda
-antes da recolha não tem estatísticas para levar a fotografia, e o central ficava dois ciclos atrás
-(secção~\ref{sec:d15}). Depois da correção, três execuções mediram 5,85~s, 0,16~s e 5,82~s. O atraso depende da fase
-entre a quarentena e a recolha seguinte, e o máximo é um ciclo de recolha, que no teste são 6~s: o intervalo
-mais 1~s de amostragem do CPU. O limite do teste é 7~s, com 1~s para a observação pelo condutor; em produção,
-o ciclo é de 31~s. \cen{MN1} cumpre-se, nos testes de cada lado e ponta a ponta.
+No remote, um teste verifica que os lotes de um ciclo levam a mesma fotografia, com a quarentena contada; no
+central, um teste de integração lê três registos em quarentena na API do \emph{dashboard}, e confirma que uma
+fotografia antiga não substitui a recente e que uma inválida é ignorada. No E2E, com um log pendente corrompido, a
+primeira execução falhou (10,0~s, o defeito da secção~\ref{sec:d15}); depois da correção, três execuções mediram
+5,85, 0,16 e 5,82~s, e 6,03~s no GitHub. O máximo é um ciclo de recolha (6~s no teste, 31~s em produção) mais a
+observação, e o limite do teste é 7~s.
+\cen{MN1} cumpre-se.
 
 \paragraph{\cen{MN2}: \emph{job} parado.}
-Um teste corre um \emph{job} liderado com intervalo de 15~s que bloqueia, com o relógio controlado: aos 30~s o
-\texttt{/health/ready} ainda responde 200, um segundo depois responde 503 e nomeia o \emph{job}, e o
-\texttt{/health/live} continua a responder 200. Um \emph{job} liderado por outra instância nunca conta. Quando
-a iteração termina, a instância volta a estar pronta. A deteção acontece em $\le$ 2 intervalos. \cen{MN2}
-cumpre-se (dados em \texttt{docs/metrics/iter-6/mn1-mn2.txt}).
+Com relógio controlado, um \emph{job} liderado de 15~s bloqueia: aos 30~s o \texttt{/health/ready} ainda dá 200, um
+segundo depois dá 503 e nomeia o \emph{job}, e o \texttt{/health/live} continua a 200; \emph{jobs} de outra instância
+não contam, e a instância volta a pronta quando a iteração acaba. \cen{MN2} cumpre-se
+(\texttt{docs/metrics/iter-6/mn1-mn2.txt}).
 
 \subsection{Segurança}
 \label{sec:aval-se}
 
 \paragraph{\cen{SE1}: chave inválida ou revogada.}
-O teste ponta a ponta arranca um segundo remote, com o seu próprio \emph{buffer}, duas vezes: com uma chave que
-não existe e com a chave antiga de um host cuja chave foi regenerada (a mesma alteração que a interface faz:
-um \emph{digest} novo na linha do host). Em cada caso, a aplicação escreve 10 logs. Nos dois casos, o remote
-pausa por \texttt{UNAUTHENTICATED} em 0,7~s (\dec{16}); o central não tem nenhuma linha de logs, estatísticas
-ou estado do \emph{buffer} de outro host que não o principal, e o host revogado nunca aparece como visto; no
-\emph{buffer} do remote, os 10 logs e a estatística ficam pendentes, sem quarentena: corrigida a chave,
-seriam entregues. \cen{SE1} cumpre-se.
+O E2E arranca um segundo remote com uma chave inexistente e, depois, com a chave antiga de um \emph{host}
+regenerado; a aplicação escreve 10 logs em cada caso. O remote pausa por \texttt{UNAUTHENTICATED} em 0,7~s (1,1~s no GitHub)
+(\dec{16}); o central não grava nada desses \emph{hosts}, e o revogado nunca aparece como visto; no \emph{buffer},
+os logs ficam pendentes, sem quarentena, para entregar quando a chave for corrigida. \cen{SE1} cumpre-se.
 
 \paragraph{\cen{SE2}: XSS e \emph{clickjacking}.}
-Um teste verifica que todas as respostas, de página, de API, de erro e de rota inexistente, levam a CSP e os outros
-cabeçalhos, e o teste das páginas falha se alguma tiver um \emph{script inline} ou de uma CDN. A prova principal
-foi feita num navegador real, com a CSP em \emph{enforce}: as sete páginas da interface carregaram sem nenhum
-relatório de violação; um \emph{script} injetado na página, como faria um XSS, não executou; e a página posta num
-\texttt{<iframe>} foi bloqueada. Os dois bloqueios chegaram ao \emph{endpoint} de relatórios do central
-(dados em \texttt{docs/metrics/iter-6/se2-se3.md}). \cen{SE2} cumpre-se.
+Um teste verifica a CSP e os cabeçalhos em todas as respostas (páginas, API, erros, rotas inexistentes), e o das
+páginas falha com \emph{scripts inline} ou de CDN. Num navegador real, em \emph{enforce}: as sete páginas carregaram
+sem violações, um \emph{script} injetado não executou e a página num \texttt{<iframe>} foi bloqueada, com os dois
+bloqueios reportados ao central (\texttt{docs/metrics/iter-6/se2-se3.md}). \cen{SE2} cumpre-se.
 
 \paragraph{\cen{SE3}: \emph{endpoint} de saúde para \emph{loopback} ou metadados.}
-A guarda das \emph{probes} é testada com 14 endereços que têm de ser recusados (\emph{loopback}, metadados das
-\emph{clouds}, \emph{link-local}, \emph{multicast}, endereços IPv4 escritos como IPv6) e 6 que têm de passar
-(redes privadas e públicas). Num teste ponta a ponta, \emph{probes} reais para \texttt{127.0.0.1} e para
-\texttt{localhost}, um nome que só depois de resolvido se sabe que é \emph{loopback}, não chegaram ao servidor
-local, e os dois \emph{hosts} ficaram em baixo; sem a guarda, o mesmo servidor recebeu a \emph{probe}, o que mostra
-que foi a guarda a travá-la. \cen{SE3} cumpre-se.
+A guarda é testada com 14 endereços a recusar (\emph{loopback}, metadados, \emph{link-local}, \emph{multicast},
+IPv4 em forma IPv6) e 6 a aceitar. Num ensaio real, \emph{probes} para \texttt{127.0.0.1} e para \texttt{localhost}
+(só depois de resolvido se sabe que é \emph{loopback}) não chegaram ao servidor local; sem a guarda, chegaram.
+\cen{SE3} cumpre-se.
 
 \paragraph{OWASP ASVS 5.0.0, nível 1.}
 Dos 70 requisitos, antes de \dec{18} cumpriam-se 36, 25 não se aplicavam (não há \emph{upload} de ficheiros,
@@ -502,16 +421,16 @@ da secção~\ref{sec:aval-sc3}.
     \toprule
     Cenário & Medida-alvo & Medido & Cumpre \\
     \midrule
-    \cen{SC1} & p95 $<$ 300~ms; 0\,\% de erros; CPU $<$ 70\,\% & 5~ms; 0\,\%; 3\,\% & \Sim \\
-    \cen{SC2} & \emph{backlog} em $\le$ 15~min; \emph{dashboard} p95 $<$ 1~s; 0 perdas e duplicados & 42~s; 145~ms; 0 e 0 & \Sim \\
-    \cen{SC3} & débito $\ge$ 1,8× e $\ge$ 2,5×; 0 \emph{jobs} duplicados; troca de líder $\le$ 30~s & 1,01× e 1,04×; 0; 12~s & \Parc \\
-    \cen{SC4} & \emph{dashboard} p95 $<$ 1~s com 30 dias; ingestão sem degradação com a retenção & 15 a 210~ms; ingestão p95 5~ms, 0 rejeições & \Sim \\
+    \cen{SC1} & p95 $<$ 300~ms; 0\,\% de erros; CPU $<$ 70\,\% & 4--5~ms; 0\,\%; 3\,\% & \Sim \\
+    \cen{SC2} & \emph{backlog} em $\le$ 15~min; \emph{dashboard} p95 $<$ 1~s; 0 perdas e duplicados & 42--44~s; 44--168~ms; 0 e 0 & \Sim \\
+    \cen{SC3} & débito $\ge$ 1,8× e $\ge$ 2,5×; 0 \emph{jobs} duplicados; troca de líder $\le$ 30~s & 1,01× e 1,03--1,04×; 0; 12~s & \Parc \\
+    \cen{SC4} & \emph{dashboard} p95 $<$ 1~s com 30 dias; ingestão sem degradação com a retenção & 14 a 652~ms; ingestão p95 5 a 7~ms, 0 rejeições & \Sim \\
     \cen{SC5} & atraso p95 dos outros \emph{hosts} $<$ 5~s & 5~ms & \Sim \\
     \addlinespace
-    \cen{AV1} & 1~h em baixo: 0 perdas, 0 duplicados & 3.603~s: 0 e 0 & \Sim \\
+    \cen{AV1} & 1~h em baixo: 0 perdas, 0 duplicados & 3\,603 e 3\,604~s (\texttt{main}): 0 e 0 & \Sim \\
     \cen{AV2} & alerta em $\le$ \emph{timeout} + 60~s com 1\,000 \emph{hosts} & 50,4~s além do limiar & \Sim \\
     \cen{AV3} & retoma em $\le$ 5~min sem reiniciar & aos 5~min, sem reinício & \Sim \\
-    \cen{AV4} & \emph{buffer} $\le$ limite; só INFO e WARN perdidos, contados & 0,88 de 1~MiB; 0 ERROR e 0 WARN perdidos; 11.500 INFO contados & \Sim \\
+    \cen{AV4} & \emph{buffer} $\le$ limite; só INFO e WARN perdidos, contados & 0,88 de 1~MiB; 0 ERROR e 0 WARN perdidos; 11\,500 INFO contados & \Sim \\
     \addlinespace
     \cen{MO1} & $\le$ 1 pessoa-dia; $\le$ 3 ficheiros Go e 1 migração & 3 ficheiros Go (1 da métrica) e 1 migração & \Sim \\
     \cen{MO2} & 1 sítio por repositório; divergência apanhada por teste & 1 por repositório; 2 divergências, 2 apanhadas & \Sim \\
@@ -521,7 +440,7 @@ da secção~\ref{sec:aval-sc3}.
     \cen{TE2} & cobertura dos \emph{handlers} $\ge$ 60\,\% & 95,6\,\% & \Sim \\
     \cen{TE3} & lógica temporal sem esperas & 0 \texttt{time.Sleep} nos testes & \Sim \\
     \addlinespace
-    \cen{MN1} & quarentena visível em $\le$ 1 ciclo & no máximo 5,85~s, com ciclos de 6~s & \Sim \\
+    \cen{MN1} & quarentena visível em $\le$ 1 ciclo & no máximo 6,03~s, para um limite de 7~s & \Sim \\
     \cen{MN2} & \texttt{/health/ready} falha em $\le$ 2 intervalos & 503 logo após 2 intervalos & \Sim \\
     \addlinespace
     \cen{SE1} & chave inválida ou revogada: recusada, nada persistido & recusadas as duas; 0 linhas no central & \Sim \\

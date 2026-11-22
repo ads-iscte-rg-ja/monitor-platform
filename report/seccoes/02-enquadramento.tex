@@ -1,9 +1,16 @@
 \section{Enquadramento teórico}
 \label{sec:enquadramento}
 
-Este capítulo resume apenas os conceitos que o relatório usa, e como os usa. A referência principal são
-os diapositivos da unidade curricular~\cite{bastofernandes2026}, baseados em Bass et
-al.~\cite{bass2012}.
+Este capítulo resume só os conceitos usados, a partir dos diapositivos da unidade
+curricular~\cite{bastofernandes2026}, baseados em Bass et al.~\cite{bass2012}.
+
+Os diapositivos~01 definem a engenharia de software como uma abordagem sistemática, disciplinada e
+\textbf{quantificável}, e apontam como causas comuns de insucesso os requisitos incompletos ou voláteis e as
+expectativas irrealistas. Este trabalho responde com requisitos de qualidade que têm uma medida
+(capítulo~\ref{sec:requisitos}) e decisões aceites ou rejeitadas por medição. Das normas de referência que os mesmos
+diapositivos sublinham, usa a ISO/IEC~25010 (atributos de qualidade)~\cite{iso25010}, o OWASP ASVS
+(segurança)~\cite{owaspasvs5} e os protocolos da IETF (HTTP/2, TLS) sob o gRPC. E toda a engenharia envolve
+\emph{trade-offs}, decisões com informação incompleta: o fio deste relatório.
 
 \subsection{Arquitetura de software, estruturas e vistas}
 
@@ -19,99 +26,73 @@ categorias de estruturas~\cite{bastofernandes2026}:
         ficheiros e equipas. A estrutura de \emph{deployment} serve para raciocinar sobre desempenho,
         integridade dos dados, segurança e disponibilidade.
 \end{itemize}
-Uma vista é a representação documentada de uma estrutura. O capítulo~\ref{sec:sistema} documenta uma
-vista de cada categoria. Segue-se o princípio de só documentar o que traz retorno: as partes que um
-recém-chegado precisa de aprender, as que têm risco e as que mudam com frequência (YAGNI).
+Uma vista é a representação documentada de uma estrutura; documenta-se só o que dá retorno: o que um recém-chegado
+precisa de aprender, o que tem risco e o que muda com frequência.
 
 \subsection{Atributos de qualidade e cenários}
 
-Os sistemas são muitas vezes redesenhados não por lhes faltar funcionalidade, mas por serem difíceis de
-manter, escalar ou proteger~\cite{bastofernandes2026}. Os atributos de qualidade (QA) dividem-se em atributos
-\textbf{de execução} (disponibilidade, desempenho, usabilidade) e \textbf{de desenvolvimento}
-(modificabilidade, testabilidade). Os nomes seguem os diapositivos e o modelo de qualidade da ISO/IEC
-25010~\cite{iso25010}. Os QA
-não se atingem isoladamente: melhorar um afeta outros, e desenhar é, em parte, escolher
-\emph{trade-offs}. Por isso o capítulo~\ref{sec:requisitos} os torna explícitos.
+Os sistemas são redesenhados mais por serem difíceis de manter, escalar ou proteger do que por falta de
+funcionalidade~\cite{bastofernandes2026}. Os atributos de qualidade (QA) são \textbf{de execução} (disponibilidade,
+desempenho, usabilidade) ou \textbf{de desenvolvimento} (modificabilidade, testabilidade), e não se atingem
+isoladamente: melhorar um afeta outros, e o capítulo~\ref{sec:requisitos} torna os \emph{trade-offs} explícitos.
 
-Um requisito de qualidade tem de ser inequívoco e testável. Especifica-se como um cenário de seis partes:
-\textbf{fonte} do estímulo, \textbf{estímulo}, \textbf{artefacto} afetado, \textbf{ambiente},
-\textbf{resposta} e \textbf{medida da resposta}. A medida é o que torna o cenário verificável, e é ela que
-os testes de carga e as métricas de código deste trabalho medem.
+Um requisito de qualidade tem de ser testável: especifica-se como cenário de seis partes (\textbf{fonte},
+\textbf{estímulo}, \textbf{artefacto}, \textbf{ambiente}, \textbf{resposta} e \textbf{medida}), e é a medida que
+os testes de carga e as métricas medem.
 
-Três definições dos diapositivos 03 são usadas na avaliação. Quando as responsabilidades de dois módulos
-se sobrepõem, uma única alteração pode afetar ambos; o \textbf{acoplamento} é a probabilidade de isso
-acontecer, e é mau para a modificabilidade. A \textbf{coesão} é a
-probabilidade de uma alteração que afeta uma responsabilidade de um módulo afetar também as outras, e é
-boa quando é alta. A \textbf{testabilidade} é a facilidade com que os testes revelam as faltas que
-existem.
+Dos diapositivos~03: o \textbf{acoplamento} é a probabilidade de uma alteração afetar dois módulos (mau para a
+modificabilidade); a \textbf{coesão}, a de uma alteração a uma responsabilidade afetar as outras do mesmo módulo
+(boa quando alta); a \textbf{testabilidade}, a facilidade com que os testes revelam as faltas existentes.
 
 \subsection{Táticas e padrões}
 
-Uma tática é uma decisão de desenho que influencia a resposta de um único atributo de qualidade, sem ter
-em conta os outros. Os \emph{trade-offs} entre táticas têm de ser controlados explicitamente pelo
-arquiteto~\cite{bastofernandes2026}. Os padrões arquiteturais (Layered, Client-Server, Shared-Data,
-Broker, MVC, Publish-Subscribe) já incluem os seus \emph{trade-offs}. O Broker, por exemplo, traz
-indireção e latência, e torna-se um ponto de ataque, de falha e de estrangulamento. Ao nível do desenho
-detalhado usam-se os padrões GoF~\cite{gamma1994}. Neste trabalho os catálogos de táticas por QA
-(disponibilidade, modificabilidade, desempenho, segurança, testabilidade) servem duas vezes: para
-identificar o que o sistema já faz (secção~\ref{sec:tacticas-existentes}) e para justificar cada decisão
-nova.
+Uma tática influencia a resposta de um só atributo, sem ter em conta os outros, por isso os seus
+\emph{trade-offs} controlam-se explicitamente~\cite{bastofernandes2026}. Os padrões arquiteturais (Layered,
+Client-Server, Shared-Data, Broker, MVC, Publish-Subscribe) já trazem os seus: o Broker, por exemplo, acrescenta
+indireção e latência e é um ponto de ataque, de falha e de estrangulamento. No desenho detalhado usam-se os padrões
+GoF~\cite{gamma1994}. Os catálogos de táticas servem para identificar o que o sistema já faz
+(secção~\ref{sec:tacticas-existentes}) e para justificar cada decisão nova.
 
-A análise de um QA pode fazer-se por estimativas \emph{back-of-the-envelope}, por experiências mentais
-ou por \emph{checklists}, como na segurança. A análise feita mais tarde no ciclo de vida, sobre o sistema
-real, dá mais confiança, mas custa mais~\cite{bastofernandes2026}. É essa a relação entre as estimativas
-do capítulo~\ref{sec:requisitos}, baratas e feitas cedo, que apontam os prováveis estrangulamentos, e os
-testes de carga, que os confirmam ou desmentem.
+Um QA analisa-se por estimativas \emph{back-of-the-envelope}, experiências mentais ou \emph{checklists}; a análise
+tardia, sobre o sistema real, dá mais confiança mas custa mais~\cite{bastofernandes2026}. É a relação entre as
+estimativas do capítulo~\ref{sec:requisitos} e os testes de carga que as confirmam ou desmentem.
 
 \subsection{Estilos arquiteturais e sistemas distribuídos}
 \label{sec:estilos}
 
-Um estilo descreve a topologia de todo o sistema e as suas características, positivas e negativas; um padrão
-resolve um problema mais localizado dentro de um estilo~\cite{bastofernandes2026}. Os estilos dividem-se em
-\textbf{monolíticos}, com uma só unidade de \emph{deployment} (em camadas, \emph{pipeline}, microkernel), e
-\textbf{distribuídos}, com várias unidades ligadas por protocolos de rede (\emph{service-based},
-\emph{event-driven}, \emph{space-based}, SOA e microserviços). O estilo em camadas tem \textbf{partição técnica}:
-agrupa o código pelo que faz (apresentação, negócio, dados), e não pelo domínio; é simples e barato, mas a
-manutenção e a testabilidade degradam-se quando a aplicação cresce. O microkernel separa um núcleo de
-\emph{plug-ins} independentes, obtidos de um registo, e é o único estilo que pode ter partição técnica e por
-domínio ao mesmo tempo. A escolha guia-se por critérios explícitos: o domínio, as características
-arquiteturais, a arquitetura dos dados, os fatores organizacionais e a maturidade operacional da equipa; e
-responde a três perguntas: monólito ou distribuído, onde vivem os dados, comunicação síncrona ou assíncrona.
+Um estilo descreve a topologia de todo o sistema; um padrão resolve um problema localizado dentro
+dele~\cite{bastofernandes2026}. Os estilos são \textbf{monolíticos}, com uma unidade de \emph{deployment} (camadas,
+\emph{pipeline}, microkernel), ou \textbf{distribuídos} (\emph{service-based}, \emph{event-driven},
+\emph{space-based}, SOA, microserviços). As camadas têm \textbf{partição técnica} (apresentação, negócio, dados):
+simples e baratas, mas a manutenção degrada-se com o crescimento. O microkernel separa um núcleo de \emph{plug-ins}
+obtidos de um registo, e é o único que admite partição técnica e por domínio. A escolha segue critérios explícitos
+(domínio, características, dados, fatores organizacionais, maturidade operacional) e três perguntas: monólito ou
+distribuído, onde vivem os dados, comunicação síncrona ou assíncrona.
 
-Os estilos distribuídos são mais poderosos em desempenho, escalabilidade e disponibilidade, mas pagam-no.
-Têm de contrariar as \textbf{oito falácias da computação distribuída} (a rede é fiável, a latência é zero, a
-largura de banda é infinita, a rede é segura, a topologia não muda, há um só administrador, o custo de
-transporte é zero, a rede é homogénea) e enfrentam desafios que um monólito não tem: os logs distribuídos, as
-transações distribuídas e a manutenção e o versionamento dos contratos. O slide~08 acrescenta um indicador de
-granularidade: uma transação que atravessa a fronteira entre serviços sugere que a fronteira está no sítio
-errado.
+Os distribuídos ganham em desempenho, escalabilidade e disponibilidade, mas têm de contrariar as \textbf{oito
+falácias da computação distribuída} (Tabela~\ref{tab:falacias}) e enfrentar logs distribuídos, transações
+distribuídas e versionamento de contratos. Uma transação que atravessa a fronteira entre serviços sugere que a
+fronteira está no sítio errado.
 
-A \textbf{conascência} mede o acoplamento pelo que tem de mudar em conjunto: dois componentes são conascentes se
-uma alteração num obriga a alterar o outro para o sistema continuar correto. A \textbf{estática} vê-se no
-código (de nome, de tipo, de significado, de posição, de algoritmo); a \textbf{dinâmica} só aparece em execução
-(de execução, de tempo, de valores, de identidade). Reduzi-la, ou trocar uma forma forte por uma mais fraca e
-verificável, reduz o custo da mudança~\cite{bastofernandes2026}.
+Dois componentes são \textbf{conascentes} se alterar um obriga a alterar o outro. A conascência \textbf{estática}
+vê-se no código (nome, tipo, significado, posição, algoritmo); a \textbf{dinâmica}, só em execução (execução, tempo,
+valores, identidade). Trocar uma forma forte por uma mais fraca e verificável reduz o custo da
+mudança~\cite{bastofernandes2026}.
 
 \subsection{Documentação, conformidade e testes}
 \label{sec:documentacao}
 
-As notações de documentação podem ser \textbf{informais} (diagramas com a semântica em texto),
-\textbf{semiformais} (UML) ou \textbf{formais} (ADL). A escolha é um \emph{trade-off} entre o esforço e a
-ambiguidade, e as vistas a documentar resultam de uma decisão de custo e benefício. Além das vistas
-estruturais, uma \textbf{vista de qualidade} junta o que um atributo precisa de mostrar e que está espalhado por
-várias estruturas, como uma vista de segurança~\cite{bastofernandes2026}.
+As notações são \textbf{informais}, \textbf{semiformais} (UML) ou \textbf{formais} (ADL), um \emph{trade-off} entre
+esforço e ambiguidade. Uma \textbf{vista de qualidade} junta o que um atributo espalha por várias estruturas, como a
+segurança~\cite{bastofernandes2026}.
 
-O código e a arquitetura afastam-se com facilidade (\textbf{erosão}). Há duas formas de manter a conformidade:
-\emph{por construção}, gerando código a partir da arquitetura, de aplicabilidade limitada; e \emph{por análise},
-verificando o código e assinalando o que não está conforme. A segunda tem um limite conhecido: as estruturas
-estáticas do código (pacotes) não mostram as estruturas de execução (processos, instâncias), que são a
-essência da maioria das descrições de arquitetura. Ajuda escrever a arquitetura no próprio código
-(\emph{architecturally-evident coding style}), por exemplo dizendo em cada pacote a que camada pertence.
+Contra a \textbf{erosão}, a conformidade mantém-se \emph{por construção} (código gerado da arquitetura, de uso
+limitado) ou \emph{por análise} (verificar o código), que não vê as estruturas de execução. Ajuda escrever a
+arquitetura no código (\emph{architecturally-evident coding style}).
 
-A arquitetura define as unidades dos testes unitários e as interfaces que os testes de integração exercitam;
-nos testes de aceitação, o seu papel é pôr à prova os atributos de qualidade. Por fim, a
-\textbf{variabilidade} é o atributo das linhas de produtos, e os seus mecanismos (\emph{extension points},
-parâmetros, substituição de componentes, \emph{plug-ins}) também servem um só produto que tem de mudar.
+A arquitetura define as unidades dos testes unitários e as interfaces dos de integração; os de aceitação põem os
+atributos de qualidade à prova. Os mecanismos de \textbf{variabilidade} das linhas de produtos (\emph{extension
+points}, parâmetros, substituição de componentes, \emph{plug-ins}) também servem um só produto que muda.
 
 \subsection{Desenho orientado a atributos (ADD) e registo de decisões}
 
@@ -128,18 +109,16 @@ seguinte. O desenho avança por \emph{generate and test}: cada hipótese é test
 resultado. Neste trabalho o ``teste'' de cada iteração é uma medição: a mesma medição de baseline,
 repetida depois de cada alteração.
 
-Cada decisão é registada num \emph{Architecture Decision Record} (ADR)~\cite{nygard2011}, com o contexto,
-a decisão e as consequências, a que se acrescentam a teoria que a fundamenta, as alternativas rejeitadas e
-a forma de a verificar. Os ADR estão no anexo~\ref{anx:adrs}. Não é uma prática só académica: o
-\emph{Technology Radar} da Thoughtworks recomenda-os para adoção desde 2017~\cite{thoughtworks2017adr}, a AWS
-publica um guia sobre o processo~\cite{kunce2022adr} e o \emph{Azure Well-Architected Framework} da Microsoft
-trata-os como um dos principais entregáveis do arquiteto~\cite{microsoftadr}. O motivo é preservar o porquê de cada
-decisão, que o código não mostra, e evitar voltar a discutir o que já foi decidido.
+Cada decisão é registada num \emph{Architecture Decision Record} (ADR)~\cite{nygard2011} (contexto, decisão,
+consequências), a que se juntam a teoria, as alternativas e a verificação (anexo~\ref{anx:adrs}). A prática é de
+indústria: o \emph{Technology Radar} da Thoughtworks recomenda-os desde 2017~\cite{thoughtworks2017adr}, a AWS tem um
+guia~\cite{kunce2022adr} e o \emph{Azure Well-Architected Framework} trata-os como entregável do
+arquiteto~\cite{microsoftadr}. Preservam o porquê, que o código não mostra.
 
 \subsection{Métricas de qualidade de software}
 
-As métricas são escolhidas pelo método \emph{Goal--Question--Metric}~\cite{basili1994}: um objetivo gera
-perguntas, e só se mede o que responde a uma delas. As métricas de código usadas são:
+As métricas escolhem-se por \emph{Goal--Question--Metric}~\cite{basili1994}: só se mede o que responde a uma
+pergunta derivada de um objetivo. As de código são:
 \begin{itemize}
   \item \textbf{complexidade ciclomática}~\cite{mccabe1976}: o número de caminhos linearmente
         independentes de uma função, que é também o número de testes necessários para percorrer uma

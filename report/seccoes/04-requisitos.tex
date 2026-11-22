@@ -1,15 +1,12 @@
 \section{Requisitos arquiteturais}
 \label{sec:requisitos}
 
-Este capítulo deriva os requisitos arquiteturalmente significativos a partir dos objetivos da
-Tabela~\ref{tab:objetivos}: primeiro prioriza os atributos de qualidade, depois torna explícitos os
-conflitos entre eles, estima a carga a 1\,000 \emph{hosts} e, por fim, organiza os cenários numa
-\emph{utility tree}.
+Este capítulo deriva os ASR dos objetivos (Tabela~\ref{tab:objetivos}): prioriza os atributos, explicita os
+conflitos, estima a carga a 1\,000 \emph{hosts} e organiza os cenários numa \emph{utility tree}.
 
 \subsection{Priorização dos atributos de qualidade}
 
-A Tabela~\ref{tab:ranking} ordena os atributos. A ordem decide onde se investe o tempo disponível e
-qual dos lados ganha quando dois atributos entram em conflito.
+A ordem da Tabela~\ref{tab:ranking} decide onde se investe o tempo e que lado ganha num conflito.
 
 \begin{table}[htbp]
   \centering\small
@@ -32,17 +29,14 @@ qual dos lados ganha quando dois atributos entram em conflito.
   \end{tabularx}
 \end{table}
 
-A performance não aparece como prioridade própria por uma razão de domínio: um operador não nota a
-diferença entre 50 e 200~ms na ingestão de uma amostra. O que importa é que o débito acompanhe o número
-de \emph{hosts}, e isso é escalabilidade. A usabilidade é baixa não por ser irrelevante, mas por estar fora do
-âmbito de um trabalho de arquitetura: o que lhe cabe é o suporte arquitetural, a separação MVC, que
-permite mudar a apresentação sem tocar nos serviços nem nos dados (\cen{MO3}).
+A performance não é prioridade própria: um operador não distingue 50 de 200~ms na ingestão de uma amostra; o que
+importa é o débito acompanhar os \emph{hosts}, e isso é escalabilidade. A usabilidade fica fora do âmbito de um
+trabalho de arquitetura, que lhe dá só o suporte: a separação MVC (\cen{MO3}).
 
 \subsection{Trade-offs explícitos}
 
-Cada tática melhora um atributo sem olhar aos outros (secção~\ref{sec:enquadramento}), por isso os
-conflitos têm de ser decididos explicitamente. A Tabela~\ref{tab:tradeoffs} regista cada conflito, a
-escolha feita e a tática que mitiga o lado que perde.
+Cada tática melhora um atributo sem olhar aos outros, por isso os conflitos decidem-se explicitamente
+(Tabela~\ref{tab:tradeoffs}).
 
 \begin{table}[htbp]
   \centering\small
@@ -52,7 +46,7 @@ escolha feita e a tática que mitiga o lado que perde.
     \toprule
     Conflito & Escolha & Tática que mitiga \\
     \midrule
-    Scalability vs.\ Modifiability & Escalar só até onde as medições exigem (1\,000 \emph{hosts}); o resto fica no plano de evolução, com gatilhos & Defer Binding (papéis por configuração); Encapsulate (particionamento escondido no repositório) \\
+    Scalability vs.\ Modifiability & Escalar só até onde as medições exigem (1\,000 \emph{hosts}); o resto fica no plano de evolução, com gatilhos & Defer Binding (papéis por configuração); Encapsulate (um eventual particionamento fica escondido no repositório) \\
     Availability vs.\ Consistency & Entrega \emph{at-least-once} com deduplicação idempotente (recibos) & Transactions (registo e recibo juntos) \\
     Scalability vs.\ Availability & O controlo de admissão rejeita pedidos por sobrecarga, mas sem perder dados: o remote guarda e volta a tentar & Limit Event Response no central; Retry com o atraso indicado pelo central \\
     Modifiability vs.\ Performance & Estratégias por métrica de alerta, mas uma única consulta \emph{set-based} montada a partir delas & Increase Cohesion sem consultas N+1 \\
@@ -66,10 +60,9 @@ escolha feita e a tática que mitiga o lado que perde.
 \subsection{Estimativas para 1\,000 hosts}
 \label{sec:estimativas}
 
-Os números dos cenários vêm de estimativas \emph{back-of-the-envelope} (Tabela~\ref{tab:estimativas}),
-feitas antes de qualquer medição. O intervalo de 30~s, o \emph{timeout} de 5~s, a concorrência de 8 e
-as 25 ligações vêm do código; o tamanho de cada linha e o número de regras por \emph{host} são
-estimativas.
+Os números dos cenários vêm de estimativas \emph{back-of-the-envelope} feitas antes de medir
+(Tabela~\ref{tab:estimativas}); intervalos, \emph{timeout}, concorrência e ligações vêm do código, e o tamanho das
+linhas e as regras por \emph{host} são estimados.
 
 \begin{table}[htbp]
   \centering\small
@@ -90,17 +83,15 @@ estimativas.
   \end{tabularx}
 \end{table}
 
-A conclusão é que \textbf{a ingestão nominal é trivial}: 33 pedidos por segundo não pesam nem ao Go nem
-ao PostgreSQL. Os problemas de escala estão em pontos concretos: as escritas linha a linha (S2), a falta de
-controlo de admissão quando os \emph{hosts} recuperam ao mesmo tempo (S4), a verificação de
-disponibilidade sequencial (S1), o crescimento dos dados (S7) e os logs sem limite (S9, S10). É por isso que
-uma reescrita foi rejeitada e cada ponto é tratado com uma tática localizada.
+\textbf{A ingestão nominal é trivial} (33 pedidos/s). Os problemas de escala estão em pontos concretos: escritas
+linha a linha (S2), falta de admissão na recuperação (S4), verificação de disponibilidade sequencial (S1),
+crescimento dos dados (S7) e logs sem limite (S9, S10). Por isso cada um tem uma tática localizada, e não uma
+reescrita.
 
 \paragraph{Volume de logs imprevisível.}
-O número de logs de um \emph{host} não é constante: é zero quando não há nada a registar e muito alto
-quando uma aplicação entra em ciclo de erro. Dimensionar pela média seria errado; o sistema tem de ser
-desenhado para a cauda. Os testes de carga usam, por isso, o perfil misto da
-Tabela~\ref{tab:perfil-logs}. Os valores são uma hipótese explícita da equipa.
+Os logs de um \emph{host} vão de zero a muito altos quando uma aplicação entra em ciclo de erro: o sistema
+desenha-se para a cauda, não para a média. Os testes de carga usam o perfil da Tabela~\ref{tab:perfil-logs}, uma
+hipótese explícita da equipa.
 
 \begin{table}[htbp]
   \centering\small
@@ -118,22 +109,17 @@ Tabela~\ref{tab:perfil-logs}. Os valores são uma hipótese explícita da equipa
   \end{tabular}
 \end{table}
 
-Cada categoria fica cerca de uma ordem de grandeza acima da anterior, para que meçam comportamentos
-distintos. Os registos são erros de aplicações, não registos de acesso: um erro por segundo, sem parar (86
-mil por dia), já descreve uma aplicação claramente avariada, e é esse o significado de ``ruidoso''. As
-rajadas não entram na média da Tabela~\ref{tab:estimativas}: são o estímulo do cenário \cen{SC5} e
-medem-se à parte. Como o perfil é uma hipótese, a avaliação repete o cenário principal com uma carga de
-logs duas e cinco vezes maior, para mostrar a partir de onde os cenários deixam de ser cumpridos.
+Cada categoria fica uma ordem de grandeza acima da anterior. São erros de aplicações, não acessos: um por segundo
+sem parar (86 mil por dia) já é uma aplicação avariada. As rajadas são o estímulo de \cen{SC5} e não entram na média.
+A avaliação repete o cenário principal com duas e cinco vezes mais logs.
 
-Este perfil revela dois riscos que o desenho original não tratava. No \emph{host}: com o central em baixo,
-uma aplicação ruidosa enche o \emph{buffer} sem limite e, com ele, o disco, e o monitor passa a prejudicar o
-sistema que devia proteger (S9). No central: sem justiça entre \emph{hosts}, um único \emph{host} em rajada
-consome a capacidade de ingestão e atrasa os alertas de todos os outros (S10).
+O perfil revela dois riscos: com o central em baixo, uma aplicação ruidosa enche o \emph{buffer} e o disco do
+\emph{host} (S9); e, sem justiça entre \emph{hosts}, um em rajada pode atrasar os outros (S10).
 
 \subsection{Utility tree}
 
-A Tabela~\ref{tab:utility} apresenta a \emph{utility tree}. Cada folha é um cenário, classificado por
-(valor de negócio, impacto arquitetural) na escala H/M/L~\cite{bastofernandes2026}.
+Na \emph{utility tree} (Tabela~\ref{tab:utility}), cada folha é um cenário classificado por (valor de negócio,
+impacto arquitetural)~\cite{bastofernandes2026}.
 
 \begin{table}[htbp]
   \centering\small
@@ -174,13 +160,12 @@ A Tabela~\ref{tab:utility} apresenta a \emph{utility tree}. Cada folha é um cen
   \end{tabularx}
 \end{table}
 
-Os cenários (H,H) são \cen{SC1}--\cen{SC3}, \cen{SC5}, \cen{MO1}, \cen{AV1} e \cen{SE1}. \cen{AV1} e
-\cen{SE1} já são cumpridos pelo desenho atual e só precisam de ser demonstrados. A escalabilidade é o
-ramo com mais cenários (H,H), e é por isso o eixo das iterações ADD.
+Os (H,H) são \cen{SC1}--\cen{SC3}, \cen{SC5}, \cen{MO1}, \cen{AV1} e \cen{SE1}; \cen{AV1} e \cen{SE1} só
+precisam de ser demonstrados. A escalabilidade, com mais (H,H), é o eixo das iterações ADD.
 
 \subsection{Cenários de qualidade}
 
-A Tabela~\ref{tab:cenarios} detalha, no formato de seis partes, os cenários que a avaliação mede.
+A Tabela~\ref{tab:cenarios} detalha os cenários principais no formato de seis partes.
 
 \begin{table}[htbp]
   \centering\footnotesize
@@ -203,13 +188,9 @@ A Tabela~\ref{tab:cenarios} detalha, no formato de seis partes, os cenários que
 \end{table}
 
 \paragraph{Origem dos números.}
-Os 1\,000 \emph{hosts} são a escala escolhida pela equipa. Os 300~ms são folgados para um POST assíncrono e
-servem de sinal de saturação, não de requisito de latência. Os 15~minutos de \cen{SC2} obrigam a absorver as
-$\approx$435\,000 linhas do \emph{backlog} a $\approx$480 linhas/s, enquanto continuam a chegar as $\approx$120/s
-normais: cerca de cinco vezes o débito nominal, uma margem exigente mas plausível com escritas em lote
-(\dec{5}). O fator 1,8× de \cen{SC3} admite que duas instâncias
-percam 10\,\% para a coordenação; o de 2,5× admite uma perda maior com três. Os limites de \cen{MO1} correspondem a uma alteração confinada a um único
-módulo, que é o que a modificabilidade promete. O \emph{atraso} de \cen{SC1} e \cen{SC5} conta do primeiro
-envio de um lote à sua confirmação, incluindo novas tentativas: é o atraso que o central acrescenta. O
-intervalo de recolha do agente (até 10~s para os erros) é fixo por desenho e fica de fora; contá-lo tornaria
-o limite de 5~s impossível por definição.
+Os 1\,000 \emph{hosts} são a escala escolhida. Os 300~ms são um sinal de saturação, não um requisito de latência.
+Os 15~minutos de \cen{SC2} obrigam a absorver $\approx$435\,000 linhas a $\approx$480/s, além das $\approx$120/s
+normais: cerca de cinco vezes o débito nominal, exigente mas plausível com lotes (\dec{5}). Os fatores de \cen{SC3}
+admitem 10\,\% de perda para a coordenação com duas instâncias e mais com três. Os limites de \cen{MO1} correspondem
+a uma alteração confinada a um módulo. O \emph{atraso} de \cen{SC1} e \cen{SC5} conta do primeiro envio de um lote à
+confirmação, com as novas tentativas; o intervalo de recolha (até 10~s) é fixo por desenho e fica de fora.

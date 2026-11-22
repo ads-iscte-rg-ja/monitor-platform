@@ -42,7 +42,7 @@ Os repositórios consomem uma **versão** do pipeline (tag `v1`, movida delibera
 |---|---|
 | Copiar o pipeline para os 4 repos | 4 cópias divergem; cada mudança tem de ser feita 4 vezes (o mesmo problema que D12 resolve no código) |
 | Workflow reutilizável dentro do `monitor-central` | O CI e os testes de sistema não pertencem ao central; acoplaria a infraestrutura de todos a um componente |
-| **Monorepo** com os 4 repos | Elimina a duplicação de raiz e permite mudanças atómicas ao contrato, mas perde a separação deliberada de módulos (`GOWORK=off` no central, ciclo de vida próprio do SDK), obriga a reescrever o histórico a 3 semanas do prazo e coincide com o trabalho de EUVI no mesmo código. Fica como evolução possível |
+| **Monorepo** com os 4 repos | Elimina a duplicação de raiz e permite mudanças atómicas ao contrato, mas perde a separação deliberada de módulos (`GOWORK=off` no central, ciclo de vida próprio do SDK), obriga a reescrever o histórico a 3 semanas do prazo e coincidiria com outras alterações em curso no mesmo código. Fica como evolução possível |
 | Composite action para o setup do Go | Os passos de setup são 2 linhas; a action acrescentava mais uma referência versionada a manter (YAGNI) |
 
 ## Consequências
