@@ -54,6 +54,53 @@
 \definecolor{parcial}{RGB}{200, 130, 0}
 
 % ---------------------------------------------------------------------------
+% Notação UML e BPMN (estilos TikZ partilhados pelas figuras)
+% ---------------------------------------------------------------------------
+\tikzset{
+  % UML: pacote (pasta com separador); o nome vai no corpo
+  umlpkg/.style={draw=iscte, fill=fundotab, minimum height=7mm, minimum width=22mm, font=\small\ttfamily,
+    align=center, append after command={\pgfextra{\draw[iscte, fill=fundotab]
+      ([yshift=-0.1pt]\tikzlastnode.north west) rectangle ++(6mm,1.6mm);}}},
+  % UML: pacote que contém outros (nome no separador)
+  umlpkgbox/.style={draw=iscte, rounded corners=0pt, inner sep=7pt, append after command={\pgfextra{
+      \node[draw=iscte, fill=white, anchor=south west, font=\small\bfseries\ttfamily, inner sep=2pt,
+        minimum height=4mm] at ([yshift=-0.1pt]\tikzlastnode.north west) {#1};}}},
+  % UML: componente (ícone no canto superior direito)
+  umlcomp/.style={draw=iscte, fill=fundotab, minimum height=9mm, minimum width=22mm, font=\small, align=center,
+    inner sep=3pt, append after command={\pgfextra{
+      \draw[iscte, fill=white] ([xshift=-4.2mm, yshift=-1.2mm]\tikzlastnode.north east) rectangle ++(3mm,-2.6mm);
+      \draw[iscte, fill=white] ([xshift=-5mm, yshift=-1.7mm]\tikzlastnode.north east) rectangle ++(1.6mm,-0.6mm);
+      \draw[iscte, fill=white] ([xshift=-5mm, yshift=-2.9mm]\tikzlastnode.north east) rectangle ++(1.6mm,-0.6mm);}}},
+  % UML: artefacto/base de dados (estereótipo no texto)
+  umlart/.style={draw=iscte, fill=white, minimum height=8mm, minimum width=20mm, font=\small, align=center},
+  % UML: nó de implantação (caixa 3D); o nome é dado por label
+  umlnode/.style={draw=cinza, inner sep=7pt, append after command={\pgfextra{
+      \draw[cinza] (\tikzlastnode.north west) -- ++(2mm,2mm) -| ([xshift=2mm, yshift=2mm]\tikzlastnode.south east)
+        -- (\tikzlastnode.south east);
+      \draw[cinza] (\tikzlastnode.north east) -- ++(2mm,2mm);}}},
+  % UML: classe ou interface com compartimentos
+  umlclass/.style={draw=iscte, fill=fundotab, rectangle split, rectangle split parts=2, font=\scriptsize\ttfamily,
+    align=left, inner sep=3pt},
+  % UML: setas
+  umldep/.style={-{Straight Barb[length=2mm]}, dashed, thick, iscte},           % dependência («use»)
+  umlreal/.style={-{Triangle[open, length=2.5mm, width=2.5mm]}, dashed, thick, iscte}, % realização
+  umlassoc/.style={-{Straight Barb[length=2mm]}, thick, iscte},                % associação navegável / mensagem
+  umlmsg/.style={-{Stealth[length=2mm]}, thick, iscte},                        % mensagem síncrona
+  umlret/.style={-{Straight Barb[length=2mm]}, dashed, iscte},                  % resposta
+  umlconn/.style={thick, iscte},                                               % conector/caminho de comunicação
+  % UML (atividade) e BPMN
+  bpmntask/.style={draw=iscte, fill=fundotab, rounded corners=3pt, minimum height=9mm, minimum width=19mm,
+    text width=18mm, font=\scriptsize, align=center, inner sep=2pt},
+  bpmnstart/.style={circle, draw=iscte, thick, fill=white, minimum size=5mm, inner sep=0pt},
+  bpmnend/.style={circle, draw=iscte, line width=1.8pt, fill=white, minimum size=5mm, inner sep=0pt},
+  bpmngw/.style={diamond, draw=iscte, thick, fill=white, minimum size=7mm, inner sep=0pt, font=\small\bfseries},
+  bpmnflow/.style={-{Stealth[length=2mm]}, thick, iscte},
+  actstart/.style={circle, fill=iscte, minimum size=3.5mm, inner sep=0pt},
+  actend/.style={circle, draw=iscte, thick, fill=white, minimum size=4.5mm, inner sep=0pt,
+    path picture={\fill[iscte] (path picture bounding box.center) circle (1.2mm);}},
+}
+
+% ---------------------------------------------------------------------------
 % Títulos de secção e cabeçalhos
 % ---------------------------------------------------------------------------
 \titleformat{\section}{\Large\bfseries\color{iscte}}{\thesection}{0.8em}{}

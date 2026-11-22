@@ -128,8 +128,7 @@ confirmou cerca de 22\,000 registos/s no minuto de pico, cerca de 180 vezes o re
 Por isso, a base de dados não foi escalada: réplicas de leitura não aumentam a escrita, \emph{sharding} é
 complexidade que nenhum cenário pede, e desligar a sincronização do WAL poria \cen{AV1} em risco, porque o agente
 apaga o que o central confirma. Fica como E9, com o gatilho de um débito sustentado acima de metade do medido.
-\dec{8} vale pela disponibilidade: o central deixa de ser ponto único de falha. O relatório regista a premissa que
-deixou de ser verdadeira, em vez de ajustar o alvo.
+\dec{8} vale pela disponibilidade: o central deixa de ser ponto único de falha.
 
 Na iteração~5, o \emph{dashboard} piorava sob esta carga (4,9~s com uma instância, 9,4~s com três: a admissão é
 por instância). Na versão final fica entre 84 e 194~ms: ingestão (15) e \emph{dashboard} (5, o \emph{bulkhead} de
@@ -158,8 +157,7 @@ Antes, cada execução da retenção chegava a 27~s, à espera das ligações oc
 demora 0,2 a 0,3~s em média (0,48 a 0,78~s no p95), e os expirados descem 727 a 734 mil por hora: remove 2,6 vezes o
 que entra. A ingestão não abrandou com a retenção (iteração~6: 7,4~ms sem ela, 4,9~ms com ela, dentro do ruído).
 Nenhuma das três condições escritas antes no ADR-0017 se verifica, por isso \textbf{não se particionou}; o gatilho
-(E10) usa métricas que já existem. É o resultado mais claro do \emph{generate and test}: o plano previa
-particionar, e a medição mostrou que o problema estava noutro sítio.
+(E10) usa métricas que já existem.
 
 \subsection{Disponibilidade e integridade dos dados}
 \label{sec:av1-av4}
@@ -257,9 +255,9 @@ tudo o que o remote marcou como entregue tem de estar no central uma só vez, e 
 O tempo de recuperação é o do \emph{backoff} do remote: depois de 60~s de falhas seguidas, a espera entre
 tentativas já ia em cerca de 40~s (32 a 48~s, com a variação aleatória); o limite do \emph{backoff} é 5~minutos, que é por isso o
 atraso máximo depois de uma falha longa. Com 1~h em baixo, a entrega completa demorou 202 e 216~s: até 5~minutos de
-espera pela tentativa seguinte, e depois 500 logs e 599 estatísticas em lotes. As duas primeiras execuções usaram o
-código ainda por \emph{commit}; a terceira correu o \texttt{e2e.yml} no GitHub sobre o \texttt{main} de todos os
-repositórios (\texttt{docs/metrics/iter-7/e2e/}). Os duplicados são impossíveis no central por construção (recibos por
+espera pela tentativa seguinte, e depois 500 logs e 599 estatísticas em lotes. As duas primeiras execuções foram locais; a
+terceira correu o \texttt{e2e.yml} no GitHub sobre o \texttt{main} de todos os repositórios
+(\texttt{docs/metrics/iter-7/e2e/}). Os duplicados são impossíveis no central por construção (recibos por
 \emph{host} e identificador de origem); o que o teste prova é que o remote não cria identificadores novos ao repetir
 um envio e que não marca como entregue nada que o central não tenha gravado. \cen{AV1} cumpre-se.
 
@@ -324,9 +322,8 @@ Experiência controlada numa cópia descartável do central (\texttt{docs/metric
 apresentação típicas, escolhidas antes de ver o código (no \emph{dashboard}, os incidentes abertos em primeiro e os
 erros críticos de hoje; na página de erros, o nível como \emph{badge} colorido e uma coluna para o ambiente).
 Tocaram quatro ficheiros, todos em \texttt{frontend/}, e nenhum Go: \textbf{0 alterações em \texttt{services} e
-\texttt{repositories}}; os testes dos \emph{handlers} passaram. \cen{MO3} cumpre-se. O histórico do git não serve de
-medida, porque os \emph{commits} juntam alterações de várias naturezas; e uma página que precise de um dado novo já
-não é só apresentação.
+\texttt{repositories}}; os testes dos \emph{handlers} passaram. \cen{MO3} cumpre-se; uma página que precise de um dado
+novo já não é só apresentação.
 
 \paragraph{\cen{IO1}: um agente noutra linguagem.}
 O gerador de carga de \dec{10} é esse agente: JavaScript para o k6, que só usa o \texttt{.proto} do
@@ -344,7 +341,7 @@ do gRPC, de \dec{4} e de \dec{5}--\dec{6} por cobertura nova abaixo de 80\,\%; n
 \cen{TE1} cumpre-se.
 
 \paragraph{\cen{TE2} e \cen{TE3}: \emph{handlers} e tempo.}
-Com \dec{14}, a cobertura dos \emph{handlers} passou de 9,5\,\% para 95,6\,\% (alvo $\ge$ 60\,\%), em testes de
+Com \dec{14}, a cobertura unitária dos \emph{handlers} passou de 9,5\,\% para 95,6\,\% (alvo $\ge$ 60\,\%), em testes de
 0,2~s sem base de dados. Os \texttt{time.Sleep} nos testes passaram de 1 para 0. O resumo diário é testado em seis
 casos com relógio e fuso controlados (antes, às e depois das 9~h, fim do mês, mudança de hora, outro fuso).
 \cen{TE2} e \cen{TE3} cumprem-se.
@@ -358,8 +355,7 @@ testes unitários têm de apanhar: dos 265 executados, 211 foram mortos, uma efi
 linhas sem testes unitários (\texttt{docs/metrics/iter-7/mutacao.md}). Mostrou o que a cobertura esconde: 23 dos 54
 sobreviventes eram limites na validação da ingestão (\texttt{>} trocado por \texttt{>=}), em linhas cobertas, mas
 sem nenhum teste no valor exato. Um teste de tabela com cada limite e um passo além, sem mudar produção, levou a
-eficácia a 87,9\,\% (233 mortos); na ingestão fica um sobrevivente, equivalente. É uma métrica de tendência, lenta
-demais para \emph{gate}.
+eficácia a 87,9\,\% (233 mortos); na ingestão fica um sobrevivente, equivalente.
 
 \subsection{Monitorabilidade}
 \label{sec:mn}

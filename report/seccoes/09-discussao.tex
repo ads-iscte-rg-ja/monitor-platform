@@ -13,6 +13,10 @@ e \dec{5} e \dec{6} resolveram-nos. Mas o limite seguinte era a base de dados, n
 instâncias, o débito subiu 1,01 e, no máximo, 1,04 vezes (\cen{SC3}). Registou-se o resultado e o gatilho E9, sem ajustar o
 alvo.
 
+\paragraph{Um \emph{trade-off} previsto não apareceu.}
+O controlo de admissão devia tornar a recuperação mais lenta; tornou-a mais rápida (42 a 44~s, contra
+1,4~minutos), porque limitar a concorrência eliminou a contenção no \emph{pool} (secção~\ref{sec:aval-escala}).
+
 \paragraph{Um risco previsto não se verificou.}
 O vizinho ruidoso (S10) parecia o risco mais provável; medido, os restantes \emph{hosts} mantiveram 5~ms
 (\cen{SC5}). A justiça por \emph{host} não foi implementada, e o ADR-0006 regista porquê.
@@ -36,8 +40,6 @@ mesma transação) e o estrangulamento das escritas e ponto único de falha (ADR
 apagados (40~GB em 30 dias, E11);
 \item o limite do \emph{buffer} protege o disco do \emph{host}, mas perde INFO e WARN, contados e reportados, quando
 a falha é longa (\dec{19});
-\item o estilo em camadas é simples, mas espalha cada funcionalidade por três camadas; o microkernel dos alertas
-resolveu-o onde mais custava (\cen{MO1});
 \item o controlo de admissão e o \emph{bulkhead} protegem o central rejeitando trabalho, que os agentes repetem
 mais tarde: o sistema troca latência por estabilidade.
 \end{itemize}
@@ -68,8 +70,8 @@ provocadas, \cen{MO3} com uma experiência controlada.
 Na iteração~7, cada cenário de carga correu três vezes; nas anteriores, uma. Três execuções mostram o ruído, mas
 não estimam a variância. O que mais variou foi a latência do \emph{dashboard}: com 30 dias, as métricas de 24~h e
 de um mês (15 a 166 e 188 a 652~ms no p95); durante \cen{SC2}, 44 a 168~ms; sob \cen{SC3}, 84 a 194~ms. Débito,
-rejeições e contagens variaram pouco (\cen{SC3}: menos de 2\,\%), e nenhum veredicto mudou entre execuções. As comparações com iterações anteriores têm uma só execução do lado de lá,
-mas as conclusões assentam em diferenças muito maiores do que o ruído (de segundos para milissegundos, ou de 1,0
+rejeições e contagens variaram pouco (\cen{SC3}: menos de 2\,\%), e nenhum veredicto mudou entre execuções. As comparações com iterações anteriores têm
+uma só execução do lado de lá, mas as conclusões assentam em diferenças muito maiores do que o ruído (de segundos para milissegundos, ou de 1,0
 para 1,8 vezes).
 
 \paragraph{A equipa mediu o seu próprio trabalho.}

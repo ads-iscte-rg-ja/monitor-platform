@@ -35,6 +35,11 @@ A ordem segue as dependências: D13 cria o mecanismo que MO1 mede; D19 produz os
 D17 reporta; D17 traz o dado (quarentena) que dá a métrica nova de MO1; o E2E de D15 usa D16 e D17. Os passos
 6–9 são independentes entre si.
 
+**Gestão do projeto (22/11):** o quadro público do projeto está no GitHub Projects,
+<https://github.com/orgs/ads-iscte-rg-ja/projects/1>: um item por decisão e por medição, com a iteração ADD, os
+cenários, o ADR e os PR que o fecharam. O processo (iterativo, inspirado no Scrum, com a definição de feito abaixo)
+está no relatório, §6.6, com o diagrama BPMN.
+
 ## Definição de "feito" (vale para todos os passos)
 
 1. **ADR antes do código**, com o modelo `adr/0000-modelo.md`: contexto com números, decisão, teoria (táticas e
@@ -211,7 +216,7 @@ Por ordem de valor (detalhe em D20 e na revisão de D1, no plano):
   repositórios medidos e com CI), separadores de milhares e *host* em itálico uniformizados. READMEs: central
   (retenção ligada por omissão, *bulkhead*, esquema 8) e SDK (v0.2.0).
 * **E2E de 1 h a partir do `main`:** corrido no GitHub a 22/11 (run 45014597006), todos os cenários passaram
-  (`docs/metrics/iter-7/e2e/`). O agendamento noturno ainda não disparou; as menções a outro trabalho nos ADR-0001/0002 e no plano foram retiradas (22/11).
+  (`docs/metrics/iter-7/e2e/`). O agendamento noturno também já correu (22/11, run 45016898494, sucesso); as menções a outro trabalho nos ADR-0001/0002 e no plano foram retiradas (22/11).
 * **Carga repetida:** todos os cenários correram mais duas vezes (22/11, `docs/metrics/iter-7/repeticao-2` e `-3`,
   sem falhas); `tabelas.py --repeticoes` dá o mínimo–máximo das três execuções nas tabelas. Nenhum veredicto mudou;
   o que mais variou foi a latência do *dashboard* (SC4 métricas de 1 mês 188–652 ms, SC2 44–168 ms). Texto dos

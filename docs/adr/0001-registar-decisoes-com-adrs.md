@@ -53,3 +53,7 @@ Cada decisão D1–D19 do plano tem um ADR aceite antes da entrega (9/12/2026).
   duas pessoas, uma revisão obrigatória bloquearia o trabalho sempre que uma delas não estivesse disponível; a
   proteção do `main` exige CI verde mas 0 aprovações (relatório, §5.3). A decisão deste ADR (registar as decisões
   em ADRs) não muda.
+* **2026-11-22, correção:** as figuras do relatório passaram a usar UML (pacotes, componentes e implantação,
+  classes, sequência, atividade) e o processo de desenvolvimento BPMN, as notações habituais pedidas no enunciado,
+  em vez de caixas e setas com legenda. A alternativa rejeitada continua a sê-lo: não se mantém um modelo UML
+  completo do código, só os diagramas das vistas. A decisão deste ADR não muda.

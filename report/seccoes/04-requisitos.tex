@@ -18,20 +18,16 @@ A ordem da Tabela~\ref{tab:ranking} decide onde se investe o tempo e que lado ga
     \midrule
     1 & Scalability & Alta & G3. É também o atributo com mais impacto arquitetural: passar de uma para N instâncias, ou de tabelas simples para particionadas, é caro de fazer tarde \\
     2 & Modifiability & Alta & G4. A maior parte do custo do software ocorre depois da primeira versão~\cite{bastofernandes2026}; aqui a mudança é garantida, porque o sistema continua a ser desenvolvido e a interface é a parte que mais muda \\
-    3 & Availability (com integridade dos dados) & Alta & G1, G2. Num monitor é um requisito do domínio. Já está quase toda implementada: o trabalho é prová-la e não a perder ao escalar \\
+    3 & Availability (com integridade dos dados) & Alta & G1, G2. Num monitor é um requisito do domínio, e já estava quase toda implementada \\
     4 & Testability & Alta (habilitador) & Não é um fim: é o que permite mudar e escalar sem regressões. Os testes de integração partidos sem ninguém saber mostraram o risco \\
     5 & Monitorability & Média-alta & Sem medições não se demonstra escalabilidade, e o monitor tem de mostrar as suas próprias perdas \\
     6 & Security & Média & G5. A base já é sólida (HMAC, CSRF, bcrypt, auditoria) e o sistema não guarda dados pessoais sensíveis. Avalia-se por \emph{checklist} \\
-    7 & Performance & Média, subordinada & A telemetria é assíncrona: interessa o débito sob carga crescente, medido como escalabilidade, e a latência do \emph{dashboard} \\
+    7 & Performance & Média, subordinada & A telemetria é assíncrona: ninguém distingue 50 de 200~ms na ingestão de uma amostra; interessa o débito sob carga crescente, medido como escalabilidade, e a latência do \emph{dashboard} \\
     8 & Interoperability & Baixa-média & Há um único agente. O contrato fica documentado para agentes futuros \\
-    9 & Usability & Baixa & Fora do âmbito deste trabalho; garante-se apenas o suporte arquitetural: a separação MVC \\
+    9 & Usability & Baixa & Fora do âmbito de um trabalho de arquitetura; garante-se só o suporte: a separação MVC (\cen{MO3}) \\
     \bottomrule
   \end{tabularx}
 \end{table}
-
-A performance não é prioridade própria: um operador não distingue 50 de 200~ms na ingestão de uma amostra; o que
-importa é o débito acompanhar os \emph{hosts}, e isso é escalabilidade. A usabilidade fica fora do âmbito de um
-trabalho de arquitetura, que lhe dá só o suporte: a separação MVC (\cen{MO3}).
 
 \subsection{Trade-offs explícitos}
 

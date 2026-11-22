@@ -6,8 +6,10 @@ arquitetura, o primeiro passo foi uma \textbf{reconstrução} (secção~\ref{sec
 código, do grafo de \emph{imports} e da primeira execução do \texttt{depguard}, que confirmou a leitura. As vistas
 finais estão na secção~\ref{sec:d20}.
 
-A notação é \textbf{informal com legenda}, por custo e benefício (ADR-0001). O que precisa de ser exato usa notações
-verificáveis por máquina: o contrato em Protocol Buffers (\texttt{buf}) e as camadas no \texttt{depguard}.
+As vistas usam \textbf{UML} (pacotes, componentes e implantação, classes, sequência e atividade) e o processo de
+desenvolvimento \textbf{BPMN} (secção~\ref{sec:processo}), só onde dão retorno (ADR-0001). O que precisa de ser
+exato usa notações verificáveis por máquina: o contrato em Protocol Buffers (\texttt{buf}) e as camadas no
+\texttt{depguard}.
 
 \subsection{Vista de módulos}
 
@@ -18,55 +20,52 @@ do \emph{buffer} (\texttt{repository}) e envia pelo cliente (\texttt{requests}),
 
 \begin{figure}[htbp]
   \centering
-  \begin{tikzpicture}[
-      mod/.style={draw=iscte, fill=fundotab, rounded corners=2pt, minimum height=7mm,
-                  minimum width=22mm, font=\small\ttfamily, align=center},
-      dado/.style={mod, fill=white, dashed},
-      usa/.style={-{Stealth[length=2mm]}, thick, iscte},
-      partilha/.style={-{Stealth[length=2mm]}, thick, dashed, acento},
-      grupo/.style={draw=cinza, rounded corners=4pt, inner sep=8pt}]
-    % central
-    \node[mod] (srv) {server};
-    \node[mod, below=6mm of srv] (h) {handlers};
-    \node[mod, below=6mm of h] (s) {services};
-    \node[mod, below=6mm of s] (r) {repositories};
-    \node[dado, below=6mm of r] (pg) {database\\[-1pt]{\scriptsize\rmfamily (PostgreSQL)}};
-    \node[mod, left=6mm of s] (mw) {middleware};
-    \draw[usa] (srv) -- (h);
-    \draw[usa] (h) -- (s);
-    \draw[usa] (s) -- (r);
-    \draw[usa] (r) -- (pg);
-    \draw[usa] (mw) -- (s);
-    \draw[usa, red!70!black] (h.east) to[bend left=40] node[right, font=\scriptsize, text=red!70!black] {violação} (pg.east);
-    \node[grupo, fit=(srv)(h)(s)(r)(pg)(mw), label={[font=\small\bfseries]above:monitor-central}] {};
-    % remote
-    \node[mod, right=48mm of srv] (ag) {cmd/agent};
-    \node[mod, below=6mm of ag] (snd) {sender};
-    \node[mod, below left=6mm and -4mm of snd] (req) {requests};
-    \node[mod, below right=6mm and -4mm of snd] (rep) {repository};
-    \node[dado, below=6mm of rep] (lite) {SQLite};
-    \node[mod, right=6mm of ag] (col) {collect};
-    \draw[usa] (ag) -- (snd);
-    \draw[usa] (ag) -- (col);
-    \draw[usa] (snd) -- (req);
-    \draw[usa] (snd) -- (rep);
-    \draw[usa] (rep) -- (lite);
-    \node[grupo, fit=(ag)(snd)(req)(rep)(lite)(col), label={[font=\small\bfseries]above:monitor-remote}] {};
-    % sdk
-    \node[mod, below=10mm of lite] (sdk) {monitor-go-sdk};
-    \node[mod, left=8mm of sdk] (hw) {hello-world};
-    \draw[usa] (hw) -- (sdk);
-    \draw[partilha] (sdk) -- node[right, font=\scriptsize] {escreve no esquema} (lite);
+  \begin{tikzpicture}[node distance=7mm]
+    % monitor-central
+    \node[umlpkg] (srv) {server};
+    \node[umlpkg, below=of srv] (h) {handlers};
+    \node[umlpkg, below=of h] (s) {services};
+    \node[umlpkg, below=of s] (r) {repositories};
+    \node[umlpkg, below=of r] (db) {database};
+    \node[umlpkg, left=6mm of s] (mw) {middleware};
+    \node[umlpkg, left=6mm of r] (mod) {models};
+    \draw[umldep] (srv) -- (h);
+    \draw[umldep] (h) -- (s);
+    \draw[umldep] (s) -- (r);
+    \draw[umldep] (r) -- (db);
+    \draw[umldep] (mw) -- (s);
+    \draw[umldep] (r) -- (mod);
+    \draw[umldep, mau] (h.east) to[bend left=45] node[right, font=\scriptsize, text=mau, align=left] {«use»\\violação} (db.east);
+    \node[umlpkgbox=monitor-central, fit=(srv)(h)(s)(r)(db)(mw)(mod), inner sep=9pt] (central) {};
+    % monitor-remote
+    \node[umlpkg, right=44mm of srv] (ag) {cmd/agent};
+    \node[umlpkg, below=of ag] (snd) {sender};
+    \node[umlpkg, below left=7mm and -5mm of snd] (req) {requests};
+    \node[umlpkg, below right=7mm and -5mm of snd] (rep) {repository};
+    \node[umlpkg, right=5mm of ag] (col) {collect};
+    \draw[umldep] (ag) -- (snd);
+    \draw[umldep] (ag) -- (col);
+    \draw[umldep] (snd) -- (req);
+    \draw[umldep] (snd) -- (rep);
+    \node[umlpkgbox=monitor-remote, fit=(ag)(snd)(req)(rep)(col), inner sep=9pt] (remote) {};
+    % buffer e SDK
+    \node[umlart, below=12mm of rep] (lite) {«database»\\ \emph{buffer} SQLite};
+    \draw[umldep] (rep) -- (lite);
+    \node[umlpkg, below=12mm of lite, xshift=-6mm] (sdk) {monitor-go-sdk};
+    \node[umlpkg, left=10mm of sdk] (hw) {hello-world};
+    \draw[umldep] (hw) -- (sdk);
+    \draw[umldep, acento] (sdk) -- node[right, font=\scriptsize] {«escreve no esquema»} (lite);
+    \node[umlart, below=12mm of db] (pg) {«database»\\ PostgreSQL};
+    \draw[umldep] (db) -- (pg);
   \end{tikzpicture}
-  \caption{Vista de módulos da iteração~0 (decomposição e uso). Legenda: caixa = pacote Go; caixa a tracejado =
-base de dados; seta cheia = ``usa'' (\emph{import}); seta a vermelho = a única violação de camadas encontrada;
-seta a tracejado = dependência de dados entre o SDK e o remote, que não aparece em nenhum \emph{import}.}
+  \caption{Vista de módulos da iteração~0, em diagrama de pacotes UML. Seta a tracejado = dependência
+(\texttt{import}); a vermelho, a única violação de camadas encontrada; a azul, a dependência de dados entre o SDK
+e o remote, que não aparece em nenhum \texttt{import}.}
   \label{fig:modulos}
 \end{figure}
 
 As camadas eram só convenção; passaram a regras \texttt{depguard} verificadas em cada PR
-(secção~\ref{sec:pipeline}). A primeira execução encontrou uma só violação, \texttt{handlers/health.go} a usar
-\texttt{database}, corrigida na iteração~1.
+(secção~\ref{sec:pipeline}), e a violação da figura foi corrigida na iteração~1.
 
 A dependência mais importante não é um \emph{import}: o SDK escreve nas tabelas do \emph{buffer}, cujo esquema
 pertence ao remote (Shared-Data), e por isso verifica-se por testes (secção~\ref{sec:pipeline}).
@@ -152,7 +151,7 @@ na escalabilidade e na manutenção.
 \subsection{Lacunas identificadas}
 \label{sec:lacunas}
 
-A análise do código, as estimativas e a baseline identificaram as lacunas da Tabela~\ref{tab:lacunas}, que o
+A análise do código, as estimativas e a \emph{baseline} identificaram as lacunas da Tabela~\ref{tab:lacunas}, que o
 capítulo~\ref{sec:decisoes} trata.
 
 \begin{table}[htbp]
