@@ -26,59 +26,93 @@ quem serve pedidos de quem corre \emph{jobs};
 \item a comunicação é \textbf{síncrona por pedido} entre o agente e o central (gRPC), mas \textbf{assíncrona para a
 aplicação}, que só escreve no \emph{buffer} local.
 \end{itemize}
-A Figura~\ref{fig:cc-final} junta as vistas finais de componentes e conectores e de alocação.
+A Figura~\ref{fig:cc-final} junta as vistas finais de componentes e conectores e de alocação, e a
+Figura~\ref{fig:seq-entrega} mostra o comportamento no caminho crítico, a entrega de um lote.
 
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
-  comp/.style={draw=iscte, fill=fundotab, rounded corners=2pt, minimum height=7mm, minimum width=20mm,
-    font=\small, align=center},
-  dado/.style={comp, fill=white, dashed},
-  ext/.style={comp, fill=white},
-  liga/.style={-{Stealth[length=2mm]}, thick, iscte},
-  dados/.style={-{Stealth[length=2mm]}, thick, dashed, acento},
-  no/.style={draw=cinza, rounded corners=4pt, inner sep=6pt},
-  pt/.style={circle, draw=mau, text=mau, font=\scriptsize\bfseries, inner sep=1pt, minimum size=4mm}]
+  lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
+  pt/.style={circle, draw=mau, text=mau, font=\scriptsize\bfseries, fill=white, inner sep=1pt, minimum size=4mm}]
   % host monitorizado
-  \node[comp] (app) {Aplicação\\[-1pt]{\scriptsize + SDK}};
-  \node[dado, below=7mm of app] (buf) {\emph{buffer}\\[-1pt]{\scriptsize SQLite (WAL)}};
-  \node[comp, below=7mm of buf] (rem) {monitor-remote\\[-1pt]{\scriptsize recolha, envio}};
-  \draw[dados] (app) -- node[left, font=\scriptsize] {escreve} (buf);
-  \draw[dados] (rem) -- node[left, font=\scriptsize] {lê, marca} (buf);
-  \node[no, fit=(app)(buf)(rem), label={[font=\small\bfseries]above:\emph{host} (×1\,000)}] (host) {};
-  % central
-  \node[comp, right=34mm of buf] (nginx) {nginx\\[-1pt]{\scriptsize balanceador}};
-  \node[comp, right=8mm of nginx, yshift=10mm] (c1) {central 1\\[-1pt]{\scriptsize HTTP, gRPC, \emph{jobs}}};
-  \node[comp, right=8mm of nginx, yshift=-10mm] (c2) {central N\\[-1pt]{\scriptsize líder por \emph{job}}};
-  \node[dado, right=10mm of c1, yshift=-10mm] (pg) {PostgreSQL~16\\[-1pt]{\scriptsize telemetria}\\[-2pt]{\scriptsize recibos, \emph{outbox}}};
-  \draw[liga] (nginx) -- (c1);
-  \draw[liga] (nginx) -- (c2);
-  \draw[liga] (c1) -- (pg);
-  \draw[liga] (c2) -- (pg);
-  \node[ext, below=8mm of c2] (prom) {Prometheus};
-  \draw[liga, dashed] (prom) -- node[left, font=\scriptsize] {recolhe} (c2);
-  \node[no, fit=(nginx)(c1)(c2)(pg), label={[font=\small\bfseries, anchor=north east]south east:servidor central (Compose)}] (srv) {};
-  \draw[liga] (rem.east) -| node[pos=0.3, below, font=\scriptsize, align=center] {gRPC, lotes\\\texttt{monitor-api}} (nginx.south);
+  \node[umlcomp] (app) {Aplicação\\[-1pt]{\scriptsize + SDK}};
+  \node[umlart, below=8mm of app] (buf) {«database»\\[-1pt]{\scriptsize \emph{buffer} SQLite}};
+  \node[umlcomp, below=8mm of buf] (rem) {monitor-remote};
+  \draw[umldep] (app) -- node[lbl, left] {escreve} (buf);
+  \draw[umldep] (rem) -- node[lbl, left] {lê, marca} (buf);
+  \node[umlnode, fit=(app)(buf)(rem), label={[font=\scriptsize\bfseries, align=center]above:«device»\\\emph{host} [1\,000]}] (host) {};
+  % servidor central
+  \node[umlcomp, right=30mm of buf] (nginx) {nginx\\[-1pt]{\scriptsize balanceador}};
+  \node[umlcomp, right=8mm of nginx] (c) {central [N]\\[-1pt]{\scriptsize HTTP, gRPC, \emph{jobs}}};
+  \node[umlart, right=8mm of c] (pg) {«database»\\[-1pt]{\scriptsize PostgreSQL 16}};
+  \node[umlcomp, below=9mm of c] (prom) {Prometheus};
+  \draw[umlconn] (nginx) -- (c);
+  \draw[umlconn] (c) -- node[lbl, above] {SQL} (pg);
+  \draw[umldep] (prom) -- node[lbl, right] {\texttt{/metrics}} (c);
+  \node[umlnode, fit=(nginx)(c)(pg)(prom), label={[font=\scriptsize\bfseries, align=center]below:«device» servidor central\\«executionEnvironment» Docker Compose}] (srv) {};
   % externos
-  \node[ext, above=24mm of nginx] (br) {\emph{browser}};
-  \node[ext, above=14mm of pg] (smtp) {SMTP};
-  \draw[liga] (br) -- node[right, font=\scriptsize, pos=0.3] {HTTPS} (nginx);
-  \draw[liga] (c1.north) |- (smtp.west);
-  \draw[liga, dashed] (c1.west) to[bend right=10] node[above, font=\scriptsize, pos=0.4] {\emph{probe}} (app.east);
+  \node[umlnode, above=17mm of nginx, font=\small] (br) {\emph{browser}};
+  \node[umlnode, above=17mm of pg, font=\small] (smtp) {servidor SMTP};
+  \draw[umlconn] (br) -- node[lbl, right] {HTTPS} (nginx);
+  \draw[umlconn] (c) |- node[lbl, pos=0.75, above] {SMTP} (smtp);
+  \draw[umlconn] (rem.east) -| node[lbl, pos=0.25, below, align=center] {gRPC/TLS, lotes\\(\texttt{monitor-api})} (nginx.south);
+  \draw[umldep] (c.north west) to[bend right=12] node[lbl, pos=0.55, above] {\emph{probe} HTTP} (app.east);
   % pontos das vistas de qualidade
-  \node[pt] at ($(app.north east)+(1mm,1mm)$) {1};
+  \node[pt] at ($(app.north west)+(-1mm,1mm)$) {1};
   \node[pt] at ($(rem.south east)+(1mm,-1mm)$) {2};
   \node[pt] at ($(nginx.south west)+(-1mm,-1mm)$) {3};
-  \node[pt] at ($(c1.north east)+(1mm,1mm)$) {4};
+  \node[pt] at ($(c.south east)+(1mm,-1mm)$) {4};
   \node[pt] at ($(pg.south east)+(1mm,-1mm)$) {5};
   \node[pt] at ($(smtp.north east)+(1mm,1mm)$) {6};
 \end{tikzpicture}
-\caption{Arquitetura final: componentes e conectores sobre os nós de \emph{deployment}. Legenda: caixa = componente
-em execução; caixa a tracejado = base de dados; caixa branca = externo; moldura cinzenta = nó; seta cheia =
-chamada; seta a tracejado azul = dados partilhados; seta a tracejado escuro = verificação
-periódica (a \emph{probe} do central a cada \emph{host}; a recolha de métricas do Prometheus); círculo
-vermelho = ponto das vistas de qualidade (Tabelas~\ref{tab:vista-disp} e~\ref{tab:vista-seg}).}
+\caption{Arquitetura final em diagrama de implantação UML: componentes sobre os nós. Linha cheia = caminho de
+comunicação, com o protocolo; seta a tracejado = dependência (leitura e escrita no \emph{buffer}, \emph{probe} de
+saúde, recolha de métricas); [N] = multiplicidade; círculo vermelho = ponto das vistas de qualidade
+(Tabelas~\ref{tab:vista-disp} e~\ref{tab:vista-seg}).}
 \label{fig:cc-final}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  obj/.style={draw=iscte, fill=fundotab, font=\scriptsize, minimum height=6mm, inner sep=2pt, align=center},
+  m/.style={font=\scriptsize, above, inner sep=1pt},
+  y=-5.6mm]
+  % participantes (x em cm)
+  \foreach \x/\n/\t in {0/app/{:Aplicação\\[-2pt](SDK)}, 3/buf/{:\emph{buffer}\\[-2pt]SQLite}, 6.2/rem/{:monitor-remote},
+                       10/cen/{:central}, 13.6/pg/{:PostgreSQL}}
+    {\node[obj] (\n) at (\x,0) {\t};
+     \draw[dashed, cinza] (\n.south) -- (\x,16.3);}
+  % ativações (por baixo das mensagens)
+  \foreach \x/\a/\b in {3/1.4/1.95, 3/2.8/3.6, 6.2/2.8/14.4, 10/4.6/6.9, 10/10.3/13.2, 13.6/10.3/12.4}
+    \fill[white, draw=iscte] (\x-0.07,\a) rectangle (\x+0.07,\b);
+  % mensagens
+  \draw[umlmsg] (0,1.4) -- node[m] {registar(erro)} (3,1.4);
+  \node[font=\tiny, text=cinza, anchor=west] at (0.1,1.9) {numa transação};
+  \draw[umlmsg] (6.2,2.8) -- node[m] {pendentes(100)} (3,2.8);
+  \draw[umlret] (3,3.6) -- node[m] {lote} (6.2,3.6);
+  \draw[umlmsg] (6.2,4.6) -- node[m] {IngestErrors(lote) \quad gRPC} (10,4.6);
+  % fragmento alt
+  \draw[iscte] (4.4,5.3) rectangle (14.4,15.4);
+  \node[draw=iscte, fill=white, font=\scriptsize\bfseries, anchor=north west, inner sep=2pt] at (4.4,5.3) {alt};
+  \node[font=\scriptsize, anchor=west] at (6.45,5.8) {[admissão cheia, \dec{6}]};
+  \draw[umlret] (10,6.9) -- node[m] {\texttt{RESOURCE\_EXHAUSTED}} (6.2,6.9);
+  \draw[umlmsg] (6.2,7.7) -- ++(0.7,0) -- ++(0,0.8) node[font=\scriptsize, right, pos=0.5] {espera o \texttt{RetryInfo} e repete} -- ++(-0.7,0);
+  \draw[dashed, iscte] (4.4,9.3) -- (14.4,9.3);
+  \node[font=\scriptsize, anchor=west] at (6.45,9.8) {[admitido]};
+  \draw[umlmsg] (10,10.3) -- node[m] {recibos, \texttt{ON CONFLICT}} (13.6,10.3);
+  \draw[umlret] (13.6,11.1) -- node[m] {só os novos} (10,11.1);
+  \draw[umlmsg] (10,12.1) -- node[m] {registos novos; \texttt{COMMIT}} (13.6,12.1);
+  \draw[umlret] (10,13.2) -- node[m] {OK (identificadores)} (6.2,13.2);
+  \draw[umlmsg] (6.2,14.4) -- node[m] {marcar entregues} (3,14.4);
+  % nota
+  \node[draw=cinza, fill=white, font=\tiny, text width=29mm, align=left, anchor=north west] (nota) at (-0.3,10.2)
+    {Um reenvio (resposta perdida, \emph{timeout}) devolve os mesmos identificadores, sem duplicar: recibo e registo
+     estão na mesma transação (ADR-0020).};
+\end{tikzpicture}
+\caption{Entrega de um lote, em diagrama de sequência UML: o caminho de \cen{AV1} e \cen{SC2}, com as escritas em
+lote de \dec{5} (três \emph{statements} por lote) e o controlo de admissão de \dec{6}.}
+\label{fig:seq-entrega}
 \end{figure}
 
 A vista de módulos final (Tabela~\ref{tab:modulos-final}) resume as regras do \texttt{depguard} verificadas em cada
@@ -574,8 +608,8 @@ A avaliação faz uma consulta por métrica (seis), \emph{set-based} (\dec{5}), 
   \begin{tikzpicture}[
       cls/.style={draw=iscte, fill=fundotab, rectangle split, rectangle split parts=2,
                   font=\scriptsize\ttfamily, align=left, inner sep=3pt},
-      cliente/.style={draw=iscte, fill=white, rounded corners=2pt, font=\scriptsize\ttfamily, minimum height=6mm},
-      usa/.style={-{Stealth[length=2mm]}, thick, iscte},
+      cliente/.style={draw=iscte, fill=white, font=\scriptsize\ttfamily, minimum height=6mm},
+      usa/.style={umldep},
       impl/.style={-{Triangle[open, length=2.5mm, width=2.5mm]}, thick, dashed, iscte}]
     \node[cls] (metric) {\textbf{«interface» Metric}
       \nodepart{second} Name(), Help()\\ValidThreshold(t)\\Breached(cond, v, t)\\Format(v), FormatThreshold(cond, t)\\Query() (sql, args)};
@@ -585,16 +619,17 @@ A avaliação faz uma consulta por métrica (seis), \emph{set-based} (\dec{5}), 
     \draw[impl] (machine.north) -- (metric.south west);
     \draw[impl] (errors.north) -- (metric.south);
     \draw[impl] (offline.north) -- (metric.south east);
-    \node[cliente, left=18mm of metric] (reg) {registo: Lookup, All, Names};
-    \draw[usa] (reg) -- node[above, font=\scriptsize\rmfamily] {devolve} (metric);
+    \node[cls, left=16mm of metric] (reg) {registry\nodepart{second}Lookup(name) Metric\\All() []Metric\\Names() []string};
+    \draw[usa] (reg) -- node[above, font=\scriptsize\rmfamily] {«create»} (metric);
     \node[cliente, above=7mm of reg.north west, anchor=south west] (svc) {AlertsService};
     \node[cliente, right=3mm of svc] (repo) {AlertsRepository};
-    \node[cliente, right=3mm of repo] (form) {formulário};
+    \node[cliente, right=3mm of repo] (form) {«template» alerts};
     \draw[usa] (svc) -- (reg);
     \draw[usa] (repo) -- (reg);
     \draw[usa] (form) -- (reg);
   \end{tikzpicture}
-  \caption{\dec{13}: as métricas de alerta como estratégias, obtidas pelo nome a partir de um registo}
+  \caption{\dec{13} em diagrama de classes UML: as métricas de alerta como estratégias (realização a tracejado com
+triângulo), obtidas pelo nome a partir de um registo; seta a tracejado aberta = dependência («use»).}
   \label{fig:d13}
 \end{figure}
 
@@ -749,23 +784,37 @@ e \dec{17} reporta os contadores.
 \begin{figure}[htbp]
   \centering
   \begin{tikzpicture}[
-      fase/.style={draw=iscte, fill=fundotab, rounded corners=2pt, font=\scriptsize, minimum height=6mm,
+      act/.style={draw=iscte, fill=fundotab, rounded corners=4pt, font=\scriptsize, minimum height=6mm,
                    inner sep=3pt, align=center},
+      g/.style={font=\scriptsize, inner sep=1pt},
       seta/.style={-{Stealth[length=2mm]}, thick, iscte}]
-    \node[fase] (a) {entregues\\(não é perda)};
-    \node[fase, right=4mm of a] (b) {INFO};
-    \node[fase, right=4mm of b] (c) {WARN};
-    \node[fase, right=4mm of c] (d) {estatísticas};
-    \node[fase, below=9mm of a] (e) {quarentena};
-    \node[fase, right=4mm of e] (f) {ERROR};
-    \node[fase, right=4mm of f] (g) {CRITICAL};
-    \node[fase, right=4mm of g] (h) {PANIC};
-    \node[fase, right=6mm of h, fill=white] (ev) {evento\\CRITICAL};
-    \foreach \x/\y in {a/b, b/c, c/d, e/f, f/g, g/h, h/ev} \draw[seta] (\x) -- (\y);
-    \node[font=\scriptsize, anchor=west] at ($(d.east)+(3mm,0)$) {acima do limite suave, até 90\,\%};
-    \node[font=\scriptsize, anchor=south west] at ($(e.north west)+(0,0.5mm)$) {só se ainda acima do limite rígido, até 90\,\%};
+    \node[actstart] (i) {};
+    \node[act, right=4mm of i] (m) {medir o tamanho\\(páginas em uso)};
+    \node[bpmngw, right=5mm of m] (d1) {};
+    \node[act, right=13mm of d1] (a) {entregues\\(não é perda)};
+    \node[act, right=3mm of a] (b) {INFO};
+    \node[act, right=3mm of b] (c) {WARN};
+    \node[act, right=3mm of c] (e) {estatísticas\\pendentes};
+    \node[bpmngw, below=8mm of e] (d2) {};
+    \node[act, left=15mm of d2] (q) {quarentena};
+    \node[act, left=3mm of q] (f) {ERROR};
+    \node[act, left=3mm of f] (cr) {CRITICAL};
+    \node[act, left=3mm of cr] (pa) {PANIC};
+    \node[act, left=4mm of pa, fill=white] (ev) {registar um\\evento CRITICAL};
+    \node[actend, below=5mm of d1] (f1) {};
+    \node[actend, right=9mm of d2] (f2) {};
+    \node[actend, below=4mm of ev] (f3) {};
+    \draw[seta] (i) -- (m);
+    \draw[seta] (m) -- (d1);
+    \draw[seta] (d1) -- node[g, above] {[$>$ suave]} (a);
+    \draw[seta] (d1) -- node[g, right] {[$\le$ suave]} (f1);
+    \foreach \x/\y in {a/b, b/c, c/e, e/d2, q/f, f/cr, cr/pa, pa/ev, ev/f3} \draw[seta] (\x) -- (\y);
+    \draw[seta] (d2) -- node[g, above] {[$>$ rígido]} (q);
+    \draw[seta] (d2) -- node[g, above] {[$\le$]} (f2);
   \end{tikzpicture}
-  \caption{\dec{19}: ordem de descarte do \emph{buffer}, sempre dos registos mais antigos para os mais recentes}
+  \caption{\dec{19} em diagrama de atividade UML: ordem de descarte do \emph{buffer}. Cada ação apaga os registos
+mais antigos dessa categoria até o tamanho voltar a 90\,\% do limite, e pára aí; ERROR, CRITICAL e PANIC só se
+descartam acima do limite rígido.}
   \label{fig:d19}
 \end{figure}
 
@@ -926,12 +975,77 @@ secção~\ref{sec:aval-se}.
 As três primeiras decisões não mudam o sistema: criam as condições para tomar, verificar e defender as outras.
 Foram feitas antes de qualquer alteração ao código, e a \emph{baseline} (secção~\ref{sec:baseline}) logo a seguir.
 
+\paragraph{Processo e gestão do projeto.}
+A equipa seguiu um processo iterativo inspirado no Scrum, à medida de duas pessoas e três semanas
+(Figura~\ref{fig:processo}). Cada iteração do ADD é um ciclo curto com um objetivo (uma ou duas decisões e os
+cenários que as provam); o \emph{backlog} é o plano de melhorias, ordenado pela \emph{utility tree}; e a revisão de
+cada iteração é a medição antes/depois, que decide o que se segue. Ficaram de fora os papéis e as cerimónias
+formais, que duas pessoas não justificam. Uma \textbf{definição de feito} comum vale para todos os itens: ADR antes
+do código, as verificações do CI corridas localmente, cobertura do código novo $\ge$ 80\,\%, prova do cenário em
+\texttt{docs/metrics/}, relatório atualizado e PR com o CI verde. A plataforma é o GitHub: um quadro no GitHub
+Projects (\url{\Quadro}) com um item por iteração e por decisão, ligado aos PR; ramos por item (\emph{git-flow}); e o
+\texttt{main} protegido pelo CI.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}[
+      lane/.style={draw=cinza},
+      lanelbl/.style={draw=cinza, fill=fundotab, font=\scriptsize\bfseries},
+      g/.style={font=\scriptsize, inner sep=1pt},
+      bpmntask/.append style={text width=17mm, minimum width=18mm}]
+    % raias
+    \draw[lane] (0,1.35) rectangle (16,-1.2);
+    \draw[lane] (0,-1.2) rectangle (16,-3.6);
+    \fill[fundotab] (0,1.35) rectangle (0.6,-3.6);
+    \draw[cinza] (0,1.35) rectangle (0.6,-3.6) (0,-1.2) -- (0.6,-1.2);
+    \node[rotate=90, font=\scriptsize\bfseries] at (0.3,0) {Equipa};
+    \node[rotate=90, font=\scriptsize\bfseries, align=center] at (0.3,-2.4) {GitHub};
+    % equipa
+    \node[bpmnstart] (s) at (1.1,0) {};
+    \node[bpmntask] (t1) at (2.5,0) {Item do quadro; escrever o ADR};
+    \node[bpmntask] (t2) at (4.6,0) {Implementar, testar e verificar localmente};
+    \node[bpmntask] (t3) at (6.7,0) {Abrir o PR (ramo \texttt{feature/})};
+    \node[bpmntask] (t7) at (10.3,0) {Medir: \texttt{medir.py}, k6, E2E};
+    \node[bpmngw, label={[g, align=center]below:cumpre o\\cenário?}] (g2) at (12.6,0) {$\times$};
+    \node[bpmntask] (t8) at (14.2,0) {Relatório e quadro atualizados};
+    \node[bpmnend] (e) at (15.6,0) {};
+    % github
+    \node[bpmnstart, double] (sT) at (1.1,-2.4) {};
+    \draw[iscte] (sT.center) -- ++(0,0.17) (sT.center) -- ++(0.12,0);
+    \node[bpmntask] (n1) at (2.5,-2.4) {E2E noturno};
+    \node[bpmnend] (eT) at (3.85,-2.4) {};
+    \node[bpmntask] (t4) at (6.7,-2.4) {CI e \emph{quality gate} do Sonar};
+    \node[bpmngw, label={[g]above:CI verde?}] (g1) at (8.4,-2.4) {$\times$};
+    \node[bpmntask] (t5) at (10.3,-2.4) {\emph{Merge} no \texttt{main}};
+    % fluxos
+    \draw[bpmnflow] (s) -- (t1);
+    \draw[bpmnflow] (t1) -- (t2);
+    \draw[bpmnflow] (t2) -- (t3);
+    \draw[bpmnflow] (t3) -- (t4);
+    \draw[bpmnflow] (t4) -- (g1);
+    \draw[bpmnflow] (g1) -- node[g, below] {sim} (t5);
+    \draw[bpmnflow] (g1.south) -- ++(0,-0.35) -| node[g, pos=0.25, below] {não} (t2.south);
+    \draw[bpmnflow] (t5) -- (t7);
+    \draw[bpmnflow] (t7) -- (g2);
+    \draw[bpmnflow] (g2) -- node[g, above] {sim} (t8);
+    \draw[bpmnflow] (g2.north) -- (12.6,0.95) -- node[g, above, pos=0.5] {não: nova hipótese} (2.5,0.95) -- (t1.north);
+    \draw[bpmnflow] (t8) -- (e);
+    \draw[bpmnflow] (sT) -- (n1);
+    \draw[bpmnflow] (n1) -- (eT);
+  \end{tikzpicture}
+  \caption{Processo de cada iteração, em BPMN: duas raias (a equipa e o GitHub), eventos de início (o temporizador
+do E2E noturno) e de fim, e portas exclusivas. O ciclo exterior é o \emph{generate and test} do ADD; o interior, o
+CI como porta do \texttt{main}.}
+  \label{fig:processo}
+\end{figure}
+
 \paragraph{Documentação da arquitetura (\dec{1}, ADR-0001 e ADR-0002).}
 Sem documentação de arquitetura é impossível avaliá-la (diapositivos~02). Documentou-se só o que dá retorno: uma
 vista por categoria de estruturas (capítulo~\ref{sec:sistema}), os cenários (capítulo~\ref{sec:requisitos}) e um
 ADR por decisão (anexo~\ref{anx:adrs}), incluindo retroativos para o que já estava no código (0018 a 0023). Os ADR
-vivem no \texttt{monitor-platform}, porque dizem respeito ao sistema inteiro (ADR-0002). Rejeitado: UML completo,
-mais custo do que retorno (secção~\ref{sec:documentacao}).
+vivem no \texttt{monitor-platform}, porque dizem respeito ao sistema inteiro (ADR-0002). As vistas usam UML e
+o processo BPMN, só nos diagramas que dão retorno. Rejeitado: um modelo UML completo do código, mais custo do que
+retorno (secção~\ref{sec:documentacao}).
 
 \paragraph{Métricas e ferramentas de qualidade (\dec{2}).}
 As métricas e as ferramentas do capítulo~\ref{sec:metricas}, escolhidas por GQM. Regra: medir antes de mudar, e

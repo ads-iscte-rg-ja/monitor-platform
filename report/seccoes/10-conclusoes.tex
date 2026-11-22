@@ -37,9 +37,9 @@ foi avaliada pelo ASVS, com três riscos aceites, e um agente noutra linguagem i
 
 \subsection{O que o trabalho ensinou}
 
-A lição principal é a do \emph{generate and test}: as medições contrariaram a análise em quatro pontos e mudaram o
-desenho (secção~\ref{sec:tradeoffs-observados}); a justiça entre \emph{hosts} e o particionamento previstos não se
-fizeram, porque não eram o que faltava.
+A lição principal é a do \emph{generate and test}: as medições contrariaram a análise em quatro pontos
+(secção~\ref{sec:tradeoffs-observados}), e duas táticas previstas, a justiça entre \emph{hosts} e o
+particionamento, não se fizeram, porque não eram o que faltava.
 
 A segunda é sobre o estilo: um monólito em camadas com uma base de dados chegou aos 1\,000 \emph{hosts} com
 táticas locais (lotes, admissão, \emph{bulkhead}, consultas limitadas), sem o custo das fronteiras de rede dos
@@ -47,6 +47,5 @@ microserviços (\dec{20}). O que o fará mudar são os gatilhos medidos do capí
 
 \subsection{Trabalho futuro}
 
-Pela ordem dos gatilhos esperados (Tabela~\ref{tab:evolucao}): o armazenamento (E11, E10, E2), depois ingestão e
-\emph{dashboard} em \emph{deploys} próprios (E3), e só bem depois dos 10\,000 \emph{hosts} uma fila e a escala das
-escritas (E1, E9). Fica ainda por medir \cen{MO1} com uma pessoa sem assistência de programação.
+O plano do capítulo~\ref{sec:evolucao}, pela ordem dos gatilhos, a começar pelo armazenamento. Fica ainda por
+medir \cen{MO1} com uma pessoa sem assistência de programação.

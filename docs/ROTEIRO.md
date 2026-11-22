@@ -35,6 +35,11 @@ A ordem segue as dependências: D13 cria o mecanismo que MO1 mede; D19 produz os
 D17 reporta; D17 traz o dado (quarentena) que dá a métrica nova de MO1; o E2E de D15 usa D16 e D17. Os passos
 6–9 são independentes entre si.
 
+**Gestão do projeto (22/11):** o quadro público do projeto está no GitHub Projects,
+<https://github.com/orgs/ads-iscte-rg-ja/projects/1>: um item por decisão e por medição, com a iteração ADD, os
+cenários, o ADR e os PR que o fecharam. O processo (iterativo, inspirado no Scrum, com a definição de feito abaixo)
+está no relatório, §6.6, com o diagrama BPMN.
+
 ## Definição de "feito" (vale para todos os passos)
 
 1. **ADR antes do código**, com o modelo `adr/0000-modelo.md`: contexto com números, decisão, teoria (táticas e

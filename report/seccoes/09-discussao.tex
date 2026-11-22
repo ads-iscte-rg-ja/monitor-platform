@@ -40,8 +40,6 @@ mesma transação) e o estrangulamento das escritas e ponto único de falha (ADR
 apagados (40~GB em 30 dias, E11);
 \item o limite do \emph{buffer} protege o disco do \emph{host}, mas perde INFO e WARN, contados e reportados, quando
 a falha é longa (\dec{19});
-\item o estilo em camadas é simples, mas espalha cada funcionalidade por três camadas; o microkernel dos alertas
-resolveu-o onde mais custava (\cen{MO1});
 \item o controlo de admissão e o \emph{bulkhead} protegem o central rejeitando trabalho, que os agentes repetem
 mais tarde: o sistema troca latência por estabilidade.
 \end{itemize}

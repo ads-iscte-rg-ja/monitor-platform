@@ -264,10 +264,9 @@ segurança por oito \emph{issues}, triadas na Tabela~\ref{tab:baseline-sonar}.
   \end{tabularx}
 \end{table}
 
-Os dois achados de segurança são os do \texttt{gosec}, detetados por outro motor, e são falsos positivos. Quatro
-dos oito estão em SQL, JavaScript e HTML, fora do alcance das ferramentas de Go, e um é real (o \emph{script} sem
-integridade). O \emph{rating} é dado pelo pior \emph{issue}, aqui falsos positivos: sem triagem sobrestima o risco,
-por isso o relatório usa os \emph{issues} triados.
+Quatro dos oito estão fora do alcance das ferramentas de Go, e um é real. O \emph{rating} é dado pelo pior
+\emph{issue}, aqui um falso positivo: sem triagem sobrestima o risco, por isso o relatório usa os \emph{issues}
+triados.
 
 \paragraph{Síntese.}
 A \emph{baseline} deu quatro ações na iteração~1, por custo e benefício: (1)~a \emph{toolchain} e o \texttt{x/text}, para
