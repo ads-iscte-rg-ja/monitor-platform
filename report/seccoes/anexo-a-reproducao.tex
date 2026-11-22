@@ -16,9 +16,9 @@ cd ../monitor-central && ../monitor-platform/scripts/ci-local.sh
 \paragraph{Métricas de código (capítulo~\ref{sec:metricas}).}
 \begin{verbatim}
 scripts/medir.py baseline        # iteração 0
-scripts/medir.py iter-7      # compara com a baseline
+scripts/medir.py iter-7          # compara com a baseline
 \end{verbatim}
-Mede os cinco repositórios de código: \emph{issues} do lint com a configuração partilhada, complexidade,
+Mede os quatro componentes (o \texttt{monitor-api} só tem código gerado e constantes): \emph{issues} do lint com a configuração partilhada, complexidade,
 acoplamento de Martin, cobertura unitária e de integração (num PostgreSQL~16 temporário) e vulnerabilidades. O
 ficheiro \texttt{ambiente.txt} regista os \emph{commits} medidos e as versões das ferramentas.
 
@@ -28,7 +28,9 @@ cd loadtest
 ./correr.sh iter-7                  # SC1, SC2, SC5, sensibilidade
 ./correr.sh iter-7 capacidade-1 capacidade-2 capacidade-3     # SC3
 ./correr.sh iter-7 dashboard-30d    # SC4 (~1 h 30 min, ~150 GB)
-./tabelas.py iter-7 --antes iter-3  # tabelas antes/depois
+./correr.sh iter-7/repeticao-2 ...  # repetições (as mesmas medições)
+./tabelas.py iter-7 --antes iter-3 \
+    --repeticoes iter-7/repeticao-2,iter-7/repeticao-3   # mínimo-máximo
 HOSTS=50 DURACAO=2m ./correr.sh ensaio nominal   # ensaio rápido
 \end{verbatim}
 Cada medição recria o ambiente do zero, com os limites de recursos de \texttt{loadtest/compose.yaml}. O
@@ -44,4 +46,5 @@ Corre também todas as noites no GitHub Actions (\texttt{.github/workflows/e2e.y
 \paragraph{Medições pontuais.}
 \cen{AV2} corre com \texttt{MONITOR\_MEDIR\_AV2=1} no teste de integração \texttt{TestAV2MeasureProbeCycle} do
 central. \cen{MO1}, \cen{MO2}, \cen{MO3}, \cen{IO1}, \cen{TE2} e \cen{TE3} estão descritos, com os comandos e
-os dados, em \texttt{docs/metrics/iter-6/}.
+os dados, em \texttt{docs/metrics/iter-6/}. O \emph{mutation testing} dos \emph{services} do central (gremlins v0.6.0)
+está descrito, com o comando, em \texttt{docs/metrics/iter-7/mutacao.md}.

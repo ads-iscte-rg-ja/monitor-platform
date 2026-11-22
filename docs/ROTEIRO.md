@@ -182,7 +182,7 @@ Por ordem de valor (detalhe em D20 e na revisão de D1, no plano):
    alertas por *polling* de 15 s em vez de *streaming* (ADR-0008, E5) e sessões no servidor em vez de JWT
    (ADR-0016). Todos entram no anexo B do relatório.
 
-### Passo 11: medição final e fecho do relatório (7/12) — feito (21/11, por commitar)
+### Passo 11: medição final e fecho do relatório (7/12) — feito (21/11)
 * **Feito:** `medir.py iter-7` e `correr.sh` com os 10 cenários (21/11, 18:45–21:42 UTC, rc=0) em
   `docs/metrics/iter-7/`; tabelas com `--antes iter-3`, e SC4 com `--antes iter-6/sc4-antes` (antes do ADR-0017 →
   final). Cap. 7 atualizado para iter-7, tabela-resumo dos 21 cenários (20 cumprem; SC3 em parte), resumo e
@@ -198,12 +198,29 @@ Por ordem de valor (detalhe em D20 e na revisão de D1, no plano):
   * cap. 8: evolução E1–E9 com gatilhos;
   * resumo (rever com os resultados finais).
 
-### Passo 12: revisão final (8/12)
+### Passo 12: revisão final (8/12) — feito (22/11, por commitar)
+* **Feito:** CI verde na `main` dos seis repositórios e *quality gate* OK nos quatro com Sonar; relatório compila
+  sem avisos de referências nem *overfull*; 0 menções a outros trabalhos; `make dados ITER=iter-7` (o `carga-sc4.tex` do
+  relatório estava desatualizado). Teoria: diapositivos 01 aplicados no cap. 2 (normas, engenharia
+  quantificável, causas de insucesso), 05 citados no Strategy e nos GoF do cap. 3, bibliografia "aulas 01–08",
+  ASVS na bibliografia, "slide" → "diapositivos". **Lacuna fechada:** o *mutation score* prometido no cap. 5
+  nunca tinha sido medido; medido agora (gremlins, `services` do central: eficácia 79,6 %,
+  `docs/metrics/iter-7/mutacao.md`) e acrescentado ao cap. 7; depois, com testes de limites da ingestão
+  no central (`ingestion_limits_test.go`, por commitar), 87,9 %. Números corrigidos contra os dados (SC5 7→5 ms
+  na discussão, CPU do central 15→16 % em SC4 também no ADR-0019, retenção 0,33 s→0,2–0,3 s, MO1 7 sítios,
+  repositórios medidos e com CI), separadores de milhares e *host* em itálico uniformizados. READMEs: central
+  (retenção ligada por omissão, *bulkhead*, esquema 8) e SDK (v0.2.0).
+* **E2E de 1 h a partir do `main`:** corrido no GitHub a 22/11 (run 45014597006), todos os cenários passaram
+  (`docs/metrics/iter-7/e2e/`). O agendamento noturno ainda não disparou; as menções a outro trabalho nos ADR-0001/0002 e no plano foram retiradas (22/11).
+* **Carga repetida:** todos os cenários correram mais duas vezes (22/11, `docs/metrics/iter-7/repeticao-2` e `-3`,
+  sem falhas); `tabelas.py --repeticoes` dá o mínimo–máximo das três execuções nas tabelas. Nenhum veredicto mudou;
+  o que mais variou foi a latência do *dashboard* (SC4 métricas de 1 mês 188–652 ms, SC2 44–168 ms). Texto dos
+  cap. 0, 7, 9 e 10 atualizado; a ameaça "Medições únicas" passou a "Poucas repetições". A legenda do SC4
+  ("antes do ADR-0017") é corrigida à mão depois de `tabelas.py iter-7 --antes iter-6/sc4-antes --repeticoes ...`.
 * PT-PT, afirmações (cada número tem fonte: medição, ADR ou estimativa identificada), coerência entre plano,
   ADRs e relatório.
 * **Cobertura da teoria:** cada slide (01–08) tem pelo menos uma decisão ou secção que o aplica, com a citação;
   nenhuma referência a padrões ou estilos com o nome errado (por exemplo, E3 é Service-Based, não SOA).
-* **O relatório não menciona EUVI** (o plano menciona-o em MO3, US1, D14, D17 e D18: reformular ao passar para
-  o relatório).
+* **O relatório só trata da arquitetura**: nenhuma menção a outros trabalhos sobre o mesmo sistema.
 * Compilação limpa; `make dados` com a iteração final; anexos completos.
 * Repositórios: CI e Sonar verdes na `main` de todos; README de cada um atualizado.

@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """Gera as tabelas LaTeX dos testes de carga a partir de docs/metrics/<iteração>/carga/*.json.
 
-Uso:  loadtest/tabelas.py <iteração> [--antes <iteração>]
+Uso:  loadtest/tabelas.py <iteração> [--antes <iteração>] [--repeticoes <iteração>,...]
 
 Escreve em docs/metrics/<iteração>/: carga-sc1.tex, carga-sc2.tex, carga-sc5.tex,
 carga-sensibilidade.tex, carga-sc3.tex e carga-sc4.tex (o relatório inclui-as com \\gerado, depois de "make dados ITER=...").
 Com --antes, cada tabela acrescenta a coluna da iteração anterior (antes/depois).
+Com --repeticoes, os valores da iteração passam a ser o mínimo–máximo dela e das repetições (cada
+repetição é uma pasta com carga/*.json, das mesmas medições); os que não variam ficam como estão.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 METRICAS = Path(__file__).resolve().parent.parent / "docs" / "metrics"
@@ -131,6 +134,42 @@ def tabela(rotulo: str, legenda: str, cabecalho: list[str], linhas: list[list[st
 """
 
 
+# Um número de uma célula: "1\\,000", "0,7", "$-$733\\,603".
+NUMERO = re.compile(r"(?:\$-\$)?\d+(?:\\,\d{3})*(?:,\d+)?")
+
+
+def _valor_numero(texto: str) -> float:
+    negativo = texto.startswith("$-$")
+    v = float(texto.removeprefix("$-$").replace("\\,", "").replace(",", "."))
+    return -v if negativo else v
+
+
+def intervalo(celulas: list[str]) -> str:
+    """A mesma célula de várias execuções: cada número que varia passa a mínimo--máximo."""
+    if len(set(celulas)) == 1:
+        return celulas[0]
+    moldes = {NUMERO.sub("#", c) for c in celulas}
+    if len(moldes) > 1:
+        raise SystemExit(f"células sem a mesma forma nas repetições: {celulas}")
+    numeros = list(zip(*(NUMERO.findall(c) for c in celulas)))
+    partes = []
+    for tokens in numeros:
+        menor, maior = min(tokens, key=_valor_numero), max(tokens, key=_valor_numero)
+        if menor == maior:
+            partes.append(menor)
+        elif _valor_numero(maior) < 0:  # "$-$732\\,410--734\\,166": o sinal uma vez, por valor absoluto
+            partes.append(f"{maior}--{menor.removeprefix('$-$')}")
+        else:
+            partes.append(f"{menor}--{maior}")
+    pedacos = NUMERO.split(celulas[0])
+    return "".join(p + (partes[i] if i < len(partes) else "") for i, p in enumerate(pedacos))
+
+
+def juntar(execucoes: list[list]) -> list[list[str]]:
+    """As mesmas linhas de várias execuções, juntas célula a célula."""
+    return [[intervalo(list(cs)) for cs in zip(*linhas)] for linhas in zip(*execucoes)]
+
+
 def com_antes(linhas_depois, linhas_antes):
     if linhas_antes is None:
         return [[d[0], d[1], d[2], d[3]] for d in linhas_depois]
@@ -141,19 +180,33 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("iteracao")
     ap.add_argument("--antes")
+    ap.add_argument("--repeticoes", type=lambda v: v.split(","), default=[])
     a = ap.parse_args()
     destino = METRICAS / a.iteracao
     ambiente = "Ambiente: " + (destino / "carga" / "ambiente.txt").read_text().splitlines()[-1] if (destino / "carga" / "ambiente.txt").exists() else ""
     cab = ["Medida", "Alvo", "Medido", "Cumpre"] if not a.antes else ["Medida", "Alvo", a.antes, a.iteracao, "Cumpre"]
     fmt = "llrc" if not a.antes else "llrrc"
 
+    execucoes = [a.iteracao] + a.repeticoes
+    nota_rep = (f"Valores de {a.iteracao}: mínimo--máximo de {len(execucoes)} execuções. " if a.repeticoes else "")
+
+    def todas(medicao: str) -> list[dict] | None:
+        """A medição em cada execução; None se faltar na iteração."""
+        medidas = [carregar(it, medicao) for it in execucoes]
+        if medidas[0] is None:
+            return None
+        if None in medidas:
+            raise SystemExit(f"{medicao}: falta em {execucoes[medidas.index(None)]}")
+        return medidas
+
     def gerar(medicao: str, linhas_fn, rotulo: str, legenda: str, nota: str = "") -> None:
-        depois = carregar(a.iteracao, medicao)
+        depois = todas(medicao)
         if depois is None:
             return
         antes = linhas_fn(carregar(a.antes, medicao)) if a.antes else None
         (destino / f"{rotulo}.tex").write_text(
-            tabela(f"tab:{rotulo}", f"{legenda} ({a.iteracao})", cab, com_antes(linhas_fn(depois), antes), fmt, nota))
+            tabela(f"tab:{rotulo}", f"{legenda} ({a.iteracao})", cab, com_antes(juntar([linhas_fn(d) for d in depois]), antes),
+                   fmt, (nota_rep + nota).strip()))
 
     gerar("nominal", linhas_sc1, "carga-sc1", "Cenário SC1: 1\\,000 \\emph{hosts} em regime normal",
           "Atraso: do primeiro envio de um lote à confirmação, com as novas tentativas. " + ambiente)
@@ -210,11 +263,12 @@ def main() -> None:
 
     # Sensibilidade à hipótese do perfil de logs (relatório, secção 4.3), com --antes lado a lado.
     iteracoes = ([a.antes] if a.antes else []) + [a.iteracao]
-    colunas = [(it, m, carregar(it, m)) for it in iteracoes for m in ("nominal", "nominal-x2", "nominal-x5")]
-    colunas = [(it, m, d) for it, m, d in colunas if d is not None]
+    colunas = [(it, m, todas(m) if it == a.iteracao else [carregar(it, m)])
+               for it in iteracoes for m in ("nominal", "nominal-x2", "nominal-x5")]
+    colunas = [(it, m, d) for it, m, d in colunas if d is not None and d[0] is not None]
     if len(colunas) > 1:
         def col(f):
-            return [f(d) for _, _, d in colunas]
+            return [intervalo([f(x) for x in d]) for _, _, d in colunas]
         linhas = [
             ["p95 da ingestão (agente)"] + col(lambda d: num(valor(d, "agente", "grpc_req_duration{ingestao:sim}", "p(95)"), 0, " ms")),
             ["CPU média do central"] + col(lambda d: num(valor(d, "servidor", "cpu_media_pct"), 0, "\\,\\%")),
@@ -239,28 +293,45 @@ def main() -> None:
     \\midrule
 {corpo}
     \\bottomrule
-  \\end{{tabular}}
+  \\end{{tabular}}{f"{chr(10)}  \\par\\smallskip\\footnotesize {nota_rep.strip()}" if nota_rep else ""}
 \\end{{table}}
 """)
-    escala = [(n, carregar(a.iteracao, f"capacidade-{n}")) for n in (1, 2, 3)]
+    escala = [(n, todas(f"capacidade-{n}")) for n in (1, 2, 3)]
     escala = [(n, m) for n, m in escala if m is not None]
     if escala:
-        (destino / "carga-sc3.tex").write_text(tabela_sc3(escala, ambiente))
+        (destino / "carga-sc3.tex").write_text(
+            juntar_tabela([tabela_sc3([(n, m[i]) for n, m in escala], nota_rep + ambiente) for i in range(len(execucoes))]))
     # Com --antes, as colunas dizem "antes"/"depois"; as iterações vão na legenda.
     rotulo_it = {a.antes: "antes, ", a.iteracao: "depois, "} if a.antes else {a.iteracao: ""}
     # O rótulo vem do que correu de facto: desde que a retenção está ligada por omissão (ADR-0017), a primeira
     # fase também a tem, e as duas fases passam a ser duas corridas com retenção.
-    fases = []
-    for it in ([a.antes] if a.antes else []) + [a.iteracao]:
-        medidas = [m for m in (carregar(it, "dashboard-30d"), carregar(it, "dashboard-30d-retencao")) if m is not None]
-        com = [bool((valor(m, "servidor", "retencao") or {}).get("execucoes")) for m in medidas]
-        for i, m in enumerate(medidas):
-            fase = ("com ret." if com[i] else "sem ret.") + (f" ({i + 1}.ª)" if com.count(com[i]) > 1 else "")
-            fases.append((f"{rotulo_it[it]}{fase}", m))
-    if fases:
+    def fases_sc4(it_depois: str) -> list[tuple[str, dict]]:
+        fases = []
+        for it in ([a.antes] if a.antes else []) + [it_depois]:
+            medidas = [m for m in (carregar(it, "dashboard-30d"), carregar(it, "dashboard-30d-retencao")) if m is not None]
+            com = [bool((valor(m, "servidor", "retencao") or {}).get("execucoes")) for m in medidas]
+            for i, m in enumerate(medidas):
+                fase = ("com ret." if com[i] else "sem ret.") + (f" ({i + 1}.ª)" if com.count(com[i]) > 1 else "")
+                fases.append((f"{rotulo_it[a.iteracao if it == it_depois else it]}{fase}", m))
+        return fases
+    if fases_sc4(a.iteracao):
         iteracoes = f"{a.antes} $\\rightarrow$ {a.iteracao}" if a.antes else a.iteracao
-        (destino / "carga-sc4.tex").write_text(tabela_sc4(fases, ambiente, iteracoes))
+        (destino / "carga-sc4.tex").write_text(
+            juntar_tabela([tabela_sc4(fases_sc4(it), nota_rep + ambiente, iteracoes) for it in execucoes]))
     print(f"tabelas de carga escritas em {destino}")
+
+
+def juntar_tabela(tabelas: list[str]) -> str:
+    """A mesma tabela de várias execuções (só mudam os valores), junta linha a linha."""
+    linhas = [t.splitlines() for t in tabelas]
+    saida = []
+    for ls in zip(*linhas):
+        if len(set(ls)) == 1 or not ls[0].rstrip().endswith("\\\\"):
+            saida.append(ls[0])
+            continue
+        celulas = [l.strip().removesuffix("\\\\").rstrip().split(" & ") for l in ls]
+        saida.append("    " + " & ".join(juntar([[c] for c in celulas])[0]) + " \\\\")
+    return "\n".join(saida) + "\n"
 
 
 # SC4: as consultas do dashboard do cenário dashboard-30d (k6/ingestao.js, CONSULTAS_30D).
@@ -296,7 +367,8 @@ def tabela_sc4(fases: list[tuple[str, dict]], ambiente: str, iteracoes: str) -> 
         ["Expirados: variação por hora", "$\\le$ 0"] + col(lambda m: num(-(valor(m, "estado_bd", "removidos_por_hora") or 0)).replace("-", "$-$")),
         ["Lotes perdidos / duplicados", "0 / 0"] + col(lambda m: f"{num(valor(m, 'agente', 'lotes_perdidos', 'passes'))} / {num(valor(m, 'base_de_dados', 'duplicados'))}"),
     ]
-    cab = ["Medida", "Alvo"] + [nome for nome, _ in fases]
+    # Cabeçalhos em duas linhas ("antes," / "sem ret."), para a coluna das medidas não ficar estreita.
+    cab = ["Medida", "Alvo"] + [f"\\makecell[r]{{{nome.replace(', ', ',\\\\ ')}}}" for nome, _ in fases]
     nota = ("31 dias de histórico de 1\\,000 \\emph{hosts} (89 M estatísticas, 239 M erros) e a carga nominal durante 10 min, "
             "com uma consulta do \\emph{dashboard} por segundo, à vez pelas sete. Com retenção: 30 dias, a cada minuto, lotes de 10\\,000. "
             + ambiente)

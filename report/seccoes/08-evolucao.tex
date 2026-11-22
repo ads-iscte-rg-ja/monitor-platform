@@ -1,21 +1,17 @@
 \section{Plano de evolução}
 \label{sec:evolucao}
 
-O trabalho fixou a escala em 1\,000 \emph{hosts} e mediu-a. Este capítulo diz o que mudaria para ir além, e
-quando: cada evolução tem um \textbf{gatilho medível} com as métricas de \dec{4}, que funcionam como
-\emph{fitness functions}. A decisão de escalar fica assim guiada por números e não por antecipação (YAGNI,
-slide~06), como as decisões deste trabalho foram.
+Este capítulo diz o que mudaria para ir além dos 1\,000 \emph{hosts}, e quando: cada evolução tem um
+\textbf{gatilho medível} com as métricas de \dec{4}, a funcionar como \emph{fitness function}, para escalar por
+números e não por antecipação (YAGNI, diapositivos~06).
 
-\subsection{Escalar para 10\,000+ hosts}
+\subsection{Escalar para 10\,000+ \emph{hosts}}
 
 \paragraph{O que se sabe da escala atual.}
-As medições dão um ponto de partida melhor do que as estimativas do capítulo~\ref{sec:requisitos}. Com 1\,000
-\emph{hosts} e o perfil de logs, entram cerca de 122 registos por segundo; os 31 dias de \cen{SC4} ocuparam
-143~GB, cerca de 4,6~GB por dia, dos quais os recibos de deduplicação são 28\,\%. Uma instância do central
-confirmou cerca de 22\,000 registos por segundo no pico de \cen{SC3}, com o PostgreSQL como limite. A 10\,000
-\emph{hosts}, por extrapolação linear, seriam 1\,200 registos por segundo (dentro da capacidade medida, com
-lotes pequenos a reduzir a folga), cerca de 46~GB por dia, e 1,4~TB para 30 dias. É o armazenamento, e não o
-débito, que chega primeiro a um limite.
+Medido: com 1\,000 \emph{hosts} entram cerca de 122 registos/s; os 31 dias de \cen{SC4} ocuparam 143~GB (4,6~GB por
+dia, 28\,\% de recibos); uma instância confirmou cerca de 22\,000 registos/s no pico de \cen{SC3}. A 10\,000
+\emph{hosts}, por extrapolação linear: 1\,200 registos/s (dentro da capacidade, com menos folga em lotes pequenos),
+46~GB por dia e 1,4~TB em 30 dias. O armazenamento chega primeiro a um limite, não o débito.
 
 \begin{table}[htbp]
   \centering\small
@@ -42,14 +38,13 @@ débito, que chega primeiro a um limite.
 \end{table}
 
 \paragraph{Ordem esperada.}
-Com os números acima, o primeiro gatilho a disparar é o do armazenamento (E2, E10, E11), seguido da competição
-pelo CPU (E3). A fila de ingestão (E1) e a escala das escritas (E9) só são necessárias bem depois dos 10\,000
-\emph{hosts}, se os lotes forem cheios. A ordem real é a que os gatilhos ditarem.
+Primeiro o armazenamento (E2, E10, E11), depois a competição pelo CPU (E3); a fila (E1) e a escala das escritas
+(E9) só bem depois dos 10\,000 \emph{hosts}. A ordem real é a dos gatilhos.
 
 \subsection{Decisões rejeitadas e adiadas}
 
-A Tabela~\ref{tab:rejeitadas} junta as propostas que o trabalho considerou e não seguiu, com a razão. As
-alternativas de cada decisão tomada estão no seu ADR.
+A Tabela~\ref{tab:rejeitadas} junta as propostas consideradas e não seguidas; as alternativas de cada decisão estão
+no seu ADR.
 
 \begin{table}[htbp]
   \centering\small
@@ -59,11 +54,11 @@ alternativas de cada decisão tomada estão no seu ADR.
     \toprule
     Proposta & Decisão & Razão \\
     \midrule
-    Reescrever em microserviços & rejeitada & O registo, o recibo e a avaliação de alertas partilham uma transação, sinal de que pertencem ao mesmo serviço (slide~08); duas pessoas não sustentam a operação; cada fronteira de rede traz as oito falácias. Os limites a 1\,000 \emph{hosts} resolveram-se com táticas locais (ADR-0019) \\
-    \emph{Broker} (Kafka, RabbitMQ) já & adiada (E1) & O \emph{store-and-forward} com recibos já dá \emph{at-least-once} sem duplicados; o \emph{broker} acrescenta latência, indireção e um ponto de falha (slide~04) \\
-    Particionar a telemetria (\dec{9}) & adiada (E10) & Medido: não era o que faltava; a retenção por \texttt{DELETE} em lotes custa 0,33~s por execução (ADR-0017) \\
-    Escalar a base de dados para \cen{SC3} & adiada (E9) & A folga medida (cerca de 180 vezes o regime normal) cobre o \emph{backlog} de 10\,000 \emph{hosts}; desligar a sincronização do WAL poria \cen{AV1} em risco \\
-    Justiça por \emph{host} na ingestão & não implementada & Medido em \cen{SC5}: um vizinho ruidoso não atrasou os outros (ADR-0006) \\
+    Reescrever em microserviços & rejeitada & Transação partilhada entre registo, recibo e alertas; operação incomportável para duas pessoas; as oito falácias (secção~\ref{sec:d20}) \\
+    \emph{Broker} (Kafka, RabbitMQ) já & adiada (E1) & Os recibos já dão \emph{at-least-once} sem duplicados; o \emph{broker} acrescenta latência, indireção e um ponto de falha \\
+    Particionar a telemetria (\dec{9}) & adiada (E10) & Medido: não era o que faltava (secção~\ref{sec:sc4}) \\
+    Escalar a base de dados para \cen{SC3} & adiada (E9) & Folga medida de cerca de 180 vezes o regime normal (secção~\ref{sec:aval-sc3}) \\
+    Justiça por \emph{host} na ingestão & não implementada & Medido em \cen{SC5}: o risco não se verificou \\
     SPA no lugar dos \emph{templates} & rejeitada & Um passo de \emph{build} e uma API JSON completa para páginas de leitura; \cen{MO3} cumpre-se com os \emph{templates} (ADR-0019) \\
     Alertas em tempo real (\emph{push}) & adiada (E5) & O \emph{polling} de 15~s cumpre \cen{AV2} e mantém as métricas sem estado (ADR-0008) \\
     Migrações no SQLite do remote & adiada & Recusar um \emph{buffer} incompatível é seguro enquanto não houver \emph{hosts} com dados por entregar durante uma atualização (ADR-0020) \\

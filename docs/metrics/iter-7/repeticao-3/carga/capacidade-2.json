@@ -1,0 +1,295 @@
+{
+  "janela": {
+    "inicio": 1795360950,
+    "fim": 1795361600
+  },
+  "hosts": 1000,
+  "instancias": 2,
+  "cpu_contentores": {
+    "central": {
+      "media_pct": 13.5,
+      "max_pct": 35.0
+    },
+    "postgres": {
+      "media_pct": 48.6,
+      "max_pct": 108.0
+    }
+  },
+  "agente": {
+    "respostas_nao_ok": {
+      "count": 16161,
+      "rate": 24.91555718721247
+    },
+    "respostas_nao_ok{codigo:12}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:4}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:16}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:2}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "grpc_req_duration": {
+      "med": 102.2067,
+      "p(90)": 191.77107660000001,
+      "p(95)": 200.46287385,
+      "p(99)": 283.29547705,
+      "max": 420.001845,
+      "count": 82572,
+      "avg": 104.86770963330214,
+      "min": 0.532769
+    },
+    "atraso_central{vizinho:sim}": {
+      "p(95)": 16294,
+      "p(99)": 151768.79999999958,
+      "max": 647011,
+      "count": 66411,
+      "avg": 5060.789417415789,
+      "min": 10,
+      "med": 113,
+      "p(90)": 4494,
+      "thresholds": {
+        "p(95)<5000": false
+      }
+    },
+    "respostas_nao_ok{codigo:3}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "http_req_duration": {
+      "max": 238.284507,
+      "count": 152,
+      "avg": 91.67849787499995,
+      "min": 46.558664,
+      "med": 60.260329,
+      "p(90)": 147.8354008,
+      "p(95)": 151.10745795,
+      "p(99)": 188.95729825000058
+    },
+    "http_req_duration{expected_response:true}": {
+      "med": 60.260329,
+      "p(90)": 147.8354008,
+      "p(95)": 151.10745795,
+      "p(99)": 188.95729825000058,
+      "max": 238.284507,
+      "count": 152,
+      "avg": 91.67849787499995,
+      "min": 46.558664
+    },
+    "respostas_nao_ok{codigo:5}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "registos_confirmados": {
+      "count": 6641100,
+      "rate": 10238.642833735335
+    },
+    "atraso_central": {
+      "med": 113,
+      "p(90)": 4494,
+      "p(95)": 16294,
+      "p(99)": 151768.79999999958,
+      "max": 647011,
+      "count": 66411,
+      "avg": 5060.789417415789,
+      "min": 10
+    },
+    "respostas_nao_ok{codigo:13}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:1}": {
+      "rate": 0,
+      "count": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:7}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:15}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:9}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:14}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "lotes_perdidos": {
+      "rate": 0,
+      "passes": 0,
+      "fails": 66411,
+      "thresholds": {
+        "rate==0": true
+      }
+    },
+    "iterations": {
+      "count": 1151,
+      "rate": 1.7745069192798437
+    },
+    "respostas_nao_ok{codigo:10}": {
+      "rate": 0,
+      "count": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "grpc_req_duration{ingestao:sim}": {
+      "max": 420.001845,
+      "count": 82572,
+      "avg": 104.86770963330214,
+      "min": 0.532769,
+      "med": 102.2067,
+      "p(90)": 191.77107660000001,
+      "p(95)": 200.46287385,
+      "p(99)": 283.29547705,
+      "thresholds": {
+        "p(95)<300": true
+      }
+    },
+    "respostas_nao_ok{codigo:8}": {
+      "count": 16161,
+      "rate": 24.91555718721247,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:11}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "respostas_nao_ok{codigo:6}": {
+      "count": 0,
+      "rate": 0,
+      "thresholds": {
+        "count>=0": true
+      }
+    },
+    "duracao_s": 648.6
+  },
+  "servidor": {
+    "ingestao_p95_ms": 198.7,
+    "ingestao_p99_ms": 282.6,
+    "pedidos_por_codigo": {
+      "OK": 66352.10010479651,
+      "ResourceExhausted": 15425.158665939922
+    },
+    "registos": {
+      "errors_duplicate": 0.0,
+      "errors_inserted": 6635210.01047965,
+      "errors_rejected": 0.0
+    },
+    "dashboard_p95_ms": 188.5,
+    "instancias": 2.0,
+    "registos_por_s_max_1m": 22776.363636363632,
+    "registos_por_s_media": 10208.015400737924,
+    "cpu_media_pct": 5.8,
+    "cpu_max_pct": 12.8,
+    "memoria_max_mb": 28.1,
+    "ligacoes_bd_max": 34.0,
+    "ligacoes_bd_limite": 50.0,
+    "esperas_por_ligacao": 0.0,
+    "espera_por_ligacao_s": 0.0,
+    "jobs": {
+      "lideres_max": {
+        "host_availability_alerts": 1.0,
+        "host_health": 1.0,
+        "metric_alerts": 1.0,
+        "notifications": 1.0,
+        "retention": 1.0
+      },
+      "instancias_que_executaram": {
+        "host_availability_alerts": 1.0,
+        "host_health": 1.0,
+        "metric_alerts": 1.0,
+        "notifications": 1.0,
+        "retention": 1.0
+      }
+    },
+    "retencao": {
+      "execucoes": 9.098030769230768,
+      "duracao_media_s": 0.04,
+      "duracao_p95_s": 0.41000000000000003,
+      "falhas": null
+    },
+    "dashboard_p95_ms_por_rota": {
+      "/api/v1/dashboard/summary": 188.5
+    }
+  },
+  "dashboard_p95_ms_durante_recuperacao": null,
+  "base_de_dados": {
+    "stats": 0,
+    "erros": 6641100,
+    "duplicados": 0
+  },
+  "estado_bd": {
+    "antes": {
+      "stats_expirados": 0,
+      "erros_expirados": 0,
+      "machine_stats_bytes": 32768,
+      "error_logs_bytes": 49152,
+      "telemetry_receipts_bytes": 16384,
+      "base_de_dados_bytes": 9034775,
+      "instante": 1795360951
+    },
+    "depois": {
+      "stats_expirados": 0,
+      "erros_expirados": 0,
+      "machine_stats_bytes": 32768,
+      "error_logs_bytes": 2228912128,
+      "telemetry_receipts_bytes": 883154944,
+      "base_de_dados_bytes": 3127147543,
+      "instante": 1795361611
+    },
+    "removidos_por_hora": 0
+  }
+}

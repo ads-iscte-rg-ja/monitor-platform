@@ -39,19 +39,16 @@ públicos, na organização \url{\Organizacao} (Tabela~\ref{tab:repositorios}).
   \end{tabularx}
 \end{table}
 
-O projeto foi proposto pela própria equipa, de duas pessoas, e não tem enunciado. Os números dos cenários
-de qualidade são, por isso, propostas da equipa; cada um é acompanhado da sua origem, quase sempre
-estimativas \emph{back-of-the-envelope}~\cite{bastofernandes2026}.
+O projeto foi proposto pela equipa, de duas pessoas, sem enunciado: os números dos cenários são propostas, cada um
+com a sua origem, quase sempre estimativas \emph{back-of-the-envelope}~\cite{bastofernandes2026}.
 
-O sistema já funcionava quando este trabalho começou. A motivação não é, portanto, construí-lo, mas
-responder a uma pergunta de arquitetura: \emph{o que impede este sistema de crescer de dezenas para
-milhares de hosts, e de continuar a ser modificado a baixo custo, e como se demonstra com números que as
+O sistema já funcionava. A motivação é responder a uma pergunta de arquitetura: \emph{o que impede este sistema de crescer de dezenas para
+milhares de \emph{hosts}, e de continuar a ser modificado a baixo custo, e como se demonstra com números que as
 decisões tomadas resolvem esses problemas?}
 
 \subsection{Objetivos}
 
-Os objetivos de negócio da Tabela~\ref{tab:objetivos} são a origem de todos os requisitos arquiteturais
-do capítulo~\ref{sec:requisitos}.
+Os objetivos de negócio (Tabela~\ref{tab:objetivos}) são a origem de todos os requisitos arquiteturais.
 
 \begin{table}[htbp]
   \centering\small
@@ -71,41 +68,34 @@ do capítulo~\ref{sec:requisitos}.
   \end{tabularx}
 \end{table}
 
-Destes objetivos a equipa escolheu três prioridades para ADS, que orientam todo o trabalho:
+A equipa escolheu três prioridades:
 \begin{enumerate}
-  \item \textbf{Métricas de qualidade}: medir antes de mudar, com métricas escolhidas por GQM e
-        recolhidas automaticamente, para que cada decisão seja avaliada com números e não com afirmações;
-  \item \textbf{Escalabilidade} (G3): suportar 1\,000 \emph{hosts}, implementado e medido com testes de
-        carga. A escala de 10\,000 ou mais \emph{hosts} fica como plano de evolução, com o gatilho
-        medível que justificaria cada passo;
-  \item \textbf{Manutenção} (G4): reduzir o custo de mudança onde ele se concentra e demonstrá-lo com um
-        cenário de modificabilidade medido (\cen{MO1}).
+  \item \textbf{métricas de qualidade}: medir antes de mudar, com métricas escolhidas por GQM e recolhidas
+        automaticamente, para avaliar cada decisão com números;
+  \item \textbf{escalabilidade} (G3): 1\,000 \emph{hosts} implementados e medidos; 10\,000 ou mais como plano de
+        evolução com gatilhos medíveis;
+  \item \textbf{manutenção} (G4): reduzir o custo de mudança onde se concentra, e demonstrá-lo (\cen{MO1}).
 \end{enumerate}
-A disponibilidade (G1) já estava quase toda garantida pelo desenho existente. Aqui o trabalho é
-prová-la e garantir que não regride quando o sistema escala.
+A disponibilidade (G1) já estava quase garantida: o trabalho é prová-la e não a perder ao escalar.
 
 \subsection{Contribuições e estrutura do relatório}
 
-O trabalho segue o processo dos diapositivos 06~\cite{bastofernandes2026}: objetivos, requisitos
-arquiteturalmente significativos, \emph{utility tree}, táticas e padrões, iterações ADD e
-\emph{generate and test}. As contribuições são:
+O trabalho segue o processo dos diapositivos~06~\cite{bastofernandes2026} (objetivos, ASR, \emph{utility tree},
+táticas e padrões, iterações ADD, \emph{generate and test}). Contribuições:
 \begin{enumerate}
   \item a documentação da arquitetura existente em três vistas, com as regras de camadas tornadas
         verificáveis automaticamente;
   \item a priorização justificada dos atributos de qualidade, com os \emph{trade-offs} explícitos, a
         \emph{utility tree} e os cenários de seis partes;
   \item uma infraestrutura de medição: métricas derivadas por GQM, um pipeline de CI partilhado pelos
-        quatro repositórios e uma medição de baseline reproduzível;
+        cinco repositórios de código e uma medição de baseline reproduzível;
   \item decisões arquiteturais registadas como ADR, cada uma ligada a táticas, alternativas rejeitadas e
         ao cenário que a verifica;
   \item a avaliação antes/depois, com testes de carga e métricas de código;
   \item um plano de evolução para mais de 10\,000 \emph{hosts}, guiado por gatilhos medidos.
 \end{enumerate}
 
-O capítulo~\ref{sec:enquadramento} resume a teoria usada. O capítulo~\ref{sec:sistema} descreve a
-arquitetura atual e as lacunas encontradas. O capítulo~\ref{sec:requisitos} define os requisitos
-arquiteturais. O capítulo~\ref{sec:metricas} apresenta as métricas, as ferramentas, o pipeline e a
-baseline. O capítulo~\ref{sec:decisoes} descreve as decisões e o capítulo~\ref{sec:avaliacao} avalia-as.
-Os capítulos seguintes tratam da evolução, da discussão e das conclusões. Os anexos contêm os comandos de
-reprodução, os ADR e a configuração das ferramentas. O código de cada componente está no seu repositório
-(Tabela~\ref{tab:repositorios}); as medições, os ADR e este relatório estão em \url{\Repositorio}.
+Os capítulos seguem essa ordem: teoria (\ref{sec:enquadramento}), arquitetura inicial e lacunas
+(\ref{sec:sistema}), requisitos (\ref{sec:requisitos}), métricas e baseline (\ref{sec:metricas}), decisões
+(\ref{sec:decisoes}), avaliação (\ref{sec:avaliacao}), evolução, discussão e conclusões. Os anexos têm a reprodução
+e os ADR. As medições, os ADR e o relatório estão em \url{\Repositorio}.

@@ -10,7 +10,8 @@ O sistema Monitor tem uma arquitetura implícita: há decisões importantes no c
 SQLite, outbox transacional, HMAC das chaves, jobs dentro do processo), mas nenhuma está escrita com o seu
 porquê. Os slides de ADS lembram que *"every software system has a software architecture (not necessarily
 known to anyone)"* e que, sem documentação, é *"impossible to evaluate the architecture"*. O projeto é
-avaliado precisamente pela fundamentação das decisões, e duas cadeiras (ADS e EUVI) mexem no mesmo código.
+avaliado precisamente pela fundamentação das decisões, e o código continua a mudar depois desta entrega, por
+mais de uma pessoa.
 
 ## Decisão
 * Cada decisão arquitetural fica num ficheiro `docs/adr/NNNN-titulo.md`, com o modelo `0000-modelo.md`.

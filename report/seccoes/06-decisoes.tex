@@ -5,30 +5,28 @@
 \label{sec:d20}
 
 \paragraph{Problema.}
-Os ADR tratam um atributo de cada vez, mas nenhum dizia que estilo o sistema segue nem porquê, que é a primeira
-decisão dos critérios do slide~08 (secção~\ref{sec:estilos}). O estilo estava no código desde a iteração~0 e
-foi recuperado na reconstrução (capítulo~\ref{sec:sistema}). Também as falácias da computação distribuída e a
-conascência estavam tratadas, mas espalhadas por várias decisões e sem nome.
+Nenhum ADR dizia que estilo o sistema segue nem porquê, a primeira decisão segundo os diapositivos~08
+(secção~\ref{sec:estilos}). O estilo estava no código desde a iteração~0 (capítulo~\ref{sec:sistema}); as falácias
+da computação distribuída e a conascência estavam tratadas, mas dispersas e sem nome.
 
 \paragraph{Decisão.}
-O ADR-0019 regista o estilo, de forma retroativa, com os critérios do slide~08: o domínio (telemetria com picos
-imprevisíveis, recolhida em muitos \emph{hosts}), as características (escalabilidade, disponibilidade,
-manutenção; capítulo~\ref{sec:requisitos}), a arquitetura dos dados (registo e recibo na mesma transação), os
-fatores organizacionais (duas pessoas, três semanas) e a operação (Docker Compose, sem orquestrador). O sistema é
-\textbf{distribuído}, com duas unidades de \emph{deployment}, e cada uma segue o estilo que lhe serve:
+O ADR-0019 regista o estilo, retroativamente, com os critérios dos diapositivos~08: domínio (telemetria com picos
+imprevisíveis, de muitos \emph{hosts}), características (escalabilidade, disponibilidade, manutenção),
+arquitetura dos dados (registo e recibo na mesma transação), fatores organizacionais (duas pessoas, três semanas) e
+operação (Docker Compose, sem orquestrador). O sistema é \textbf{distribuído}, com duas unidades de
+\emph{deployment}, cada uma com o seu estilo:
 \begin{itemize}
 \item o \textbf{agente} é um \emph{pipeline} com um \emph{pipe} persistente: a recolha e o SDK produzem, o
 \emph{buffer} SQLite guarda, os \emph{workers} de envio consomem (ADR-0020, ADR-0021);
-\item o \textbf{central} é um monólito em camadas, com partição técnica, \emph{jobs} de fundo no mesmo processo e
-a interface feita no servidor (\emph{templates}); replica-se horizontalmente sobre uma base de dados partilhada
-(\dec{8}, ADR-0018), e o \texttt{APP\_ROLE} já permite separar quem serve pedidos de quem corre \emph{jobs};
-\item dentro do central, os \textbf{alertas são um microkernel}: um avaliador genérico e as métricas como
-\emph{plug-ins} obtidos de um registo (\dec{13}), o que dá partição por domínio onde mais importa (\cen{MO1});
+\item o \textbf{central} é um monólito em camadas (partição técnica, \emph{jobs} no mesmo processo, interface em
+\emph{templates}), replicado sobre uma base de dados partilhada (\dec{8}, ADR-0018); o \texttt{APP\_ROLE} já separa
+quem serve pedidos de quem corre \emph{jobs};
+\item os \textbf{alertas são um microkernel}: um avaliador genérico e as métricas como \emph{plug-ins} de um registo
+(\dec{13}), com partição por domínio onde mais importa (\cen{MO1});
 \item a comunicação é \textbf{síncrona por pedido} entre o agente e o central (gRPC), mas \textbf{assíncrona para a
 aplicação}, que só escreve no \emph{buffer} local.
 \end{itemize}
-A Figura~\ref{fig:cc-final} mostra a arquitetura final, nas vistas de componentes e conectores e de alocação
-juntas, com os pontos que as duas vistas de qualidade seguintes referem.
+A Figura~\ref{fig:cc-final} junta as vistas finais de componentes e conectores e de alocação.
 
 \begin{figure}[htbp]
 \centering
@@ -83,8 +81,8 @@ vermelho = ponto das vistas de qualidade (Tabelas~\ref{tab:vista-disp} e~\ref{ta
 \label{fig:cc-final}
 \end{figure}
 
-A Tabela~\ref{tab:modulos-final} é a vista de módulos final. Não é desenhada à mão: cada linha resume uma regra
-do \texttt{depguard}, a mesma que é verificada em cada \emph{pull request}.
+A vista de módulos final (Tabela~\ref{tab:modulos-final}) resume as regras do \texttt{depguard} verificadas em cada
+\emph{pull request}.
 
 \begin{table}[htbp]
   \centering\small
@@ -116,9 +114,8 @@ do \texttt{depguard}, a mesma que é verificada em cada \emph{pull request}.
 \end{table}
 
 \paragraph{Vistas de qualidade.}
-As vistas estruturais não mostram bem um atributo cuja solução está espalhada por várias estruturas
-(secção~\ref{sec:documentacao}). As Tabelas~\ref{tab:vista-disp} e~\ref{tab:vista-seg} juntam, para a
-disponibilidade e para a segurança, o que importa de cada ponto da Figura~\ref{fig:cc-final}.
+As Tabelas~\ref{tab:vista-disp} e~\ref{tab:vista-seg} juntam, para a disponibilidade e a segurança, o que está
+espalhado pelas estruturas (secção~\ref{sec:documentacao}), por ponto da Figura~\ref{fig:cc-final}.
 
 \begin{table}[htbp]
   \centering\small
@@ -159,8 +156,7 @@ disponibilidade e para a segurança, o que importa de cada ponto da Figura~\ref{
 \end{table}
 
 \paragraph{As falácias da computação distribuída.}
-Cada fronteira de rede do sistema parte do princípio de que as oito falácias são falsas. A
-Tabela~\ref{tab:falacias} diz como cada uma é tratada.
+A Tabela~\ref{tab:falacias} diz como cada falácia é tratada.
 
 \begin{table}[htbp]
   \centering\small
@@ -182,16 +178,14 @@ Tabela~\ref{tab:falacias} diz como cada uma é tratada.
   \end{tabularx}
 \end{table}
 
-Dos outros desafios dos sistemas distribuídos, as \textbf{transações distribuídas} foram evitadas: remote e
-central têm cada um a sua transação, e a idempotência do recibo fecha a lacuna entre elas (o email segue o
-mesmo princípio, com a \emph{outbox}). Os \textbf{contratos} têm versões semânticas e o \texttt{buf breaking}
-no CI (\dec{11}). Os \textbf{logs distribuídos} são estruturados (\dec{4}), mas um pedido do remote não se
-correlaciona com o seu tratamento no central: é uma lacuna assumida, com o gatilho E6 (OpenTelemetry).
+Não há \textbf{transações distribuídas}: remote e central têm cada um a sua, e o recibo idempotente fecha a lacuna
+(o email faz o mesmo com a \emph{outbox}). Os \textbf{contratos} têm versões semânticas e \texttt{buf breaking} no
+CI (\dec{11}). Os \textbf{logs distribuídos} são estruturados (\dec{4}), mas não se correlacionam entre remote e
+central: lacuna assumida, com o gatilho E6 (OpenTelemetry).
 
 \paragraph{Conascência.}
-A Tabela~\ref{tab:conascencia} relê as decisões de manutenção com esta métrica
-(secção~\ref{sec:estilos}). O padrão é o mesmo em todas: trocar uma conascência forte e implícita por uma mais
-fraca, com um dono definido e um teste ou um compilador que a verifica.
+A Tabela~\ref{tab:conascencia} relê as decisões de manutenção (secção~\ref{sec:estilos}): todas trocam uma
+conascência forte e implícita por uma mais fraca, com dono e verificada por um teste ou pelo compilador.
 
 \begin{table}[htbp]
   \centering\small
@@ -211,39 +205,30 @@ fraca, com um dono definido e um teste ou um compilador que a verifica.
 \end{table}
 
 \paragraph{Conformidade com a arquitetura.}
-As regras de camadas do \texttt{depguard} são \emph{conformance by analysis}: cada \emph{pull request} verifica
-que o código respeita as dependências permitidas entre pacotes. O limite que o slide~07 aponta a esta técnica
-está presente aqui: as estruturas de execução não aparecem no código estático. Por isso o que é de execução
-verifica-se em execução: que cada \emph{job} corre numa só instância mede-se no teste de \cen{SC3}, e o
-caminho do SDK ao central sem perdas mede-se no E2E (\cen{AV1}). Para que a arquitetura se leia no próprio
-código, os pacotes de cada camada (\texttt{handlers}, \texttt{services} e \texttt{repositories} no central;
-\texttt{repository} e \texttt{sender} no remote) passaram a abrir com um comentário que diz a camada, o que
-podem usar e a regra que o garante.
+O \texttt{depguard} é \emph{conformance by analysis}, com o limite que os diapositivos~07 apontam: as estruturas
+de execução não aparecem no código. Essas verificam-se em execução: um líder por \emph{job} no teste de \cen{SC3},
+o caminho do SDK ao central sem perdas no E2E (\cen{AV1}). Para a arquitetura se ler no código, cada pacote de
+camada (\texttt{handlers}, \texttt{services}, \texttt{repositories}; \texttt{repository}, \texttt{sender} no
+remote) abre com um comentário que diz a camada, o que pode usar e a regra que o garante.
 
 \paragraph{Variabilidade.}
-O Monitor não é uma linha de produtos. Usa, ainda assim, quatro mecanismos de variação do slide~07: um
-\emph{extension point} (o registo das métricas de alerta), parâmetros validados no arranque (incluindo o papel
-de cada instância), a substituição de componentes nos testes (relógio, fuso horário, \texttt{Dialer}) e um
-\emph{core asset} reutilizável por qualquer aplicação Go, o SDK.
+Sem ser uma linha de produtos, o Monitor usa quatro mecanismos de variação dos diapositivos~07: um
+\emph{extension point} (o registo das métricas de alerta), parâmetros validados no arranque (incluindo o papel da
+instância), substituição de componentes nos testes (relógio, fuso, \texttt{Dialer}) e um \emph{core asset}, o SDK.
 
 \paragraph{Alternativas.}
-Os \textbf{microserviços} foram rejeitados com os argumentos do próprio slide~08: o registo, o recibo e a
-avaliação de alertas partilham uma transação, que é o sinal de que pertencem ao mesmo serviço; uma equipa de
-duas pessoas não sustenta a operação que exigem; e cada fronteira de rede nova traz as oito falácias. A
-\textbf{\emph{service-based architecture}} (\texttt{ingest}, \texttt{web} e \texttt{worker} separados, com a
-mesma base de dados) é o passo seguinte, e fica como E3, com o gatilho de a ingestão e o \emph{dashboard}
-competirem pelo CPU, que as medições não mostraram (o CPU do central não passou de 15\,\% em \cen{SC4}). Um
-\emph{broker} (\emph{event-driven}) fica como E1: na topologia \emph{broker}, o tratamento de erros é difícil e
-não há recuperação da transação, que é o que os recibos dão hoje.
+\textbf{Microserviços}, rejeitados com os argumentos dos diapositivos~08: registo, recibo e avaliação de alertas
+partilham uma transação (sinal de que são um só serviço), duas pessoas não sustentam a operação, e cada fronteira
+nova traz as oito falácias. \textbf{\emph{Service-based}} (\texttt{ingest}, \texttt{web}, \texttt{worker} sobre a
+mesma base de dados) é o passo seguinte (E3), com o gatilho de a ingestão e o \emph{dashboard} competirem pelo CPU,
+o que não se mediu (CPU do central $\le$ 16\,\% em \cen{SC4}). Um \emph{broker} (\emph{event-driven}) fica como
+E1: nessa topologia o tratamento de erros é difícil e não há a recuperação transacional que os recibos dão.
 
 \paragraph{\emph{Trade-offs}.}
-A partição técnica espalha cada funcionalidade pelas três camadas; o microkernel dos alertas resolveu-o onde
-mais custava, e no resto é o custo aceite do estilo. A base de dados partilhada é o estrangulamento das escritas
-(\cen{SC3}) e um ponto único de falha (ADR-0018). Um ADR retroativo descreve uma decisão que não foi tomada com
-este vocabulário, e diz isso.
-
-\paragraph{Verificação.}
-\cen{MO3} e \cen{IO1}, as medidas diretas de dois pontos deste estilo, estão na secção~\ref{sec:mo1}.
+A partição técnica espalha cada funcionalidade pelas três camadas; o microkernel resolveu-o onde mais custava. A
+base de dados partilhada é o estrangulamento das escritas (\cen{SC3}) e um ponto único de falha (ADR-0018). Um ADR
+retroativo descreve uma decisão não tomada com este vocabulário, e di-lo. \textbf{Verificação:} \cen{MO3} e
+\cen{IO1} (secção~\ref{sec:mo1}).
 
 \subsection{Escalabilidade}
 
@@ -251,20 +236,16 @@ este vocabulário, e diz isso.
 \label{sec:d4}
 
 \paragraph{Problema.}
-O central não expunha nenhuma métrica de execução (lacuna S8). As medidas dos cenários de escalabilidade
-(p95 da ingestão, rejeições por sobrecarga, atraso de ingestão, CPU, ocupação do \emph{pool} de ligações)
-só se podiam observar do lado do cliente de carga, que mostra que o sistema está lento mas não
-\emph{onde}. Sem isso, nenhuma das decisões \dec{5}--\dec{8} se consegue avaliar. Os logs eram texto livre,
-sem identificador de pedido nem de \emph{host} (lacuna A3), e por isso não se filtravam nem se correlacionavam.
+O central não expunha métricas de execução (S8): o cliente de carga mostrava que o sistema estava lento, mas não
+\emph{onde}, e \dec{5}--\dec{8} não se podiam avaliar. Os logs eram texto livre, sem identificador de pedido nem
+de \emph{host} (A3).
 
 \paragraph{Decisão.}
-O central passou a expor métricas no formato Prometheus, num registo próprio do pacote
-\texttt{observability}, transversal às camadas (uma regra \texttt{depguard} impede-o de depender delas). A
-Tabela~\ref{tab:metricas-d4} liga cada métrica ao cenário que serve. As métricas são servidas num
-\emph{listener} separado (\texttt{METRICS\_ADDR}), fora do \emph{router} do \emph{dashboard}: nunca passam
-pelo \emph{proxy} público nem pela sessão. Os logs passaram a JSON com \texttt{log/slog}: os pedidos HTTP com
-o \texttt{request\_id}, rota, estado e duração; os pedidos de ingestão que falham, com o \texttt{host\_id} e o
-código gRPC. Um perfil Compose \texttt{observability} junta Prometheus e Grafana para os testes de carga.
+Métricas Prometheus num pacote \texttt{observability} transversal (o \texttt{depguard} impede-o de depender das
+camadas), servidas num \emph{listener} próprio (\texttt{METRICS\_ADDR}), fora do \emph{proxy} público e da sessão
+(Tabela~\ref{tab:metricas-d4}). Logs em JSON (\texttt{log/slog}): pedidos HTTP com \texttt{request\_id}, rota,
+estado e duração; falhas de ingestão com \texttt{host\_id} e código gRPC. Um perfil Compose junta Prometheus e
+Grafana.
 
 \begin{table}[htbp]
   \centering\small
@@ -285,298 +266,229 @@ código gRPC. Um perfil Compose \texttt{observability} junta Prometheus e Grafan
 \end{table}
 
 \paragraph{Teoria.}
-\emph{Monitor} (disponibilidade) e monitorabilidade: o sistema observa-se a si próprio. \emph{Limit
-Exposure} (segurança): as métricas ficam fora do \emph{listener} público. Esta decisão é também um exemplo
-de ADD a rever o que falta tratar: na primeira versão do plano, o Prometheus estava adiado. Passou a ser
-necessário quando a escalabilidade passou a (H,H), porque um cenário (H,H) tem de ser medido.
+\emph{Monitor} e monitorabilidade; \emph{Limit Exposure} (métricas fora do \emph{listener} público). É também o
+ADD a rever o que tratar: o Prometheus estava adiado e tornou-se necessário quando a escalabilidade passou a (H,H),
+porque um cenário (H,H) tem de ser medido.
 
 \paragraph{Alternativas.}
-OpenTelemetry completo (\emph{traces}, métricas e coletor) traria mais infraestrutura do que um único
-serviço a 1\,000 \emph{hosts} precisa; fica no plano de evolução, com o gatilho ``diagnosticar latência entre
-serviços''. Medir só do lado do k6 dá a latência vista pelo cliente, mas não a causa. Servir
-\texttt{/metrics} no \emph{router} do \emph{dashboard} exigiria autenticação própria. Reescrever todas as
-chamadas de log existentes não trazia valor arquitetural: o \texttt{log.Logger} antigo passou a escrever
-através do mesmo \emph{handler} JSON.
+OpenTelemetry completo: mais infraestrutura do que um serviço precisa (E6). Só o k6: dá a latência, não a causa.
+\texttt{/metrics} no \emph{router} do \emph{dashboard}: exigiria autenticação própria. Reescrever as chamadas de
+log: sem valor arquitetural; o \texttt{log.Logger} antigo escreve pelo mesmo \emph{handler} JSON.
 
 \paragraph{Trade-offs.}
-Nenhuma métrica usa o \emph{host} como \emph{label}: com 1\,000 \emph{hosts} seriam 1\,000 séries por métrica, e o
-próprio Prometheus degradar-se-ia. O detalhe por \emph{host} fica nos logs. Os pedidos de ingestão bem-sucedidos
-só são registados em nível \texttt{debug}, porque 1\,000 \emph{hosts} gerariam dezenas de linhas por segundo.
-A métrica do \emph{outbox} faz uma consulta à base de dados por recolha (a cada 5--15~s), com um \emph{timeout}
-curto. Nas estatísticas, o repositório não distingue registos novos de reenviados; a métrica conta-os juntos,
-e a descrição da métrica di-lo.
+Nenhuma métrica tem o \emph{host} como \emph{label} (seriam 1\,000 séries por métrica); o detalhe por \emph{host}
+fica nos logs, e a ingestão bem-sucedida só em \texttt{debug}. A métrica do \emph{outbox} faz uma consulta por
+recolha, com \emph{timeout} curto. Nas estatísticas, novos e reenviados contam juntos, e a descrição di-lo.
 
 \paragraph{Verificação.}
-Testes fazem a recolha real de \texttt{/metrics} depois de pedidos de ingestão aceites, duplicados e rejeitados,
-de pedidos HTTP e de execuções de \emph{jobs} (incluindo uma falhada e uma interrompida pelo encerramento, que
-não conta como falha). Num teste ponta-a-ponta, com o central, o PostgreSQL e um agente reais, as métricas
-mostraram os valores esperados. A alteração não acrescentou \emph{issues} de lint: as que introduziu na
-complexidade do arranque do servidor foram corrigidas na mesma alteração (60 para 58).
+Testes leem \texttt{/metrics} depois de ingestões aceites, duplicadas e rejeitadas, de pedidos HTTP e de
+\emph{jobs} (incluindo um falhado e um interrompido pelo encerramento, que não conta como falha); um ensaio com
+componentes reais confirmou os valores. Lint do central de 60 para 58.
 
 \subsubsection{Escritas em lote (\dec{5}, ADR-0005)}
 \label{sec:d5}
 
 \paragraph{Problema.}
-A baseline de carga (secção~\ref{sec:aval-escala}) mostrou que o único cenário que falha é a recuperação:
-o \emph{pool} de ligações esgota-se (25 de 25) com o CPU abaixo de 30\,\%. Cada lote de ingestão fazia dois
-\emph{statements} por registo, o recibo de deduplicação e o próprio registo: um lote de 100 eram cerca de 200
-idas à base de dados, sempre com a mesma ligação ocupada (S2). O \emph{job} de alertas fazia um UPDATE por cada
-regra não violada, a cada 15~s (S3).
+Na baseline de carga só a recuperação falhava: o \emph{pool} esgotava-se (25 de 25) com o CPU abaixo de 30\,\%
+(secção~\ref{sec:aval-escala}). Cada registo custava dois \emph{statements} (recibo e registo), cerca de 200 por
+lote, sempre com a ligação ocupada (S2); os alertas faziam um UPDATE por regra não violada a cada 15~s (S3).
 
 \paragraph{Decisão.}
-Cada lote passa a usar três \emph{statements}, seja qual for o tamanho: os recibos de todo o lote num
-\texttt{INSERT \ldots{} FROM unnest(\ldots) ON CONFLICT DO NOTHING RETURNING}, que diz que registos são novos; os
-registos novos num único \texttt{INSERT} com \emph{arrays} por coluna; e a atualização do \emph{host}. Os alertas
-não violados resolvem-se todos num único UPDATE por ciclo. A idempotência e a atomicidade mantêm-se: dados e
-recibos continuam na mesma transação, e um reenvio devolve os mesmos identificadores.
+Três \emph{statements} por lote, seja qual for o tamanho: os recibos num \texttt{INSERT \ldots{} FROM
+unnest(\ldots) ON CONFLICT DO NOTHING RETURNING}, que diz quais são novos; esses registos num \texttt{INSERT} com
+\emph{arrays} por coluna; e a atualização do \emph{host}. Os alertas não violados resolvem-se num UPDATE por ciclo.
+Dados e recibos continuam na mesma transação, e um reenvio devolve os mesmos identificadores.
 
 \paragraph{Teoria.}
-\emph{Reduce Overhead} e \emph{Increase Resource Efficiency} (desempenho): menos trabalho por unidade de
-débito, e cada ligação fica ocupada menos tempo. \emph{Encapsulate} (modificabilidade): a mudança fica dentro
-do repositório, e a interface usada pelos serviços não muda.
+\emph{Reduce Overhead} e \emph{Increase Resource Efficiency}: menos trabalho por registo e ligações ocupadas
+menos tempo. \emph{Encapsulate}: a mudança fica no repositório, sem mudar a interface dos serviços.
 
 \paragraph{Alternativas.}
-\texttt{COPY} é o mais rápido, mas não suporta \texttt{ON CONFLICT} nem devolve os identificadores de que a
-confirmação ao agente precisa. Aumentar o \emph{pool} só adiaria o problema, e passá-lo-ia ao PostgreSQL, cujas
-100 ligações são partilhadas por todas as instâncias (\dec{8}). Uma fila em memória antes da base de dados
-arriscaria perder dados já confirmados ao agente (\cen{AV1}).
+\texttt{COPY}: não suporta \texttt{ON CONFLICT} nem devolve os identificadores da confirmação. Aumentar o
+\emph{pool}: adiaria o problema para as 100 ligações do PostgreSQL, partilhadas pelas instâncias (\dec{8}). Fila em
+memória: perderia dados já confirmados (\cen{AV1}).
 
 \paragraph{Trade-offs.}
-O SQL fica mais complexo. Isso é mitigado por ficar isolado no repositório e coberto pelos testes de
-integração que já existiam (deduplicação, reenvio, \emph{rollback} conjunto de dados e recibos, recibos
-concorrentes), a que se juntaram três: um lote com registos novos e reenviados misturados, a ordem dos
-identificadores devolvidos, e a resolução de alertas em lote.
+SQL mais complexo, isolado no repositório e coberto pelos testes de integração existentes (deduplicação, reenvio,
+\emph{rollback} conjunto, recibos concorrentes) e por três novos (lote misto de novos e reenviados, ordem dos
+identificadores, resolução de alertas em lote).
 
 \subsubsection{Controlo de admissão (\dec{6}, ADR-0006)}
 \label{sec:d6}
 
 \paragraph{Problema.}
-Nada limitava quantos pedidos de ingestão eram servidos ao mesmo tempo (S4). Na recuperação, a ingestão
-ocupava todas as ligações e o \emph{dashboard} esperava por uma livre, com p95 de pelo menos 10~s.
+Nada limitava a ingestão em simultâneo (S4): na recuperação ocupava todas as ligações e o \emph{dashboard}
+esperava (p95 $\ge$ 10~s).
 
 \paragraph{Decisão.}
-O número de pedidos de ingestão em curso é limitado (\texttt{INGEST\_MAX\_INFLIGHT}, por omissão 60\,\% do
-\emph{pool}: 15 de 25). Cada pedido usa no máximo uma ligação de cada vez, por isso ficam sempre pelo menos 10
-para o \emph{dashboard}, as sessões e os \emph{jobs}. Um pedido acima do limite é rejeitado logo, antes da
-autenticação, com \texttt{RESOURCE\_EXHAUSTED} e um atraso aleatório entre 1 e 10~s (\texttt{RetryInfo}). O
-agente guarda os registos no \emph{buffer} e volta a enviá-los, por isso nada se perde, e o atraso aleatório
-evita que 1\,000 agentes rejeitados no mesmo segundo voltem todos no mesmo segundo.
+A ingestão em curso é limitada (\texttt{INGEST\_MAX\_INFLIGHT}, por omissão 60\,\% do \emph{pool}: 15 de 25);
+cada pedido usa uma ligação de cada vez, por isso ficam pelo menos 10 para o resto. Acima do limite, o pedido é
+rejeitado antes da autenticação, com \texttt{RESOURCE\_EXHAUSTED} e um atraso aleatório de 1 a 10~s
+(\texttt{RetryInfo}). O agente guarda e reenvia, por isso nada se perde, e o atraso aleatório evita que os
+rejeitados voltem todos no mesmo segundo.
 
 \paragraph{Teoria.}
-\emph{Limit Event Response}, \emph{Bound Queue Sizes} e \emph{Schedule Resources} (desempenho): a ingestão tem
-uma quota fixa do recurso partilhado. \emph{Degradation} (disponibilidade): sob sobrecarga, a ingestão fica mais
-lenta para o \emph{dashboard} continuar utilizável. A degradação é segura porque combina com \emph{Retry} no
-agente.
+\emph{Limit Event Response}, \emph{Bound Queue Sizes}, \emph{Schedule Resources}: uma quota fixa do recurso
+partilhado. \emph{Degradation}: sob sobrecarga, a ingestão abranda para o \emph{dashboard} continuar utilizável, o
+que é seguro porque o agente faz \emph{Retry}.
 
 \paragraph{O que ficou de fora, e porquê.}
-O plano previa também justiça por \emph{host}: um \emph{token bucket} por \emph{host}, para um \emph{host} em rajada
-não atrasar os outros (S10). A baseline refutou esse risco: com 1\,\% dos \emph{hosts} a 200 logs/s, os restantes
-tiveram atraso p95 de 6~ms (Tabela~\ref{tab:carga-sc5}). Implementá-la seria complexidade sem um cenário que a
-peça. Fica desenhada no ADR, com o gatilho que a tornaria necessária: atraso p95 dos restantes \emph{hosts}
-acima de 1~s em \cen{SC5}, ou um \emph{host} com mais de metade das admissões. É o \emph{generate and test} a
-retirar do desenho uma parte que a análise tinha proposto.
+O plano previa justiça por \emph{host} (um \emph{token bucket}) contra S10. A baseline refutou o risco: com 1\,\%
+dos \emph{hosts} a 200 logs/s, os restantes tiveram atraso p95 de 6~ms (Tabela~\ref{tab:carga-sc5}). Fica desenhada
+no ADR, com o gatilho: atraso p95 dos restantes acima de 1~s em \cen{SC5}, ou um \emph{host} com mais de metade das
+admissões.
 
 \paragraph{Alternativas.}
-Esperar por uma vaga em vez de rejeitar acumularia pedidos em memória até ao \emph{timeout} do agente; rejeitar
-com \texttt{RetryInfo} devolve a espera a quem já guarda os dados. Uma segunda \emph{pool} para o \emph{dashboard}
-teria o mesmo efeito com mais configuração. Uma fila ou \emph{broker} à frente da base de dados é a evolução
-E1, para mais de 10\,000 \emph{hosts}.
+Esperar por vaga acumularia pedidos em memória; rejeitar devolve a espera a quem já guarda os dados. Um segundo
+\emph{pool} daria o mesmo com mais configuração. Uma fila ou \emph{broker} é a evolução E1.
 
 \paragraph{Trade-offs.}
-A recuperação fica mais lenta, porque os agentes esperam o \texttt{RetryInfo}, mas há folga: o limite de
-\cen{SC2} é de 15~minutos e a baseline absorveu o \emph{backlog} em 1,4. O limite é por instância, e com
-várias instâncias (\dec{8}) terá de ser dimensionado com o \texttt{max\_connections} do PostgreSQL.
+Previa-se uma recuperação mais lenta (os agentes esperam o \texttt{RetryInfo}), com folga face aos 15~minutos de
+\cen{SC2}; a medição mostrou o contrário (secção~\ref{sec:aval-escala}). O limite é por instância: com várias
+(\dec{8}), dimensiona-se com o \texttt{max\_connections} do PostgreSQL.
 
 \paragraph{Verificação de \dec{5} e \dec{6}.}
-A iteração~4 repetiu as medições de carga da \emph{baseline} (secção~\ref{sec:aval-escala}). Na recuperação, o p95
-do \emph{dashboard} desceu de pelo menos 10~s para 262~ms, as esperas por ligação de mais de 11\,000 para 0, e o
-\emph{backlog} passou a ser absorvido em 43~s em vez de 1,4~minutos, sem perdas nem duplicados. Os cenários que já
-se cumpriam continuam a cumprir-se, com latências mais baixas. Nas métricas de código, as funções acima do
-limite cognitivo no central desceram de 10 para 8 e as \emph{issues} de lint de 60 para 56: as alterações não
-deixaram dívida nova, e o arranque do servidor deixou de estar acima dos limites.
+Na iteração~4, o \emph{dashboard} durante a recuperação desceu de $\ge$ 10~s para 262~ms e o \emph{backlog} passou
+a ser absorvido em 43~s (secção~\ref{sec:aval-escala}). Funções acima do limite cognitivo no central de 10 para 8;
+lint de 60 para 56.
 
 \subsubsection{Várias instâncias do central (\dec{8}, ADR-0007)}
 \label{sec:d8}
 
 \paragraph{Problema.}
-\cen{SC3} pede que o débito suba ao acrescentar instâncias e que cada \emph{job} de fundo corra numa só. Cada
-instância corria todos os \emph{jobs} (S5) e contava as tentativas de login na sua memória (S6). A análise do
-código mostrou que os \emph{jobs} já davam resultados corretos com várias instâncias, porque cada um é idempotente
-(\emph{locks}, \texttt{SKIP LOCKED}, índices únicos, chaves de deduplicação). O problema de S5 era o custo: cada
-\emph{host} receberia N verificações de saúde a cada 30~s. S6, pelo contrário, é de segurança: o limite de
-login passaria a ser N vezes maior. O desenho revelou um terceiro problema, que o plano não previa: atrás de
-um balanceador, todos os pedidos chegam com o endereço do balanceador, e o limite de login por IP passaria a
-ser um limite global, que um atacante usaria para bloquear o login a todos.
+\cen{SC3} pede débito a subir com as instâncias e cada \emph{job} numa só. Cada instância corria todos os
+\emph{jobs} (S5) e contava as tentativas de \emph{login} na sua memória (S6). Os \emph{jobs} já eram corretos com
+várias instâncias, por serem idempotentes (\emph{locks}, \texttt{SKIP LOCKED}, índices únicos); S5 era só custo
+(N \emph{probes} por \emph{host}). S6 é de segurança: o limite seria N vezes maior. O desenho revelou um terceiro
+problema: atrás de um balanceador, o limite por IP tornar-se-ia global, e um atacante bloquearia o \emph{login} a
+todos.
 
 \paragraph{Decisão.}
 \begin{itemize}
-  \item \textbf{Liderança por \emph{job}} com \texttt{pg\_try\_advisory\_lock}, numa ligação reservada por
-    instância. O \emph{lock} é de sessão: se o líder morre, o PostgreSQL liberta-o e outra instância assume na
-    execução seguinte. A métrica \texttt{monitor\_job\_leader} mostra quem lidera cada \emph{job}. A correção
-    continua a vir da idempotência; a liderança só evita trabalho repetido.
-  \item \textbf{Papéis} (\texttt{APP\_ROLE=all|web|worker}), para separar o serviço web dos \emph{jobs} sem mais
-    um binário. Por omissão, uma instância faz tudo, como antes.
-  \item \textbf{Limitador de login no PostgreSQL}: um \texttt{INSERT … ON CONFLICT DO UPDATE} por tentativa, para o
-    IP e para a conta, numa janela fixa de um minuto, igual para todas as instâncias.
-  \item \textbf{Proxies de confiança} (\texttt{TRUSTED\_PROXIES}): o IP do cliente só é lido de
-    \texttt{X-Forwarded-For} quando o pedido vem do balanceador.
-  \item \textbf{nginx} como balanceador do HTTP e do gRPC (\texttt{docker compose up --scale backend=3}). Com
-    \texttt{grpc\_pass}, distribui cada pedido e não cada ligação: sem isso, cada agente ficaria preso à instância
-    em que abriu a sua ligação HTTP/2.
+  \item \textbf{Liderança por \emph{job}} com \texttt{pg\_try\_advisory\_lock} de sessão, numa ligação reservada: se o
+    líder morre, o PostgreSQL liberta o \emph{lock} e outra instância assume. \texttt{monitor\_job\_leader} mostra o
+    líder. A correção continua a vir da idempotência; a liderança só evita trabalho repetido.
+  \item \textbf{Papéis} (\texttt{APP\_ROLE=all|web|worker}); por omissão, uma instância faz tudo.
+  \item \textbf{Limitador de \emph{login} no PostgreSQL}: um \texttt{INSERT … ON CONFLICT DO UPDATE} por tentativa,
+    por IP e por conta, em janela fixa de um minuto, partilhado pelas instâncias.
+  \item \textbf{Proxies de confiança} (\texttt{TRUSTED\_PROXIES}): \texttt{X-Forwarded-For} só é lido se o pedido
+    vier do balanceador.
+  \item \textbf{nginx} para HTTP e gRPC (\texttt{--scale backend=3}); com \texttt{grpc\_pass} distribui pedidos e
+    não ligações, que prenderiam cada agente a uma instância.
 \end{itemize}
 
 \paragraph{Teoria.}
-\emph{Increase Resources} e \emph{Maintain Multiple Copies of Computations} (desempenho), com o balanceador como
-\emph{intermediary}. \emph{Active Redundancy} nas instâncias web e \emph{Passive Redundancy} no líder de cada
-\emph{job}, que tem instâncias à espera (disponibilidade). \emph{Defer Binding}: o papel e o número de instâncias
-escolhem-se no \emph{deploy}.
+\emph{Increase Resources} e \emph{Maintain Multiple Copies of Computations}, com o balanceador como
+\emph{intermediary}; \emph{Active Redundancy} nas instâncias web e \emph{Passive Redundancy} no líder de cada
+\emph{job}; \emph{Defer Binding} do papel e do número de instâncias.
 
 \paragraph{Alternativas.}
-Um coordenador externo (etcd, Consul, Redis) seria mais uma peça de infraestrutura, quando o PostgreSQL já
-oferece \emph{locks} com a semântica certa. Um \emph{lock} por execução, como a retenção já fazia, não chega: os
-temporizadores das instâncias não estão sincronizados, e cada uma obteria o \emph{lock} noutro momento. Um
-balanceador TCP prenderia cada agente a uma instância.
+Coordenador externo (etcd, Consul, Redis): mais infraestrutura, quando o PostgreSQL já tem \emph{locks} com a
+semântica certa. \emph{Lock} por execução: com temporizadores dessincronizados, cada instância obtê-lo-ia noutro
+momento. Balanceador TCP: prenderia cada agente a uma instância.
 
 \paragraph{Trade-offs.}
-O PostgreSQL continua a ser um ponto único, de falha e de capacidade. A medição mostrou que é este o limite que
-conta (secção~\ref{sec:aval-sc3}). O limite de admissão de \dec{6} é por instância: com N instâncias, deve ser o
-orçamento total a dividir por N.
+O PostgreSQL continua a ser um ponto único de falha e de capacidade, e foi esse o limite medido
+(secção~\ref{sec:aval-sc3}). O limite de \dec{6} passa a ser o orçamento total a dividir por N.
 
 \paragraph{Verificação.}
-Os testes de integração verificam, num PostgreSQL real, que só uma instância lidera cada \emph{job} e que outra
-assume quando o líder fecha a sessão ou quando o PostgreSQL a termina. Verificam também que o limite de login é
-partilhado por duas instâncias. Num ensaio no Compose com três réplicas, os pedidos HTTP e gRPC ficaram
-distribuídos por igual. Depois de um \texttt{SIGKILL} ao líder, outra réplica liderava o primeiro \emph{job} ao fim
-de 2~s e os quatro ao fim de 12~s; o limite de \cen{SC3} é 30~s. A medição de débito está na
-secção~\ref{sec:aval-sc3}.
+Testes de integração num PostgreSQL real: um só líder por \emph{job}, outro assume quando a sessão do líder fecha
+ou é terminada, e o limite de \emph{login} é partilhado. Num ensaio com três réplicas, os pedidos ficaram
+distribuídos por igual; depois de um \texttt{SIGKILL} ao líder, outra réplica liderava o primeiro \emph{job} em
+2~s e os quatro em 12~s (limite de \cen{SC3}: 30~s). O débito está na secção~\ref{sec:aval-sc3}.
 
 \subsubsection{\emph{Probes} de saúde escaláveis (\dec{7}, ADR-0013)}
 \label{sec:d7}
 
 \paragraph{Problema.}
-Um \emph{host} com \emph{endpoint} de saúde é verificado pelo central a cada 30~s. O \emph{job} percorria
-todos os \emph{hosts} em páginas de 100, com 8 \emph{probes} em paralelo e 5~s de \emph{timeout}, e cada página
-só acabava quando acabava a sua \emph{probe} mais lenta. \cen{AV2} pede o alerta \texttt{host\_offline} em
-$\le$ limiar + 60~s, mesmo com 1.000 \emph{hosts}. O limiar conta desde a primeira \emph{probe} falhada e os
-alertas são avaliados a cada 15~s, por isso os 60~s têm de cobrir o intervalo entre duas \emph{probes} do mesmo
-\emph{host} mais uma avaliação: esse intervalo tem de ser $\le$ 45~s. Como no \dec{6}, medimos antes de mudar
-(secção~\ref{sec:av1-av4}): com 1.000 \emph{hosts}, metade sem resposta, um ciclo durava 350,7~s, e o pior
-atraso até ao alerta, além do limiar, era de 6~min~6~s. Havia dois efeitos a mais. Um \emph{host} com a última
-verificação mais velha do que 90~s passa a ``desconhecido'' e o alerta deixa de o avaliar, o que acontecia
-durante 4~min~21~s de cada ciclo. E o \emph{heartbeat} do \emph{job} (\dec{17}) só bate quando uma iteração
-acaba, por isso o líder deixaria de estar pronto a meio de cada ciclo.
+O central verifica o \emph{endpoint} de saúde de cada \emph{host} a cada 30~s, em páginas de 100, com 8
+\emph{probes} em paralelo e 5~s de \emph{timeout}; cada página esperava pela \emph{probe} mais lenta. \cen{AV2} pede
+o alerta em $\le$ limiar + 60~s com 1\,000 \emph{hosts}; com alertas avaliados a cada 15~s, o intervalo entre
+\emph{probes} do mesmo \emph{host} tem de ser $\le$ 45~s. Medido antes de mudar (secção~\ref{sec:av1-av4}), com
+metade sem resposta, um ciclo durava 350,7~s. Além disso, um \emph{host} sem verificação há mais de 90~s passa a
+``desconhecido'' e deixa de ser avaliado, e o \emph{heartbeat} do \emph{job} (\dec{17}) só bate no fim de cada
+iteração.
 
 \paragraph{Decisão.}
-Cada \emph{host} passa a ter a hora da próxima verificação, numa coluna nova. O \emph{job} acorda a cada 5~s e
-reclama só os \emph{hosts} devidos, num \texttt{UPDATE} que marca logo a verificação seguinte para daqui a
-30~s $\pm$ 10\,\%: o \emph{jitter} espalha as \emph{probes} ao longo do intervalo, e uma iteração atrasada
-nunca verifica o mesmo \emph{host} duas vezes. Em vez de páginas, há vagas: a concorrência é configurável (por
-omissão, 128), o \emph{job} só reclama tantos \emph{hosts} quantas as vagas livres, e cada \emph{probe} começa
-logo. Um \emph{host} lento ocupa uma vaga durante no máximo 5~s e não atrasa os outros. Cada iteração tem um
-prazo igual ao intervalo; o que ficar por verificar continua devido na seguinte. O pior caso calculado é
-33~s + 5~s = 38~s entre \emph{probes}, e 53~s com a avaliação. A capacidade chega: 500 \emph{probes} em
-\emph{timeout} a cada 30~s ocupam em média 83 das 128 vagas.
+Cada \emph{host} guarda a hora da próxima verificação. O \emph{job} acorda a cada 5~s e reclama só os devidos, num
+\texttt{UPDATE} que marca a seguinte para daqui a 30~s $\pm$ 10\,\%: o \emph{jitter} espalha as \emph{probes}, e
+nenhum \emph{host} é verificado duas vezes. Em vez de páginas, há vagas (\texttt{HEALTH\_CONCURRENCY}, 128): só se
+reclamam tantos \emph{hosts} quantas as vagas livres, e um lento ocupa uma vaga até 5~s sem atrasar os outros. Cada
+iteração tem um prazo igual ao intervalo. Pior caso calculado: 38~s entre \emph{probes}, 53~s com a avaliação; 500
+\emph{probes} em \emph{timeout} a cada 30~s ocupam em média 83 das 128 vagas.
 
 \paragraph{Teoria.}
-Nas táticas de desempenho, \emph{Introduce Concurrency} (128 \emph{probes} em paralelo), \emph{Schedule
-Resources} (a vez de cada \emph{host} e o \emph{jitter}) e \emph{Bound Execution Times} (\emph{timeout} por
-\emph{probe} e prazo por iteração). A tática de disponibilidade é a mesma de antes, \emph{Ping/Echo}; o que
-muda é que cumpre o prazo à escala pedida.
+\emph{Introduce Concurrency}, \emph{Schedule Resources} (a vez de cada \emph{host}, o \emph{jitter}) e
+\emph{Bound Execution Times}; a tática de disponibilidade continua a ser \emph{Ping/Echo}, agora à escala pedida.
 
 \paragraph{Alternativas.}
-Aumentar só a concorrência e manter as páginas daria cerca de 10 páginas $\times$ 5~s = 50~s por ciclo com
-metade em \emph{timeout}: falha \cen{AV2} e mantém a rajada de 1.000 pedidos a cada 30~s. Uma \emph{goroutine}
-por \emph{host}, sem limite, abriria todas as ligações de uma vez e não teria limite a 10.000 \emph{hosts}.
-Agendar em memória perderia o estado quando a liderança muda de instância (\dec{8}): o novo líder voltaria a
-verificar todos de uma vez. Repartir as \emph{probes} por várias instâncias (E7) exige coordenar a partição, e uma
-instância chega com folga para 1.000 \emph{hosts}.
+Mais concorrência com páginas: cerca de 50~s por ciclo, falha \cen{AV2} e mantém a rajada de 1\,000 pedidos.
+Uma \emph{goroutine} por \emph{host}: sem limite de ligações. Agenda em memória: perde-se ao mudar de líder
+(\dec{8}). Repartir por instâncias (E7): coordenação desnecessária a 1\,000 \emph{hosts}.
 
 \paragraph{Trade-offs.}
-Cada \emph{probe} acrescenta uma escrita pequena (a reclamação), no PostgreSQL que já é o estrangulamento
-(\cen{SC3}): cerca de 33 por segundo com 1.000 \emph{hosts}, por chave primária. Até 128 \emph{probes}
-gravam o resultado ao mesmo tempo e competem pelo \emph{pool} de ligações. O gatilho para E7 é medido: se o
-intervalo entre \emph{probes} passar de 45~s, as \emph{probes} são repartidas entre instâncias.
+Uma escrita por \emph{probe} (cerca de 33/s, por chave primária) no PostgreSQL que já é o estrangulamento, e até
+128 gravações em simultâneo a competir pelo \emph{pool}. Gatilho de E7: intervalo entre \emph{probes} acima de 45~s.
 
 \paragraph{Verificação.}
-O resultado de \cen{AV2}, antes e depois, está na secção~\ref{sec:av1-av4}. Testes unitários fixam o limite de
-vagas, o prazo da iteração e o erro de reclamação; um teste de integração fixa o intervalo com \emph{jitter},
-que nenhum \emph{host} é entregue duas vezes e que um \emph{endpoint} alterado volta a ser devido. O lint do
-central desceu de 54 para 53 \emph{issues}, porque a função que corre as \emph{probes} ficou abaixo do limite
-de complexidade.
+\cen{AV2} na secção~\ref{sec:av1-av4}. Testes fixam o limite de vagas, o prazo, o intervalo com \emph{jitter}, que
+nenhum \emph{host} é entregue duas vezes e que um \emph{endpoint} alterado volta a ser devido. Lint de 54 para 53.
 
 \subsubsection{Trinta dias de dados: consultas com custo limitado e um \emph{bulkhead} (\dec{9}, ADR-0017)}
 \label{sec:d9}
 
 \paragraph{Problema.}
-\cen{SC4} pede o \emph{dashboard} com p95 $<$ 1~s e a retenção sem degradar a ingestão, com 30 dias de dados de
-1\,000 \emph{hosts}. O plano previa particionar as tabelas de telemetria por dia e fazer a retenção com
-\texttt{DROP PARTITION}; a regra do roteiro era medir primeiro e só particionar se \cen{SC4} falhasse. Para o
-medir, o gerador de carga ganhou um histórico sintético: 31 dias com o ritmo e o perfil de logs do k6, 89~M
-estatísticas, 239~M erros e os seus recibos, 143~GB. A mesma carga nominal corre por cima durante 10~minutos,
-com uma consulta do \emph{dashboard} por segundo, em duas fases sobre os mesmos dados, sem e com a retenção.
-\cen{SC4} falhava nas duas partes, e a ingestão falhava logo na fase sem retenção: o \emph{dashboard} tinha p95
-entre 29 e 74~s, e só 15\,\% dos registos esperados entravam, com 58\,\% dos pedidos rejeitados. Medidas uma a
-uma, com o sistema parado, quatro consultas explicavam tudo: o CPU médio do último registo de cada
-\emph{host} (55~s, um \texttt{DISTINCT ON} sobre 89~M linhas), os nomes de aplicação distintos (17~s), o total
-de erros da página de erros (13~s) e as métricas de um mês de um \emph{host} (5,3~s, uma leitura aleatória do
-disco por linha). Nenhuma tinha um limite temporal que o particionamento pudesse aproveitar. Cada uma prendia
-uma ligação durante dezenas de segundos, e com uma consulta por segundo ocupavam as 25: a partir daí tudo
-esperava, até as consultas de 16~ms e a ingestão. \dec{6} limitava a ingestão, mas nada limitava o
-\emph{dashboard}.
+O plano previa particionar a telemetria por dia, com retenção por \texttt{DROP PARTITION}, mas só se \cen{SC4}
+falhasse. Para o medir, o gerador ganhou um histórico sintético de 31 dias (89~M estatísticas, 239~M erros e
+recibos, 143~GB), com a carga nominal e uma consulta do \emph{dashboard} por segundo por cima. \cen{SC4} falhava
+nas duas partes (secção~\ref{sec:sc4}). Medidas uma a uma, quatro consultas explicavam tudo: o último registo de
+cada \emph{host} (55~s, \texttt{DISTINCT ON} sobre 89~M linhas), os nomes de aplicação distintos (17~s), o total
+da página de erros (13~s) e as métricas de um mês de um \emph{host} (5,3~s, uma leitura aleatória por linha).
+Nenhuma filtrava por tempo, por isso o particionamento não as ajudaria. Cada uma prendia uma ligação durante
+dezenas de segundos e, juntas, ocupavam as 25: tudo esperava, incluindo a ingestão. \dec{6} limitava a ingestão,
+mas nada limitava o \emph{dashboard}.
 
 \paragraph{Decisão.}
-Primeira parte: cada consulta passa a ter um custo que depende do que mostra, e não do volume guardado. O
-último registo de cada \emph{host} lê-se com uma pesquisa no índice por \emph{host} (\texttt{LATERAL}); os nomes
-distintos com um \emph{loose index scan}; o total da página de erros conta até 10\,001 e mostra ``10000+'' acima
-disso; os erros de hoje vêm de contadores por hora, \emph{host} e nível, mantidos por \emph{triggers} na mesma
-transação de cada escrita; e as métricas leem só um índice de cobertura (\texttt{INCLUDE}), que substitui o
-anterior com a mesma chave. A seguir, um \emph{bulkhead}: as rotas do \emph{browser} têm no máximo 20\,\% do
-\emph{pool} e um prazo de 10~s por pedido, que cancela a consulta no PostgreSQL. Com os 60\,\% da ingestão,
-ficam 20\,\% para os \emph{jobs}. Segunda parte: o particionamento decidia-se pela fase com retenção da medição
-seguinte, com um critério escrito antes de a fazer. Particionar se o p95 da ingestão subisse mais de 20\,\%, se
-uma execução da retenção passasse de 15~s, ou se os registos expirados continuassem a crescer.
+Primeira parte: o custo de cada consulta passa a depender do que mostra, e não do volume. Último registo por
+\emph{host} com \texttt{LATERAL} no índice; nomes distintos com \emph{loose index scan}; total de erros contado até
+10\,001 (``10000+''); erros de hoje de contadores por hora, \emph{host} e nível, mantidos por \emph{triggers} na
+transação de cada escrita; métricas lidas de um índice de cobertura (\texttt{INCLUDE}). Depois, um
+\emph{bulkhead}: as rotas do \emph{browser} têm até 20\,\% do \emph{pool} e um prazo de 10~s que cancela a consulta;
+com os 60\,\% da ingestão, ficam 20\,\% para os \emph{jobs}. Segunda parte, com o critério escrito antes de medir:
+particionar se o p95 da ingestão subisse mais de 20\,\% com a retenção, se uma execução passasse de 15~s, ou se os
+expirados continuassem a crescer.
 
 \paragraph{Teoria.}
-\emph{Increase Resource Efficiency} (consultas proporcionais ao resultado), \emph{Bound Execution Times}
-(contagem com teto e prazo por pedido), \emph{Maintain Multiple Copies of Computations} (os contadores) e
-\emph{Reduce Overhead} (o índice de cobertura). O \emph{bulkhead} aplica \emph{Limit Resources} ao \emph{pool},
-no sentido inverso de \dec{6}. O próprio caminho é a análise tardia por medição do slide~04: a estimativa
-apontava para o volume e para a retenção, e a medição mostrou outra coisa.
+\emph{Increase Resource Efficiency}, \emph{Bound Execution Times} (teto e prazo), \emph{Maintain Multiple Copies of
+Computations} (contadores), \emph{Reduce Overhead} (índice de cobertura); o \emph{bulkhead} é \emph{Limit Resources},
+o inverso de \dec{6}. É a análise tardia por medição dos diapositivos~04: a estimativa apontava para o volume, a
+medição para outro sítio.
 
 \paragraph{Alternativas.}
-Particionar já não teria ajudado nenhuma das quatro consultas, porque nenhuma filtrava por tempo. O
-TimescaleDB resolveria os agregados, mas troca a imagem oficial do PostgreSQL por uma extensão; continua como
-E2, com gatilho. Um \emph{cache} do resumo em memória teria uma cópia por instância, e o primeiro pedido depois
-de expirar voltaria a custar 55~s. Manter os contadores no código da ingestão, em vez de \emph{triggers},
-obrigaria todos os caminhos de escrita a lembrar-se deles. Baixar o \texttt{statement\_timeout} de 30~s que
-o central já tinha cortaria também a retenção e as escritas em lote; e os 30~s já existiam e não impediram a
-saturação, porque uma consulta de 55~s prende a ligação esse tempo todo.
+Particionar: não ajudava nenhuma das quatro. TimescaleDB: troca a imagem oficial por uma extensão (E2). \emph{Cache}
+em memória: uma cópia por instância, e cada expiração volta a custar 55~s. Contadores no código: todos os caminhos de
+escrita teriam de se lembrar deles. Baixar o \texttt{statement\_timeout} global de 30~s: cortaria a retenção e as
+escritas em lote, e os 30~s não tinham evitado a saturação.
 
 \paragraph{\emph{Trade-offs}.}
-Cada lote de erros faz também um \emph{upsert} nos contadores, e o índice das estatísticas cresceu para
-6,5~GB. A migração lê as tabelas inteiras: demorou 4~min~12~s sobre os 143~GB, com o central parado. A
-primeira tentativa falhou, porque a migração herdava o \texttt{statement\_timeout} de 30~s das ligações; passou
-a correr sem ele, limitada pelo prazo do \texttt{cmd/migrate}, que ficou configurável. Acima de 10\,000 erros,
-a página deixa de dar o total exato. A pesquisa por texto continua a ler a tabela quando o texto é raro;
-fica limitada pelo prazo de 10~s, sem afetar mais nada, com o gatilho de um índice \texttt{pg\_trgm}. Os
-recibos de deduplicação, que nunca são apagados (ADR-0020), ocupam 40~GB em 30 dias.
+Um \emph{upsert} nos contadores por lote de erros; índice das estatísticas com 6,5~GB. A migração lê as tabelas
+inteiras: 4~min~12~s sobre 143~GB, com o central parado; a primeira tentativa falhou por herdar o
+\texttt{statement\_timeout} de 30~s, e passou a correr só com o prazo configurável do \texttt{cmd/migrate}. Acima
+de 10\,000 erros o total deixa de ser exato. A pesquisa por texto raro continua a ler a tabela, limitada pelos 10~s
+(gatilho: índice \texttt{pg\_trgm}, E12). Os recibos, nunca apagados (ADR-0020), ocupam 40~GB em 30 dias.
 
 \paragraph{Verificação.}
-O resultado está na secção~\ref{sec:sc4}. Pelo critério, não se particiona: a ingestão não ficou mais lenta
-com a retenção, a execução mais longa da retenção levou 0,48~s, e os expirados desciam 734 mil por hora. A
-retenção por \texttt{DELETE} em lotes fica, e passa a estar ligada por omissão: telemetria 30 dias,
-incidentes resolvidos 180, emails enviados 30, auditoria 365; a cada minuto, até 10\,000 linhas por
-categoria. Os testes de integração verificam que os contadores coincidem com uma contagem completa depois de
-inserir, deduplicar, atualizar e apagar, e que o resumo dá o mesmo resultado que as consultas antigas.
+Pelo critério, não se particiona (secção~\ref{sec:sc4}). A retenção por \texttt{DELETE} em lotes fica, ligada por
+omissão: telemetria 30 dias, incidentes resolvidos 180, emails enviados 30, auditoria 365, a cada minuto, até
+10\,000 linhas por categoria. Testes de integração confirmam que os contadores coincidem com uma contagem completa
+depois de inserir, deduplicar, atualizar e apagar, e que o resumo dá o mesmo que as consultas antigas.
 
 \subsubsection{Testes de carga reprodutíveis (\dec{10})}
 \label{sec:d10}
-Os cenários de escalabilidade só se verificam com medições repetíveis. \dec{10} é o ambiente que as faz: k6
-com o cliente gRPC, num Compose próprio com os limites da medição escritos em código, e um gerador que
-recria o ambiente do zero em cada medição e junta a visão do agente, a do servidor e a da base de dados. O
-método e os seus limites estão na secção~\ref{sec:metodo}. Foi este ambiente que encontrou os dois problemas
-mais importantes do trabalho, ambos invisíveis sem carga: o \emph{dashboard} inutilizável durante a
-recuperação (\dec{5}, \dec{6}) e as consultas que paravam a ingestão com 30 dias de dados (\dec{9}).
+O ambiente das medições repetíveis: k6 com cliente gRPC num Compose com os limites escritos em código, recriado do
+zero em cada medição, juntando as visões do agente, do servidor e da base de dados (método na
+secção~\ref{sec:metodo}). Encontrou os dois problemas mais importantes, invisíveis sem carga: o \emph{dashboard}
+inutilizável na recuperação (\dec{5}, \dec{6}) e as consultas que paravam a ingestão com 30 dias (\dec{9}).
 
 \subsection{Manutenção e testabilidade}
 
@@ -584,21 +496,17 @@ recuperação (\dec{5}, \dec{6}) e as consultas que paravam a ingestão com 30 d
 \label{sec:d11}
 
 \paragraph{Problema.}
-O contrato entre o remote e o central era implícito (lacuna M2). O remote decidia se punha um registo em
-quarentena comparando o \textbf{texto em inglês} da mensagem de erro do central com uma lista fixa de
-frases: mudar uma mensagem no central mudava o comportamento do remote sem que nenhum teste falhasse.
-As estruturas JSON estavam escritas à mão nos dois repositórios, e a classificação das respostas
-(quarentena, dividir o lote, tentar mais tarde, pausar) dependia de pares código HTTP e campo
-\texttt{error} documentados apenas no código. É o acoplamento semântico que o cenário \cen{MO2} proíbe.
+O contrato remote--central era implícito (M2): o remote decidia a quarentena comparando o \textbf{texto em inglês}
+das mensagens de erro do central com frases fixas, por isso mudar uma mensagem mudava o comportamento do remote sem
+nenhum teste falhar. O JSON estava escrito à mão nos dois lados, e a reação a cada resposta dependia de pares código
+HTTP e campo \texttt{error} só documentados no código: o acoplamento semântico que \cen{MO2} proíbe.
 
 \paragraph{Decisão.}
-O contrato passou a ser um serviço gRPC definido em Protocol Buffers, num repositório próprio,
-\texttt{monitor-api}, versionado por \emph{tags} (\texttt{v1.0.0}). O central (servidor) e o remote
-(cliente) dependem dele pelo \texttt{go.mod}. Os erros levam um código gRPC e, quando um único registo é
-inválido, um detalhe com o identificador do registo e um motivo estável (\texttt{RejectionReason}); o
-texto da mensagem deixou de fazer parte do contrato. A Tabela~\ref{tab:erros-grpc} mostra a
-correspondência, que preserva os quatro comportamentos do \emph{store-and-forward}. Os endpoints HTTP de
-ingestão foram removidos; o \emph{dashboard} continua em HTTP.
+Um serviço gRPC em Protocol Buffers, no repositório \texttt{monitor-api}, versionado por \emph{tags}, de que
+central e remote dependem pelo \texttt{go.mod}. Os erros levam um código gRPC e, se um só registo é inválido, o seu
+identificador e um motivo estável (\texttt{RejectionReason}); o texto deixou de fazer parte do contrato. A
+Tabela~\ref{tab:erros-grpc} preserva os comportamentos do \emph{store-and-forward}. A ingestão HTTP foi removida;
+o \emph{dashboard} continua em HTTP.
 
 \begin{table}[htbp]
   \centering\small
@@ -619,67 +527,47 @@ ingestão foram removidos; o \emph{dashboard} continua em HTTP.
 \end{table}
 
 \paragraph{Teoria.}
-\emph{Manage Interfaces} (interoperabilidade): o contrato passa a ser um artefacto próprio, com sintaxe e
-semântica explícitas. \emph{Reduce Coupling} e \emph{Encapsulate} (modificabilidade): as duas implementações
-deixam de depender uma da outra e passam a depender de uma interface versionada, como os repositórios
-dependem da \emph{tag} \texttt{v1} do pipeline (secção~\ref{sec:pipeline}).
+\emph{Manage Interfaces}: o contrato é um artefacto com sintaxe e semântica explícitas. \emph{Reduce Coupling} e
+\emph{Encapsulate}: as implementações dependem de uma interface versionada, e não uma da outra.
 
 \paragraph{Alternativas.}
-A decisão original de \dec{11} era manter HTTP/JSON, acrescentar um campo \texttt{code} estável e
-publicar uma especificação OpenAPI com exemplos testados dos dois lados. Resolvia M2, mas a
-especificação ficava ao lado do código: nada obrigava as implementações a segui-la, a não ser os testes.
-Com Protocol Buffers é o compilador que obriga. Inicialmente o gRPC tinha sido rejeitado como ``mudança
-de tecnologia sem ASR''; essa rejeição foi revista porque o ASR existe (\cen{MO2}), e o desempenho
-\emph{não} foi argumento: a ingestão nominal são 33 pedidos por segundo (secção~\ref{sec:estimativas}).
-Também se rejeitou pôr o \texttt{.proto} dentro do central (o remote passaria a depender das versões do
-central), copiá-lo para cada repositório (duas cópias divergem, que é o próprio problema M2) e manter
-HTTP e gRPC em paralelo (duplicaria a autenticação, a validação e o controlo de admissão sem haver
-agentes antigos em produção).
+A primeira versão de \dec{11} mantinha HTTP/JSON com um campo \texttt{code} e uma especificação OpenAPI; resolvia
+M2, mas só os testes obrigavam as implementações a segui-la, e com Protocol Buffers obriga o compilador. O gRPC,
+antes rejeitado como ``tecnologia sem ASR'', foi revisto porque o ASR existe (\cen{MO2}); o desempenho \emph{não}
+foi argumento (33 pedidos/s, secção~\ref{sec:estimativas}). Rejeitou-se ainda o \texttt{.proto} dentro do central
+(o remote dependeria das versões do central), copiado para cada repositório (o próprio problema M2) e HTTP e gRPC em
+paralelo (autenticação, validação e admissão duplicadas, sem agentes antigos a servir).
 
 \paragraph{Trade-offs.}
-Há mais um repositório e um passo de geração de código, mitigado por o código gerado ficar versionado no
-\texttt{monitor-api}. O mínimo da linguagem subiu para Go~1.26, exigido pela biblioteca gRPC. Um
-balanceador entre remote e central tem de suportar HTTP/2 (\dec{8}), e os testes de carga usam o
-cliente gRPC do k6 (\dec{10}). No gRPC a mensagem é lida antes de o pedido chegar ao código da aplicação,
-o que permitiria a um cliente sem chave obrigar o central a ler até 1~MiB; para manter a proteção que o
-HTTP já tinha, um pedido sem chave plausível é rejeitado ao nível do transporte, antes de a mensagem ser
-lida, e só depois a chave é verificada na base de dados.
+Mais um repositório e um passo de geração (o código gerado fica versionado); Go~1.26 no mínimo; balanceador com
+HTTP/2 (\dec{8}). O gRPC lê a mensagem antes do código da aplicação, o que deixaria um cliente sem chave obrigar o
+central a ler até 1~MiB; por isso um pedido sem chave plausível é rejeitado no transporte, antes da leitura.
 
 \paragraph{Verificação.}
 \begin{itemize}
-  \item \cen{MO2}: o remote decide apenas pelo código e pelo \texttt{RejectionReason}. Um teste envia uma
-        rejeição com uma mensagem enganadora e confirma que o motivo guardado na quarentena vem só do
-        código. Uma alteração incompatível ao \texttt{.proto} faz falhar o CI do \texttt{monitor-api}
-        (\texttt{buf breaking}), que passa a ser a medida executável de \cen{MO2}.
-  \item \cen{AV1}, numa versão reduzida: com o central parado a meio de um teste ponta-a-ponta (central
-        real com PostgreSQL, remote e SDK), as aplicações continuaram a registar; quando o central voltou,
-        chegaram os 40 erros gerados, com 0 duplicados e 0 registos pendentes ou em quarentena.
-  \item Métricas de código no remote (iteração~2 contra iteração~1): \emph{issues} de lint de 29 para
-        24, funções acima do limite ciclomático de 3 para 1 e acima do limite cognitivo de 6 para 5. A
-        classificação das respostas, que antes interpretava códigos HTTP e textos, passou a uma
-        correspondência direta de códigos.
+  \item \cen{MO2}: um teste envia uma rejeição com uma mensagem enganadora e confirma que a quarentena só usa o
+        código; uma alteração incompatível ao \texttt{.proto} faz falhar o CI (\texttt{buf breaking}).
+  \item \cen{AV1} reduzido: com o central parado a meio de um ensaio com componentes reais, chegaram os 40 erros,
+        sem duplicados, pendentes nem quarentena.
+  \item Remote (iteração~2 contra 1): lint de 29 para 24, funções acima do limite ciclomático de 3 para 1 e do
+        cognitivo de 6 para 5.
 \end{itemize}
 
 \subsubsection{Métricas de alerta como Strategy (\dec{13}, ADR-0008)}
 \label{sec:d13}
 
 \paragraph{Problema.}
-\cen{MO1} pede que uma métrica de alerta nova se faça sem tocar no avaliador genérico, com no máximo três
-ficheiros Go e uma migração. Antes desta decisão, contámos o que uma métrica nova exigia: \textbf{7 sítios em 5
-ficheiros e 3 camadas}. No serviço, a lista de métricas válidas, as regras do limiar, a formatação e um caso
-especial da comparação; no repositório, um ramo do \texttt{CASE} da consulta de avaliação e a condição de
-frescura; na apresentação, a lista e o texto de ajuda do formulário; e o \texttt{CHECK} da base de dados. Era
-baixa coesão: o que pertence a uma métrica estava espalhado, e cada métrica nova obrigava a mudar o avaliador.
+\cen{MO1} pede uma métrica de alerta nova sem tocar no avaliador, em $\le$ 3 ficheiros Go e uma migração. Antes,
+uma métrica nova exigia \textbf{7 sítios em 5 ficheiros e 3 camadas}: no serviço, a lista válida, as regras do
+limiar, a formatação e um caso especial da comparação; no repositório, um ramo do \texttt{CASE} e a condição de
+frescura; no formulário, a lista e a ajuda; e o \texttt{CHECK} da base de dados. Era baixa coesão.
 
 \paragraph{Decisão.}
-Cada métrica passa a ser uma estratégia que implementa a interface \texttt{Metric}, no seu próprio ficheiro, e
-regista-se num registo que a devolve pelo nome (Figura~\ref{fig:d13}). O serviço valida, compara e formata
-através da interface; o formulário gera a lista e a ajuda a partir do registo; o repositório pede a cada
-métrica a sua consulta. Cada métrica fornece a consulta completa que devolve as suas regras com o valor atual,
-juntada em tempo de compilação a partir de blocos constantes partilhados. A avaliação faz uma consulta por
-métrica (seis), qualquer que seja o número de regras, e continua \emph{set-based} (\dec{5}). Nenhum SQL é
-montado em tempo de execução. O \texttt{CHECK} da base de dados mantém-se como defesa em profundidade, e um teste
-de integração compara-o com o registo: uma métrica nova sem a migração é apanhada pelos testes.
+Cada métrica é uma estratégia (interface \texttt{Metric}) no seu ficheiro, obtida pelo nome num registo
+(Figura~\ref{fig:d13}). O serviço valida, compara e formata pela interface; o formulário gera a lista e a ajuda do
+registo; cada métrica dá a sua consulta completa, feita em tempo de compilação com blocos constantes partilhados.
+A avaliação faz uma consulta por métrica (seis), \emph{set-based} (\dec{5}), sem SQL montado em execução. O
+\texttt{CHECK} fica como defesa em profundidade, e um teste compara-o com o registo.
 
 \begin{figure}[htbp]
   \centering
@@ -711,179 +599,134 @@ de integração compara-o com o registo: uma métrica nova sem a migração é a
 \end{figure}
 
 \paragraph{Teoria.}
-O padrão \emph{Strategy} (GoF): uma família de algoritmos (calcular, validar, comparar e formatar uma métrica)
-encapsulada atrás de uma interface, e o avaliador depende só da abstração. O registo é uma \emph{Simple Factory}:
-devolve a estratégia a partir do nome guardado na base de dados. É \emph{program to an interface} e o princípio
-\emph{open/closed}: o avaliador fica fechado a alterações e aberto a métricas novas. Nas táticas de
-modificabilidade, \emph{Increase Cohesion} (o que muda junto fica junto) e \emph{Reduce Coupling} (o avaliador não
-conhece as métricas).
+\emph{Strategy} (GoF, diapositivos~05): uma família de algoritmos atrás de uma interface, de que o avaliador
+depende; o registo é uma \emph{Simple Factory} que devolve a estratégia pelo nome guardado. \emph{Open/closed}:
+o avaliador fica fechado a alterações e aberto a métricas novas. Táticas: \emph{Increase Cohesion} e \emph{Reduce
+Coupling}.
 
 \paragraph{O que ficou de fora, e porquê.}
-O plano previa também uma duração mínima por regra (\texttt{for\_seconds}): só alertar se a violação se mantiver,
-para evitar alertas por picos isolados. O cenário correspondente tem prioridade baixa (M,L), e a funcionalidade
-exige guardar o início de cada violação e mudar o formulário. Fica desenhada no ADR, com o gatilho: alertas
-falsos por picos isolados reportados pelos utilizadores.
+Uma duração mínima por regra (\texttt{for\_seconds}), contra alertas por picos isolados: cenário (M,L), que exige
+guardar o início de cada violação. Fica desenhada no ADR, com o gatilho de alertas falsos reportados.
 
 \paragraph{Alternativas.}
-Juntar fragmentos SQL num único \texttt{CASE} em tempo de execução daria uma só consulta, mas com SQL montado em
-tempo de execução, que a análise estática (Sonar, regra S2077) assinala. Calcular os valores em Go faria uma
-consulta por regra, contra \dec{5}. Uma consulta única com todos os valores possíveis obrigaria a mudá-la por
-cada métrica que precise de um dado novo, voltando a mexer no avaliador. Um motor de regras configurável na base
-de dados custaria muito mais do que o ritmo a que as métricas mudam.
+Um \texttt{CASE} montado em execução: SQL dinâmico, que o Sonar assinala (S2077). Valores calculados em Go: uma
+consulta por regra, contra \dec{5}. Uma consulta com todos os valores: mudá-la por cada dado novo. Um motor de
+regras na base de dados: custo muito acima do ritmo a que as métricas mudam.
 
 \paragraph{Trade-offs.}
-A estratégia conhece o SQL do seu próprio valor, o que põe SQL fora da camada de repositórios. É o preço de
-\cen{MO1}: a alternativa voltaria a separar o que muda junto. O SQL fica confinado ao pacote
-\texttt{alertmetric}, e uma regra de camadas no lint impede esse pacote de depender do resto do central. A
-avaliação passa de uma consulta para seis por ciclo, todas \emph{set-based}; a um ciclo a cada 15~s, o custo não
-se compara com o da ingestão.
+A estratégia conhece o SQL do seu valor, fora da camada de repositórios: é o preço de juntar o que muda junto. Fica
+confinado ao \texttt{alertmetric}, que o lint impede de depender do resto. A avaliação passa de uma a seis
+consultas por ciclo de 15~s, custo desprezável face à ingestão.
 
 \paragraph{Verificação.}
-Antes da refatoração, escrevemos um teste de caracterização: num PostgreSQL real, fixa o valor que cada uma das
-seis métricas calcula e as regras que ficam de fora (estatísticas com mais de 5~minutos, regras desativadas). O
-teste passou antes e depois da mudança. Cada estratégia tem testes unitários, e um teste compara o registo com o
-\texttt{CHECK} da base de dados. A refatoração baixou também as \emph{issues} de lint do central de 56 para 54,
-porque a validação das regras deixou de estar acima dos limites de complexidade. A medição de \cen{MO1}, com uma
-métrica nova real, é feita com \dec{17}.
+Um teste de caracterização, escrito antes, fixa num PostgreSQL real o valor de cada uma das seis métricas e as
+regras excluídas (estatísticas com mais de 5~minutos, regras desativadas), e passou antes e depois. Lint de 56 para
+54. \cen{MO1} mede-se com uma métrica real de \dec{17} (secção~\ref{sec:mo1}).
 
 \subsubsection{Higiene e testes ponta a ponta (\dec{15}, ADR-0012)}
 \label{sec:d15}
 
 \paragraph{Problema.}
-Dois problemas, resolvidos no mesmo passo porque ambos preparam os repositórios para quem não os escreveu. O
-primeiro é higiene: uma segunda forma de escrever logs no \emph{buffer}, no remote, que nenhum binário usava e
-que repetia a validação do SDK (408 linhas, com o teste); a lista das rotas autenticadas do central mantida à
-mão ao lado do grupo de rotas que a autenticação de facto protege; o módulo do SDK com o nome de uma conta que
-não é a da organização; READMEs que apontavam para ficheiros que não existem. O segundo é mais sério: nenhum
-teste juntava os componentes. Os testes de cada repositório substituem o outro lado por um falso, e
-\cen{AV1} (central em baixo, 0 perdas e 0 duplicados) e \cen{SE1} (chave inválida ou revogada, nada gravado)
-são propriedades do sistema inteiro: dependem do SDK, do \emph{buffer}, da retentativa do remote, do
-balanceador, da autenticação e da idempotência do central ao mesmo tempo.
+Higiene: no remote, uma segunda escrita de logs no \emph{buffer} que nenhum binário usava (408 linhas); no central,
+a lista das rotas autenticadas mantida à mão ao lado do grupo que a autenticação protege; o módulo do SDK com o nome
+de uma conta pessoal; READMEs com ligações partidas. E, mais sério, nenhum teste juntava os componentes, quando
+\cen{AV1} e \cen{SE1} são propriedades do sistema inteiro (SDK, \emph{buffer}, retentativa, balanceador,
+autenticação e idempotência ao mesmo tempo).
 
 \paragraph{Decisão.}
-Na higiene, o código morto sai; as rotas autenticadas passam a ser uma tabela única, registada dentro do grupo
-autenticado, de onde derivam o log das rotas e um teste que confirma que cada uma, sem sessão, redireciona para
-o \emph{login}; o módulo do SDK passa para a organização; um \emph{script} cria um \texttt{go.work} local para
-desenvolver vários módulos ao mesmo tempo (o CI continua a compilar cada repositório sozinho).
-Para o resto, um teste ponta a ponta: um Compose com o sistema real construído a partir dos repositórios
-(PostgreSQL, central, balanceador, remote e uma aplicação com o SDK) e um condutor em Python, só com a
-biblioteca padrão, que provisiona os hosts, provoca as falhas e verifica o estado nos dois lados: no PostgreSQL
-do central e no SQLite do remote. O remote fala com o balanceador por TLS, com um certificado de teste gerado a
-cada execução, como em produção. Os cenários são o caminho feliz, \cen{AV1}, \cen{SE1} (chave inválida e chave
-revogada) e \cen{MN1}; o resultado de cada um (medido, limite, passa ou falha) fica num ficheiro. Corre todas
-as noites no GitHub e à mão.
+O código morto sai; as rotas autenticadas passam a uma tabela única, registada no grupo autenticado, com um teste
+de que cada uma redireciona sem sessão; o SDK passa para a organização; um \emph{script} cria um \texttt{go.work}
+local (o CI compila cada repositório sozinho). E um teste ponta a ponta: um Compose com o sistema real (PostgreSQL,
+central, nginx, remote, aplicação com o SDK) e um condutor em Python que provisiona os \emph{hosts}, provoca as
+falhas e verifica os dois lados (PostgreSQL e SQLite). O remote usa TLS, com um certificado gerado em cada execução.
+Cenários: caminho feliz, \cen{AV1}, \cen{SE1} (chave inválida e revogada) e \cen{MN1}. Corre todas as noites e à
+mão.
 
 \paragraph{Teoria.}
-Na modificabilidade, \emph{Refactor} e \emph{Reduce Size of a Module}: código morto e listas paralelas são
-duas fontes da mesma verdade. Na testabilidade, \emph{Sandbox}: o sistema corre isolado, com dados e chaves
-de teste, num ambiente descartável; e \emph{Limit Nondeterminism}: o condutor espera por condições com prazo,
-nunca por tempos fixos, e os intervalos do remote são curtos para o teste caber em minutos.
+\emph{Refactor} e \emph{Reduce Size of a Module} (listas paralelas são duas fontes da mesma verdade);
+\emph{Sandbox} (ambiente descartável); \emph{Limit Nondeterminism} (o condutor espera por condições com prazo, nunca
+por tempos fixos).
 
 \paragraph{Alternativas.}
-Um teste em Go com contentores geridos pelo próprio teste traria uma dependência grande para um repositório sem
-código Go de produção; o Compose já é a forma de executar o sistema. Ligar o remote ao central sem TLS
-obrigaria a abrir uma exceção que o remote recusa de propósito fora de \emph{loopback}, e deixaria o caminho de
-produção por testar. Pôr o remote na rede do contentor do central, para usar \emph{loopback}, também não
-serve: parar o central destrói essa rede, e o teste deixava de representar uma falha do central. Correr o
-teste em cada PR custaria minutos por PR e dependeria do \texttt{main} de seis repositórios; à noite, uma
-regressão aparece com um dia de atraso, o que chega para um sistema deste tamanho.
+Contentores geridos por um teste em Go: dependência grande num repositório sem Go de produção. Sem TLS: exigiria
+uma exceção que o remote recusa fora de \emph{loopback}. Remote na rede do central: parar o central destruiria a
+rede. Em cada PR: minutos por PR e dependência do \texttt{main} de seis repositórios; à noite, uma regressão
+aparece com um dia de atraso, o que chega aqui.
 
 \paragraph{Trade-offs.}
-Os intervalos curtos provam o mecanismo, não a cadência de produção, que fica nos testes com relógio injetado
-(\cen{AV3}, \cen{MN2}). A provisão dos hosts e a revogação da chave são feitas diretamente na base de dados,
-com o mesmo cálculo que o central faz; a interface web fica fora deste teste.
+Os intervalos curtos provam o mecanismo, não a cadência de produção (essa fica nos testes com relógio injetado,
+\cen{AV3}, \cen{MN2}). A provisão e a revogação são feitas na base de dados, com o cálculo do central; a interface
+web fica de fora.
 
 \paragraph{O que o teste encontrou.}
-Na primeira execução, \cen{MN1} falhou: a quarentena chegou ao central em 10,0~s, dois ciclos de 5~s. A
-fotografia do \emph{buffer} só viaja com estatísticas (\dec{17}), e a recolha e a entrega de estatísticas
-correm em temporizadores independentes com o mesmo intervalo. Quando a entrega acorda antes da recolha, o que
-acontece sempre no arranque e, em regime estável, sempre que as fases se cruzam, não há nada para enviar e o
-central fica um ciclo atrás. Nenhum teste unitário o via, porque cada um tinha estatísticas pendentes. A
-correção é pequena: um ciclo sem estatísticas espera, no máximo um intervalo, pela recolha seguinte, que avisa o
-\emph{sender}, e envia-a logo, com uma fotografia nova. Com os intervalos de produção (30~s), o atraso evitado
-é de até 30~s.
+Na primeira execução, \cen{MN1} falhou: a quarentena chegou em 10,0~s, dois ciclos de 5~s. A fotografia do
+\emph{buffer} só viaja com estatísticas (\dec{17}), e recolha e entrega correm em temporizadores independentes:
+quando a entrega acorda antes da recolha (sempre no arranque, e sempre que as fases se cruzam), não há nada para
+enviar e o central fica um ciclo atrás. Nenhum teste unitário o via. A correção: um ciclo sem estatísticas espera,
+até um intervalo, que a recolha seguinte o avise, e envia logo (até 30~s poupados em produção).
 
 \paragraph{Verificação.}
-Os resultados de \cen{AV1}, \cen{SE1} e \cen{MN1} estão nas secções~\ref{sec:av1-av4}, \ref{sec:aval-se}
-e~\ref{sec:mn}. A remoção do código morto baixou o lint do remote de 21 para 20 \emph{issues}; o do central
-ficou igual (54).
+\cen{AV1}, \cen{SE1} e \cen{MN1} nas secções~\ref{sec:av1-av4}, \ref{sec:aval-se} e~\ref{sec:mn}. Lint do
+remote de 21 para 20; central igual (54).
 
 \subsubsection{Uma fonte única por repositório (\dec{12}, ADR-0015)}
 \label{sec:d12}
 
 \paragraph{Problema.}
-\cen{MO2} pede que mudar uma regra do protocolo toque um sítio por repositório e que uma divergência seja
-apanhada por um teste. Entre repositórios, o contrato já é o \texttt{monitor-api} (\dec{11}). Dentro de cada
-um, as mesmas regras repetiam-se. A lista dos cinco níveis de log estava escrita cinco vezes em Go no central,
-uma no remote, uma no SDK (não exportada) e outra vez no hello-world, além do SQL e das traduções do
-\emph{protobuf}; nada ligava as cópias. No remote, o endereço do central era validado duas vezes, com regras
-diferentes: a configuração aceitava um caminho no URL e só três nomes de \emph{loopback}; o cliente gRPC recusava
-caminhos e aceitava qualquer endereço de \emph{loopback}.
+\cen{MO2} pede um sítio por repositório para cada regra do protocolo e divergências apanhadas por teste. Entre
+repositórios, o contrato já é o \texttt{monitor-api} (\dec{11}); dentro de cada um, as regras repetiam-se. Os cinco
+níveis de log estavam escritos cinco vezes em Go no central, uma no remote, uma no SDK (privada) e uma no
+hello-world, além do SQL e do \emph{protobuf}, sem nada a ligar as cópias. No remote, o endereço do central era
+validado duas vezes com regras diferentes (caminho no URL e nomes de \emph{loopback} aceites num lado e não no
+outro).
 
 \paragraph{Decisão.}
-Uma definição dos níveis por repositório: \texttt{models} no central, \texttt{validation} no remote, e
-constantes exportadas no SDK, publicadas numa versão nova, que o hello-world passa a usar. O que não se pode
-eliminar, porque a base de dados também valida e o contrato tem o seu próprio tipo, fica coberto por testes de
-consistência: os níveis do Go são comparados com os \texttt{CHECK} do SQL, com a tradução do \emph{protobuf} nos
-dois sentidos e com o SQL das métricas de erro. O endereço do central passa a ter uma só regra, a mais estrita,
-usada pela configuração e pelo cliente.
+Uma definição dos níveis por repositório (\texttt{models} no central, \texttt{validation} no remote, constantes
+exportadas no SDK v0.2.0, usadas pelo hello-world). As cópias que não se podem eliminar (o \texttt{CHECK} do SQL, o
+tipo do \emph{protobuf}, o SQL das métricas de erro) ficam cobertas por testes de consistência. O endereço do
+central passa a ter uma só regra, a mais estrita.
 
 \paragraph{Teoria.}
-\emph{Increase Semantic Coherence}: o que muda junto fica junto. \emph{Abstract Common Services}: a validação
-do endereço era um serviço usado em duas versões. A duplicação que fica, entre Go e SQL e entre Go e o
-contrato, é deliberada e passa a ser verificada.
+\emph{Increase Semantic Coherence} e \emph{Abstract Common Services}; a duplicação que fica é deliberada e
+verificada.
 
 \paragraph{Alternativas.}
-Usar o tipo do \emph{protobuf} em todo o lado levaria o contrato de rede para as camadas internas e para o SQL.
-Um módulo partilhado com os níveis acrescentaria uma dependência entre repositórios que mudam a ritmos diferentes.
-Gerar o \texttt{CHECK} a partir do Go não serve, porque as migrações são SQL escrito à mão e a base é imutável;
-um teste que compara é mais simples e cobre também as migrações antigas.
+O tipo do \emph{protobuf} em todo o lado: levaria o contrato de rede às camadas internas. Um módulo partilhado:
+dependência entre repositórios com ritmos diferentes. Gerar o \texttt{CHECK} do Go: as migrações são SQL à mão;
+um teste que compara é mais simples e cobre as antigas.
 
 \paragraph{Trade-offs.}
-O SDK muda de versão e o hello-world tem de a pedir, pela mesma ordem de \emph{merges} do \dec{15}. Um endereço
-com caminho, que a configuração aceitava, passa a ser recusado no arranque; antes era recusado logo a seguir,
-pelo cliente.
-
-\paragraph{Verificação.}
-A medição de \cen{MO2} está na secção~\ref{sec:mo1}.
+Uma versão nova do SDK, que o hello-world tem de pedir; um endereço com caminho passa a ser recusado no arranque,
+e não logo a seguir. \textbf{Verificação:} \cen{MO2} na secção~\ref{sec:mo1}.
 
 \subsubsection{\emph{Handlers} testáveis, relógio e fuso injetados (\dec{14}, ADR-0014)}
 \label{sec:d14}
 
 \paragraph{Problema.}
-Os \emph{handlers} do central guardavam serviços concretos e o gestor de sessões: testar um obrigava a montar o
-serviço, o repositório e um PostgreSQL. A cobertura da camada era de 9,5\,\%, com dois ficheiros de teste, e é a
-camada que traduz formulários, códigos HTTP e redirecionamentos (\cen{TE2}). O tempo estava escondido: o fuso
-de Lisboa estava escrito em quatro sítios, carregado a cada pedido, e o resumo diário decidia a hora de envio
-com o relógio da máquina, sem forma de o testar sem esperar; no remote ainda havia um \texttt{time.Sleep} num
-teste (\cen{TE3}).
+Os \emph{handlers} guardavam serviços concretos: testar um obrigava a montar serviço, repositório e PostgreSQL, e a
+cobertura da camada era de 9,5\,\% (\cen{TE2}). O fuso de Lisboa estava escrito em quatro sítios, e o resumo diário
+usava o relógio da máquina, sem forma de o testar sem esperar; no remote havia um \texttt{time.Sleep} num teste
+(\cen{TE3}).
 
 \paragraph{Decisão.}
-Cada \emph{handler} declara a interface mínima de que precisa, só com os métodos que chama; os serviços concretos
-satisfazem-na sem mudar, e a montagem do servidor fica igual. Os testes usam \emph{fakes} escritos à mão e
-desenham as páginas reais, o que também apanha um campo que um modelo use e o \emph{handler} não passe. O fuso
-passa a ser configuração (\texttt{APP\_TIMEZONE}, por omissão Lisboa), carregada e validada uma vez no arranque;
-o relógio é injetado onde o tempo decide alguma coisa, e a hora do resumo diário passa a ser calculada por uma
-função pura. O teste do remote passa a esperar por um evento em vez de dormir.
+Cada \emph{handler} declara a interface mínima de que precisa; os serviços satisfazem-na sem mudar. Os testes usam
+\emph{fakes} à mão e desenham as páginas reais (o que apanha campos em falta nos modelos). O fuso passa a
+configuração (\texttt{APP\_TIMEZONE}), validada no arranque; o relógio é injetado onde o tempo decide alguma coisa, e
+a hora do resumo diário é uma função pura. O teste do remote espera por um evento em vez de dormir.
 
 \paragraph{Teoria.}
-\emph{Abstract Data Sources} e \emph{Specialized Interfaces}, com o princípio de segregação de interfaces: cada
-cliente vê só o que usa. \emph{Limit Nondeterminism}: relógio injetado, fuso explícito, testes que esperam por
-eventos. \emph{Defer Binding}: o fuso passa a ser lido no arranque.
+\emph{Abstract Data Sources} e \emph{Specialized Interfaces} (segregação de interfaces); \emph{Limit
+Nondeterminism}; \emph{Defer Binding} do fuso.
 
 \paragraph{Alternativas.}
-\emph{Mocks} gerados trariam mais uma ferramenta e testes acoplados à ordem das chamadas. Testar os
-\emph{handlers} só com a base de dados seria lento e não isolaria a camada. Interfaces grandes no pacote dos
-serviços obrigariam cada \emph{fake} a implementar métodos que o \emph{handler} nunca chama. Substituir as 16
-chamadas ao relógio não tornaria possível nenhum teste novo: a maioria só carimba registos ou mede durações.
+\emph{Mocks} gerados: mais uma ferramenta e testes presos à ordem das chamadas. Só com base de dados: lento e
+sem isolar a camada. Interfaces grandes: \emph{fakes} com métodos nunca chamados. Substituir as 16 chamadas ao
+relógio: nenhum teste novo ficaria possível (a maioria só carimba registos).
 
 \paragraph{Trade-offs.}
-Sete interfaces pequenas; um método novo usado por um \emph{handler} obriga a acrescentá-lo à interface (o
-compilador avisa). Os \emph{fakes} não provam que o serviço real se comporta como eles; isso continua nos testes
-dos serviços e de integração.
-
-\paragraph{Verificação.}
-\cen{TE2} e \cen{TE3} estão na secção~\ref{sec:mo1}.
+Sete interfaces pequenas, a atualizar quando um \emph{handler} usa um método novo (o compilador avisa); os
+\emph{fakes} não provam o comportamento real, que fica nos testes de serviços e de integração.
+\textbf{Verificação:} \cen{TE2} e \cen{TE3} na secção~\ref{sec:mo1}.
 
 \subsection{Disponibilidade e monitorabilidade}
 
@@ -891,23 +734,17 @@ dos serviços e de integração.
 \label{sec:d19}
 
 \paragraph{Problema.}
-O remote guarda tudo num SQLite local até o central confirmar, e a limpeza só apagava registos já entregues.
-Não havia limite: com o central em baixo e uma aplicação em ciclo de erro, o \emph{buffer} crescia até encher o
-disco, e o monitor deitava abaixo o host que devia proteger (\cen{AV4}). Medimos o custo de um log típico no
-esquema do remote: 358~bytes, contando a tabela, a fila de entrega e os índices. A rajada do modelo de carga
-(200 logs/s durante 2~min) ocupa 8,6~MB; a mesma rajada durante uma hora de central em baixo, 258~MB. Um ciclo
-de erro sem fim passa qualquer valor fixo.
+O \emph{buffer} não tinha limite: com o central em baixo e uma aplicação em ciclo de erro, crescia até encher o
+disco do \emph{host} que o monitor devia proteger (\cen{AV4}). Um log típico ocupa 358~bytes (tabela, fila de
+entrega e índices): a rajada do modelo de carga (200 logs/s durante 2~min) são 8,6~MB, e durante uma hora 258~MB.
 
 \paragraph{Decisão.}
-O tamanho do \emph{buffer} passa a ser medido pelas páginas em uso do ficheiro SQLite (páginas menos páginas
-livres), uma leitura que não toca nos dados. Há dois limites: um suave (\texttt{BUFFER\_MAX\_MB}, 512~MiB por
-omissão) e um rígido (por omissão o dobro). Um \emph{worker} próprio verifica-os a cada 10~s e descarta sempre
-os registos mais antigos, em lotes curtos de 500 (Figura~\ref{fig:d19}). Acima do limite suave, apaga primeiro
-os registos já entregues, que não são uma perda, e depois os pendentes INFO, WARN e as estatísticas da máquina.
-ERROR, CRITICAL e PANIC só saem acima do limite rígido; nesse caso, o remote grava no próprio \emph{buffer} um
-log CRITICAL com o que descartou, que chega ao central como qualquer log e dispara as regras de alerta por
-nível. Cada descarte é contado por nível numa tabela, na mesma transação que o apaga: um registo nunca
-desaparece sem ser contado. Estes contadores são o que \dec{17} vai reportar ao central.
+O tamanho mede-se pelas páginas em uso do SQLite, sem ler dados. Há um limite suave (\texttt{BUFFER\_MAX\_MB},
+512~MiB) e um rígido (o dobro). Um \emph{worker} verifica-os a cada 10~s e descarta sempre os mais antigos, em lotes
+de 500 (Figura~\ref{fig:d19}): acima do suave, primeiro os já entregues (não são perda), depois INFO, WARN e
+estatísticas pendentes; ERROR, CRITICAL e PANIC só acima do rígido, e então o remote grava um log CRITICAL com o que
+descartou, que chega ao central e dispara alertas. Cada descarte é contado por nível na mesma transação que o apaga,
+e \dec{17} reporta os contadores.
 
 \begin{figure}[htbp]
   \centering
@@ -933,63 +770,46 @@ desaparece sem ser contado. Estes contadores são o que \dec{17} vai reportar ao
 \end{figure}
 
 \paragraph{Teoria.}
-Nas táticas de desempenho, \emph{Bound Queue Sizes}: o \emph{buffer} é uma fila e passa a ter tamanho máximo; e
-\emph{Prioritize Events}: quando é preciso descartar, a severidade decide a ordem. Nas de disponibilidade,
-\emph{Degradation}: perde-se o menos importante para manter o essencial e, acima de tudo, o host. A contagem e o
-evento CRITICAL são \emph{Inform Actors}: a perda deixa de ser silenciosa.
+\emph{Bound Queue Sizes} e \emph{Prioritize Events} (a severidade decide a ordem); \emph{Degradation} (perde-se o
+menos importante para proteger o \emph{host}); \emph{Inform Actors} (a perda deixa de ser silenciosa).
 
 \paragraph{O que ficou de fora, e porquê.}
-O ficheiro não encolhe: o SQLite reutiliza as páginas libertadas, mas devolvê-las ao disco exigiria um
-\texttt{VACUUM}, que reescreve a base inteira, precisa do dobro do espaço e bloqueia as escritas das aplicações,
-precisamente quando o disco está a acabar. O limite impede o ficheiro de crescer; não o reduz. A amostragem na
-origem (``a mesma mensagem 1.000 vezes'') fica como evolução E8, com o gatilho de descartes frequentes.
+O ficheiro não encolhe: o \texttt{VACUUM} reescreveria a base, com o dobro do espaço e as escritas bloqueadas,
+quando o disco está a acabar; o limite impede-o de crescer. A amostragem na origem fica como E8.
 
 \paragraph{Alternativas.}
-Bloquear a aplicação quando o \emph{buffer} enche (\emph{backpressure}) poria a aplicação monitorizada à espera
-do monitor, o que é inaceitável num instrumento de observação. Um descarte FIFO sem olhar à severidade perderia,
-numa tempestade de INFO, exatamente os ERROR que explicam o incidente. Um limite em número de registos não
-protege o disco, porque um registo vai de cerca de 300~bytes a mais de 100~KB (\emph{stack trace} e
-metadados). Um \emph{trigger} no SQLite poria a política no caminho de cada escrita da aplicação.
+\emph{Backpressure}: a aplicação ficaria à espera do monitor. FIFO sem severidade: perderia os ERROR que explicam o
+incidente. Limite em número de registos: não protege o disco (300~bytes a mais de 100~KB por registo).
+\emph{Trigger} no SQLite: a política no caminho de cada escrita da aplicação.
 
 \paragraph{Trade-offs.}
-Em situações extremas perdem-se INFO, WARN e amostras; é aceite, documentado e contado. O limite é aplicado
-periodicamente, por isso entre duas verificações o \emph{buffer} pode passar o limite pelo que as aplicações
-escrevem num intervalo: a 1.000 logs/s, cerca de 3,6~MB em 10~s, 0,7\,\% de 512~MiB. \cen{AV1} mantém-se: o
-limite suave só atua acima de cerca de 1,5 milhões de logs, muito acima de uma hora de central em baixo com a
-carga do modelo.
+Em casos extremos perdem-se INFO, WARN e amostras, contados. Entre verificações, o \emph{buffer} pode passar o
+limite pelo que se escreve em 10~s (a 1\,000 logs/s, 3,6~MB, 0,7\,\% de 512~MiB). \cen{AV1} mantém-se: o limite
+suave só atua acima de cerca de 1,5 milhões de logs.
 
 \paragraph{Verificação.}
-\cen{AV4} é provado por um teste de integração no remote, descrito na secção~\ref{sec:av1-av4}. Outros testes
-fixam a ordem de cada fase, o evento CRITICAL do limite rígido e que um descarte que não pode ser contado não é
-gravado.
+\cen{AV4} na secção~\ref{sec:av1-av4}; outros testes fixam a ordem das fases, o evento CRITICAL e que um descarte
+que não pode ser contado não é gravado.
 
 \subsubsection{Estado do \emph{buffer} no central e \texttt{/health/ready} (\dec{17}, ADR-0010)}
 \label{sec:d17}
 
 \paragraph{Problema.}
-O central não via o \emph{buffer} dos hosts. O remote sabe quantos registos tem pendentes, quantos pôs em
-quarentena, há quanto tempo espera o mais antigo e, desde \dec{19}, quantos descartou; nada disto saía do
-host. Um registo em quarentena é um dado que nunca chega, sem ninguém saber (\cen{MN1}). Do lado do central, o
-\texttt{/health} só testava a base de dados. Desde \dec{8}, cada \emph{job} de fundo corre na instância que o
-lidera; se bloquear, a liderança mantém-se (a sessão PostgreSQL continua viva), nenhuma outra instância o
-assume, e o \texttt{/health} continua a responder 200 enquanto os alertas deixam de ser avaliados (\cen{MN2}).
+O remote sabe o que tem pendente, em quarentena e descartado, mas nada disso saía do \emph{host}: um registo em
+quarentena nunca chegava, sem ninguém saber (\cen{MN1}). No central, o \texttt{/health} só testava a base de dados:
+um \emph{job} bloqueado mantinha a liderança (a sessão continua viva), e o \texttt{/health} respondia 200 enquanto
+os alertas deixavam de ser avaliados (\cen{MN2}).
 
 \paragraph{Decisão.}
-O pedido de estatísticas do contrato ganha um campo opcional \texttt{buffer} (\texttt{monitor-api} v1.1.0, uma
-alteração aditiva que o \texttt{buf breaking} confirma): uma fotografia do \emph{buffer} com pendentes,
-quarentena, idade do pendente mais antigo, pausa da entrega, tamanho e descartes por nível. Vai no pedido de
-estatísticas porque esse já é o sinal periódico do host, a cada 30~s: não há chamada nova nem autenticação a
-mais. O remote tira uma fotografia por ciclo e envia-a em todos os lotes desse ciclo. O central guarda a mais
-recente de cada host, na mesma transação das estatísticas, e mostra-a na API do \emph{dashboard}. Um estado
-inválido é registado no log e ignorado, e as estatísticas são aceites na mesma: um dado acessório não pode
-travar a telemetria, e o remote pausaria a entrega perante uma rejeição do lote. Com o estado no central, a
-quarentena passa a poder gerar um alerta: a métrica \texttt{buffer\_quarantined}, que é também a prova de
-\cen{MO1} (secção~\ref{sec:mo1}).
+O pedido de estatísticas ganha um campo opcional \texttt{buffer} (\texttt{monitor-api} v1.1.0, aditivo): pendentes,
+quarentena, idade do mais antigo, pausa, tamanho e descartes por nível. Vai nas estatísticas porque já são o sinal
+periódico do \emph{host}: sem chamada nem autenticação a mais. O central guarda a fotografia mais recente, na mesma
+transação, e mostra-a na API do \emph{dashboard}; uma inválida é ignorada e as estatísticas aceites, porque o remote
+pausaria perante uma rejeição. A quarentena passa a poder gerar um alerta (\texttt{buffer\_quarantined}, a métrica
+de \cen{MO1}).
 
-Para a saúde, o central passa a ter dois pontos (Tabela~\ref{tab:health}). Cada iteração de um \emph{job} é um
-batimento; um \emph{job} que esta instância lidera e que não completa uma iteração há mais de duas vezes o seu
-intervalo torna a instância não pronta. O registo dos batimentos recebe o relógio por injeção, o que permite
-testá-lo sem esperas.
+Para a saúde, há dois pontos (Tabela~\ref{tab:health}): cada iteração de um \emph{job} é um batimento, e um
+\emph{job} liderado sem batimento há mais de dois intervalos torna a instância não pronta. O relógio é injetado.
 
 \begin{table}[htbp]
   \centering\small
@@ -1008,79 +828,57 @@ testá-lo sem esperas.
 \end{table}
 
 \paragraph{Teoria.}
-Nas táticas de disponibilidade, \emph{Heartbeat} (cada iteração de um \emph{job} é um batimento e a sua falta é a
-falha), \emph{Monitor} (o registo dos batimentos vigia os \emph{jobs}) e \emph{Self-Test} (o
-\texttt{/health/ready} verifica as dependências da própria instância). O estado do \emph{buffer} no central é
-\emph{Inform Actors} e \emph{Maintain System Model}: o central passa a ter uma imagem de cada agente. Separar
-\emph{liveness} de \emph{readiness} distingue duas respostas diferentes: reiniciar e retirar do tráfego.
+\emph{Heartbeat}, \emph{Monitor} e \emph{Self-Test}; o estado do \emph{buffer} é \emph{Inform Actors} e
+\emph{Maintain System Model}. \emph{Liveness} e \emph{readiness} separados distinguem reiniciar de retirar do
+tráfego.
 
 \paragraph{O que ficou de fora, e porquê.}
-O plano previa que o balanceador usasse o \texttt{/health/ready}. O nginx de código aberto só tem verificações
-passivas (falhas de ligação); as ativas são da versão comercial. O \emph{ready} serve o Compose e qualquer
-orquestrador com \emph{readiness probe}. Mudar de balanceador fica com um gatilho: um \emph{job} bloqueado em
-produção que o \emph{ready} detetou e o balanceador não retirou. A pausa da entrega também só chega ao central
-quando o remote volta a falar com ele, o que hoje não acontece em pausa; ganha utilidade com \dec{16}. A
-apresentação do estado no HTML do \emph{dashboard} fica para depois: a API já o expõe.
+O balanceador não consulta o \emph{ready}: o nginx de código aberto só tem verificações passivas. Serve o Compose e
+qualquer orquestrador; mudar de balanceador fica com o gatilho de um \emph{job} bloqueado que o balanceador não
+retirou. A pausa só chega ao central com a \emph{probe} de \dec{16}, a cada 5~minutos. O HTML do \emph{dashboard}
+não mostra o estado; a API já o expõe.
 
 \paragraph{Alternativas.}
-Uma chamada nova só para o estado custaria mais uma autenticação por ciclo para um dado que cabe no pedido que
-já existe. Rejeitar o lote com um estado inválido faria o remote pausar toda a entrega. Expor o estado no
-\texttt{/metrics} do central, com o host como \emph{label}, daria 1.000 hosts vezes seis séries numa ferramenta
-pensada para operar o central. Considerar parado um \emph{job} que falha confundiria duas coisas: um \emph{job}
-que falha está vivo e já tem métrica de falhas (\dec{4}).
+Uma chamada própria: mais uma autenticação por ciclo. Rejeitar o lote: o remote pausaria. No \texttt{/metrics}:
+seis séries por \emph{host}. Tratar como parado um \emph{job} que falha: está vivo e já tem métrica de falhas
+(\dec{4}).
 
 \paragraph{Trade-offs.}
-Mais uma escrita, de uma linha, por lote de estatísticas, na mesma transação: o número de instruções por lote
-continua fixo (\dec{5}). Um ciclo legítimo mais longo do que dois intervalos marca a instância como não pronta;
-é intencional, porque um ciclo assim atrasado é um problema real.
-
-\paragraph{Verificação.}
-\cen{MN1} e \cen{MN2} são provados por testes, descritos na secção~\ref{sec:mn}.
+Uma escrita de uma linha por lote, na mesma transação (instruções por lote fixas, \dec{5}). Um ciclo legítimo com
+mais de dois intervalos marca a instância como não pronta, de propósito. \textbf{Verificação:} \cen{MN1} e
+\cen{MN2} na secção~\ref{sec:mn}.
 
 \subsubsection{O remote retoma a entrega sem reinício (\dec{16}, ADR-0011)}
 \label{sec:d16}
 
 \paragraph{Problema.}
-O remote pausa a entrega quando o central responde com um código que não se resolve a tentar outra vez: chave
-inválida ou revogada, permissão negada, ou uma rejeição que não identifica nenhum registo (contrato violado).
-A pausa evita gastar a fila em pedidos inúteis, mas era definitiva: os dois ciclos de entrega terminavam e só
-um reinício do agente os voltava a pôr a correr. Uma chave corrigida no \texttt{.env}, ou um erro do central
-que durou minutos, deixava os dados parados até alguém reiniciar o agente (\cen{AV3}).
+O remote pausa a entrega perante respostas que não se resolvem a repetir (chave inválida ou revogada, permissão
+negada, contrato violado). A pausa era definitiva: só um reinício do agente a desfazia, mesmo depois de corrigida a
+chave ou passado o erro do central (\cen{AV3}).
 
 \paragraph{Decisão.}
-A pausa deixa de terminar os ciclos. Enquanto dura, o agente faz uma \emph{probe} a cada 5~minutos: um pedido
-com um só registo. A \emph{probe} é partilhada pelas duas categorias de dados, porque ambas usam a mesma chave:
-quem a reserva marca logo a seguinte, e a outra categoria dorme até lá. Se o central aceitar o registo, ou o
-validar e rejeitar (o que prova que autenticou e leu o lote), a entrega retoma no mesmo ciclo, com lotes
-completos. Qualquer outra resposta mantém a pausa até à \emph{probe} seguinte. O sinal \texttt{SIGHUP}, que
-antes terminava o agente, passa a reler a chave do \texttt{.env} e a antecipar a \emph{probe}; o resto da
-configuração continua a exigir reinício. O relógio do agente é injetável, para testar os 5~minutos sem esperar.
+Em pausa, o agente faz uma \emph{probe} a cada 5~minutos: um pedido com um só registo, partilhado pelas duas
+categorias de dados (usam a mesma chave). Se o central aceitar ou validar o registo (prova de que autenticou), a
+entrega retoma no mesmo ciclo; senão, a pausa mantém-se. O \texttt{SIGHUP}, que terminava o agente, passa a reler a
+chave e a antecipar a \emph{probe}. O relógio é injetável.
 
 \paragraph{Teoria.}
-Nas táticas de disponibilidade, \emph{Retry}, mas com cadência fixa e carga mínima, porque a causa provável não
-desaparece em segundos; e uma versão branda de \emph{Escalating Restart}: reinicia-se só a entrega, e só depois
-de uma prova de que a causa desapareceu. Mudar a chave com o agente a correr é \emph{Defer Binding}. A
-\emph{probe} de estatísticas leva o estado do \emph{buffer} com a pausa assinalada (\dec{17}): o central fica
-a saber que o host está parado.
+\emph{Retry} com cadência fixa e carga mínima; uma forma branda de \emph{Escalating Restart} (só a entrega, e só
+com prova de que a causa passou); \emph{Defer Binding} da chave. A \emph{probe} leva a pausa ao central (\dec{17}).
 
 \paragraph{O que ficou de fora, e porquê.}
-Recarregar toda a configuração no \texttt{SIGHUP}: o endereço do central e os intervalos estão em ligações e
-ciclos já criados, e reconstruí-los com o agente a correr é muito mais estado para casos que um reinício
-resolve bem. Só a chave muda sem reinício, que é o caso que motivou a decisão.
+Recarregar toda a configuração no \texttt{SIGHUP}: endereço e intervalos vivem em ligações e ciclos já criados,
+e um reinício resolve bem esses casos.
 
 \paragraph{Alternativas.}
-Tentar outra vez com o \emph{backoff} normal mandaria lotes completos de 100 registos a cada poucos segundos,
-todos recusados, multiplicados por 1.000 hosts. Reler o \texttt{.env} periodicamente leria o disco sem motivo e
-o operador não saberia quando a chave nova entra em vigor. Uma \emph{probe} com um pedido vazio não serve: o
-contrato rejeita lotes vazios antes de distinguir os outros casos.
+\emph{Backoff} normal: lotes de 100 recusados a cada poucos segundos, por 1\,000 \emph{hosts}. Reler o
+\texttt{.env} periodicamente: o operador não saberia quando entra a chave nova. \emph{Probe} vazia: o contrato
+rejeita lotes vazios antes de autenticar.
 
 \paragraph{Trade-offs.}
-Um host com a chave revogada faz 12 pedidos por hora, de um registo cada; com 1.000 hosts nessa situação, são
-3,3 pedidos por segundo, uma fração desprezável da ingestão. Para caber nos limites de complexidade, a função
-que entrega um lote foi partida em quatro; o lint do remote desceu de 24 para 21 \emph{issues}.
-
-\paragraph{Verificação.}
-\cen{AV3} é provado por um teste com o relógio injetado, descrito na secção~\ref{sec:av1-av4}.
+Um \emph{host} revogado faz 12 pedidos de um registo por hora (3,3/s com 1\,000 nessa situação). A entrega de um
+lote foi partida em quatro funções; lint do remote de 24 para 21. \textbf{Verificação:} \cen{AV3} na
+secção~\ref{sec:av1-av4}.
 
 \subsection{Segurança}
 
@@ -1088,91 +886,61 @@ que entrega um lote foi partida em quatro; o lint do remote desceu de 24 para 21
 \label{sec:d18}
 
 \paragraph{Problema.}
-Com os repositórios públicos, duas lacunas estavam identificadas desde a linha de base. A interface carregava o
-Tailwind de uma CDN em cada visita e nenhuma resposta tinha cabeçalhos de segurança: um XSS executaria sem
-obstáculo e qualquer página podia ser enquadrada noutro sítio (\cen{SE2}). E o \emph{endpoint} de saúde de um
-host, que o central visita a cada 30~s, aceitava \emph{loopback} e o endereço de metadados das \emph{clouds}, ou
-um nome que resolvesse para lá: um SSRF a partir do central (\cen{SE3}).
+A interface carregava o Tailwind de uma CDN e não havia cabeçalhos de segurança: um XSS executaria sem obstáculo e
+qualquer página podia ser enquadrada (\cen{SE2}). O \emph{endpoint} de saúde de um \emph{host} aceitava
+\emph{loopback}, metadados das \emph{clouds} ou um nome que resolvesse para lá: SSRF a partir do central (\cen{SE3}).
 
 \paragraph{Decisão.}
-Para não endurecer às cegas, usámos uma \emph{checklist} externa e completa como método: os 70 requisitos de
-nível 1 do OWASP ASVS 5.0.0, avaliados um a um, com evidência. A avaliação inicial deu 36 cumpridos, 25 que não se
-aplicam e 9 falhas. As decisões seguem dela: um \emph{middleware} põe em todas as respostas uma CSP que só aceita
-\emph{scripts} da própria origem e nenhum \emph{inline}, \texttt{X-Frame-Options}, \texttt{nosniff},
-\texttt{Referrer-Policy} e, com HTTPS, HSTS; a CSP fica em \emph{enforce} por omissão, com um modo que só reporta,
-e um \emph{endpoint} regista as violações enviadas pelo navegador. O Tailwind passa a ser servido pelo central, na
-mesma versão, verificado contra a integridade publicada no registo npm. As \emph{probes} ganham uma guarda no
-momento da ligação, sobre o endereço já resolvido, que recusa \emph{loopback}, \emph{link-local}, metadados e
-\emph{multicast}, e permite as redes privadas, onde os \emph{hosts} monitorizados normalmente estão. A
-\emph{checklist} levou ainda ao \emph{cookie} com o prefixo \texttt{\_\_Host-}, ao \texttt{Clear-Site-Data} no
-\emph{logout}, e à documentação das regras de autorização e dos prazos de correção de dependências.
+O método é uma \emph{checklist} externa: os 70 requisitos de nível 1 do OWASP ASVS 5.0.0~\cite{owaspasvs5},
+avaliados um a um, com evidência (36 cumpridos, 25 não aplicáveis, 9 falhas). Daí: um \emph{middleware} com CSP
+(\emph{scripts} só da própria origem, nenhum \emph{inline}), \texttt{X-Frame-Options}, \texttt{nosniff},
+\texttt{Referrer-Policy} e HSTS; CSP em \emph{enforce} por omissão, com modo de relatório e um \emph{endpoint} para
+as violações; o Tailwind servido pelo central, verificado contra a integridade do npm; uma guarda nas \emph{probes},
+no momento da ligação e sobre o endereço resolvido, que recusa \emph{loopback}, \emph{link-local}, metadados e
+\emph{multicast} e permite redes privadas; o \emph{cookie} \texttt{\_\_Host-}, o \texttt{Clear-Site-Data} no
+\emph{logout} e a documentação da autorização e dos prazos de correção de dependências.
 
 \paragraph{Teoria.}
-Nas táticas de segurança, \emph{Limit Exposure} (código de terceiros servido localmente; o que o central pode
-alcançar), \emph{Limit Access} (quem executa \emph{scripts} e quem enquadra as páginas) e \emph{Change Default
-Settings} (os navegadores permitem tudo isto por omissão). A \emph{checklist} é o método de análise: um padrão
-reconhecido em vez de uma lista feita por nós.
+\emph{Limit Exposure}, \emph{Limit Access} e \emph{Change Default Settings}; a \emph{checklist} é a análise por
+padrão reconhecido dos diapositivos~04.
 
 \paragraph{Alternativas.}
-Deixar a CSP só a reportar não bloquearia um XSS. Compilar o CSS do Tailwind permitiria tirar
-\texttt{'unsafe-inline'} dos estilos, mas introduziria um passo de \emph{build} numa interface que não tem
-nenhum. Manter a CDN com verificação de integridade não resolveria a dependência de terceiros em cada visita.
-Validar o URL só no formulário deixaria passar um nome que resolve para \emph{loopback}; bloquear todos os IPs
-privados tornaria o produto inútil em redes internas.
+CSP só a reportar: não bloqueia um XSS. Compilar o Tailwind: tiraria \texttt{'unsafe-inline'} dos estilos, à custa
+de um passo de \emph{build}. CDN com integridade: mantém a dependência de terceiros. Validar só o URL: deixa passar
+nomes que resolvem para \emph{loopback}; bloquear redes privadas: inútil em redes internas.
 
 \paragraph{Trade-offs.}
-A CSP aceita estilos \emph{inline}, porque o Tailwind gera o CSS no navegador: um atacante que injete HTML pode
-mudar estilos, não executar código; o gatilho é a interface ganhar um passo de \emph{build}. Três requisitos
-continuam a falhar, com o risco aceite: o bloqueio temporário do \emph{login} por quem insistir, a mudança de
-palavra-passe só pela implantação, e a falta de comparação com palavras-passe comuns. Há uma única conta, de
-operador; o gatilho é haver mais.
+Estilos \emph{inline} aceites (o Tailwind gera CSS no navegador): HTML injetado muda estilos, não executa código.
+Três requisitos falham com risco aceite (bloqueio temporário do \emph{login}, mudança de palavra-passe só pela
+implantação, sem comparação com palavras-passe comuns): há uma só conta, e o gatilho é haver mais.
 
 \paragraph{O que a verificação encontrou.}
-Ao percorrer a interface num navegador real para confirmar que a CSP não partia nada, o painel de métricas do
-\emph{dashboard} não carregava. A causa era antiga e não tinha a ver com a CSP: a opção provisória do seletor de
-hosts não tinha valor, o \emph{script} enviava o texto dela como identificador, e o primeiro pedido falhava sempre.
-Os testes de carga chamam a API diretamente e não o viam. Ficou corrigido, com teste.
-
-\paragraph{Verificação.}
-\cen{SE2} e \cen{SE3} estão na secção~\ref{sec:aval-se}.
+Ao confirmar num navegador real que a CSP não partia nada, o painel de métricas não carregava, por um defeito
+antigo: a opção provisória do seletor de \emph{hosts} não tinha valor, e o primeiro pedido falhava sempre. Os testes
+de carga chamam a API e não o viam. Corrigido, com teste. \textbf{Verificação:} \cen{SE2} e \cen{SE3} na
+secção~\ref{sec:aval-se}.
 
 \subsection{Processo e qualidade}
 \label{sec:processo}
 
-As três primeiras decisões não mudam o comportamento do sistema: criam as condições para que as outras se
-possam tomar, verificar e defender. Por isso foram as primeiras a ser feitas, antes de qualquer alteração ao
-código, e a \emph{baseline} (secção~\ref{sec:baseline}) foi medida logo a seguir.
+As três primeiras decisões não mudam o sistema: criam as condições para tomar, verificar e defender as outras.
+Foram feitas antes de qualquer alteração ao código, e a \emph{baseline} (secção~\ref{sec:baseline}) logo a seguir.
 
 \paragraph{Documentação da arquitetura (\dec{1}, ADR-0001 e ADR-0002).}
-O sistema não tinha documentação de arquitetura; sem ela, diz o slide~02, é impossível avaliá-la. A decisão foi
-documentar só o que dá retorno: uma vista de cada categoria de estruturas (capítulo~\ref{sec:sistema}), os
-cenários de qualidade (capítulo~\ref{sec:requisitos}) e um ADR por decisão, com a teoria, as alternativas e a
-verificação (anexo~\ref{anx:adrs}). Os ADR vivem no repositório \texttt{monitor-platform}, ao lado do CI
-partilhado, dos testes de carga e ponta a ponta e deste relatório, porque dizem respeito ao sistema inteiro e não
-a um repositório (ADR-0002). As decisões que já estavam no código foram registadas como ADR retroativos (0018 a
-0023), para que o porquê de cada uma também fique escrito. A alternativa rejeitada foi o UML completo: mais
-custo do que retorno para uma equipa de duas pessoas (secção~\ref{sec:documentacao}).
+Sem documentação de arquitetura é impossível avaliá-la (diapositivos~02). Documentou-se só o que dá retorno: uma
+vista por categoria de estruturas (capítulo~\ref{sec:sistema}), os cenários (capítulo~\ref{sec:requisitos}) e um
+ADR por decisão (anexo~\ref{anx:adrs}), incluindo retroativos para o que já estava no código (0018 a 0023). Os ADR
+vivem no \texttt{monitor-platform}, porque dizem respeito ao sistema inteiro (ADR-0002). Rejeitado: UML completo,
+mais custo do que retorno (secção~\ref{sec:documentacao}).
 
 \paragraph{Métricas e ferramentas de qualidade (\dec{2}).}
-As métricas, os limites e as ferramentas são os do capítulo~\ref{sec:metricas}, escolhidos por GQM: o
-\texttt{golangci-lint} com uma configuração única para todos os repositórios, incluindo as regras de camadas do
-\texttt{depguard}; o SonarQube Cloud, com um \emph{quality gate} no código novo; o \texttt{govulncheck} e o
-Dependabot; e a cobertura dos testes unitários e de integração. A regra foi medir antes de mudar: a
-\emph{baseline} foi gravada em \texttt{docs/metrics/baseline/} antes da primeira alteração, e cada iteração foi
-medida da mesma forma, com o mesmo \emph{script} (\texttt{scripts/medir.py}). Táticas: \emph{Restrict
-Dependencies}, que passou de convenção a regra verificada, e a testabilidade.
+As métricas e as ferramentas do capítulo~\ref{sec:metricas}, escolhidas por GQM. Regra: medir antes de mudar, e
+cada iteração da mesma forma (\texttt{scripts/medir.py}). \emph{Restrict Dependencies} passou de convenção a regra
+verificada.
 
 \paragraph{Integração contínua (\dec{3}).}
-Os testes de integração do central estiveram partidos sem que ninguém desse por isso (lacuna M1). Os cinco
-repositórios de código passaram a correr o mesmo \emph{pipeline}, definido uma só vez como \emph{workflow} reutilizável
-no \texttt{monitor-platform} (secção~\ref{sec:pipeline}): formatação, lint, testes com \texttt{-race},
-integração com PostgreSQL, vulnerabilidades e SonarQube Cloud. O \texttt{main} só recebe alterações por
-\emph{pull request} com o CI verde, também para os administradores. Os testes de carga e o E2E são lentos e
-correm à parte: o E2E todas as noites, e a carga localmente, com os limites de recursos
-(secção~\ref{sec:metodo}). A teoria é a do slide~03: uma falta presente deve fazer falhar os testes o mais
-cedo possível. A verificação é \cen{TE1} (secção~\ref{sec:mo1}).
-
-\paragraph{\emph{Trade-offs}.}
-O CI acrescenta cerca de dois minutos a cada \emph{pull request} e liga o processo ao GitHub e ao SonarQube Cloud
-(secção~\ref{sec:pipeline}). Com duas pessoas, o \texttt{main} protegido não exige uma aprovação: uma revisão
-obrigatória bloquearia o trabalho sempre que uma das duas estivesse ausente.
+Os testes de integração do central estiveram partidos sem ninguém saber (M1). Os cinco repositórios de código
+correm o mesmo \emph{pipeline} reutilizável, e o \texttt{main} só aceita PR com ele verde
+(secção~\ref{sec:pipeline}); carga e E2E, lentos, correm à parte. Teoria: uma falta presente deve fazer falhar os
+testes o mais cedo possível (diapositivos~03). Custo: cerca de dois minutos por PR e dependência do GitHub e do
+SonarQube Cloud. Verificação: \cen{TE1} (secção~\ref{sec:mo1}).

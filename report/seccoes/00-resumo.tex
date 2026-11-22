@@ -10,7 +10,7 @@ reprodutíveis.
 
 As medições mudaram o desenho. A \emph{baseline} mostrou que, depois de uma hora de indisponibilidade do
 central, o \emph{dashboard} ficava inutilizável (p95 de pelo menos 10~s); com escritas em lote e controlo de
-admissão, o p95 desceu para 145~ms e o \emph{backlog} de 441\,000 registos passou a ser absorvido em 42~s, sem
+admissão, o p95 desceu para menos de 170~ms e o \emph{backlog} de 441\,000 registos passou a ser absorvido em 42 a 44~s, sem
 perdas nem duplicados. Com 30 dias de dados, o \emph{dashboard} chegava a 74~s no p95 e parava a ingestão;
 a causa eram consultas sem limite, e não o volume, e a correção (consultas de custo limitado e um
 \emph{bulkhead}) dispensou o particionamento que o plano previa. A medição refutou também o risco de vizinhos

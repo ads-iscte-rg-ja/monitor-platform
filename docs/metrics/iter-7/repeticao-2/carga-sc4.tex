@@ -1,0 +1,25 @@
+\begin{table}[htbp]
+  \centering\small
+  \caption{Cenário SC4: \emph{dashboard} e retenção com 30 dias de dados (iter-7/repeticao-2)}
+  \label{tab:carga-sc4}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}Xlrr}
+    \toprule
+    Medida & Alvo & \makecell[r]{com ret. (1.ª)} & \makecell[r]{com ret. (2.ª)} \\
+    \midrule
+    p95: Resumo (\texttt{/summary}) & $<$ 1 s & 31 ms & 32 ms \\
+    p95: Página do \emph{dashboard} & $<$ 1 s & 28 ms & 28 ms \\
+    p95: Métricas de 24 h & $<$ 1 s & 166 ms & 27 ms \\
+    p95: Métricas de 1 mês & $<$ 1 s & 652 ms & 217 ms \\
+    p95: Erros (\texttt{/errors}) & $<$ 1 s & 16 ms & 17 ms \\
+    p95: Erros de um \emph{host} & $<$ 1 s & 29 ms & 28 ms \\
+    p95: \emph{Hosts} (\texttt{/hosts}) & $<$ 1 s & 64 ms & 65 ms \\
+    p95 da ingestão (agente) & $<$ 300 ms & 7 ms & 5 ms \\
+    Rejeições por sobrecarga & --- & 0\,\% & 0\,\% \\
+    Registos confirmados em 10 min & --- & 73\,210 & 73\,230 \\
+    Retenção: duração média / p95 & --- & 0,3 s / 0,8 s & 0,2 s / 0,5 s \\
+    Expirados: variação por hora & $\le$ 0 & $-$734\,166 & $-$726\,790 \\
+    Lotes perdidos / duplicados & 0 / 0 & 0 / 0 & 0 / 0 \\
+    \bottomrule
+  \end{tabularx}
+  \par\smallskip\footnotesize 31 dias de histórico de 1\,000 \emph{hosts} (89 M estatísticas, 239 M erros) e a carga nominal durante 10 min, com uma consulta do \emph{dashboard} por segundo, à vez pelas sete. Com retenção: 30 dias, a cada minuto, lotes de 10\,000. Ambiente: cpu: AMD Ryzen 7 3700X 8-Core Processor (16 threads), memória: 31 GB
+\end{table}

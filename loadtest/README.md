@@ -7,6 +7,7 @@ Cenários k6 que simulam 1.000 remotes contra a ingestão gRPC do central (plano
 loadtest/correr.sh iter-3                      # medição completa (~1 h)
 HOSTS=50 DURACAO=1m DURACAO_RECUPERACAO=2m loadtest/correr.sh ensaio nominal   # ensaio rápido
 loadtest/tabelas.py iter-5 --antes iter-3      # tabelas antes/depois
+loadtest/tabelas.py iter-7 --repeticoes iter-7/repeticao-2,iter-7/repeticao-3   # mínimo–máximo de 3 execuções
 ```
 
 Os resultados ficam em `docs/metrics/<iteração>/carga/` (um JSON por medição e `ambiente.txt`) e as
